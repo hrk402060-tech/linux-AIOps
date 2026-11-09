@@ -30,7 +30,7 @@ backend() {
     -e PYTHONPATH=/app:/test-deps \
     -e CREDENTIAL_MASTER_KEY="$(openssl rand -base64 32)" \
     -e API_ADMIN_TOKEN="$(openssl rand -hex 32)" \
-    -w /app linux-vuln-sentinel-backend "$@"
+    -w /app linux-aiops-platform-backend "$@"
 }
 
 frontend() {
@@ -98,7 +98,7 @@ case "$mode" in
       -e CREDENTIAL_MASTER_KEY="$(openssl rand -base64 32)" \
       -e API_ADMIN_TOKEN="$(openssl rand -hex 32)" \
       -e DATABASE_URL="postgresql+psycopg://trust:$password@trust-postgres/trust" \
-      linux-vuln-sentinel-backend /verification/verify_data_trust_migration.py
+      linux-aiops-platform-backend /verification/verify_data_trust_migration.py
     ;;
   *)
     printf 'Unsupported verification mode\n' >&2

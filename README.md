@@ -86,4 +86,4 @@ Copy `backend/.env.example` to a server-side environment configuration before st
 
 ## Docker Deployment
 
-The current stage runs as a three-service Compose stack: React/Nginx, FastAPI, and PostgreSQL. See [docs/deployment.md](docs/deployment.md) for Docker Compose startup, backup, and Linux deployment instructions.
+The current stage runs as a three-service Compose stack named `linux-aiops-platform`: React/Nginx, FastAPI, and PostgreSQL. See [docs/deployment.md](docs/deployment.md) for Docker Compose startup, backup, and Linux deployment instructions.

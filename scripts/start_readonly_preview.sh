@@ -48,10 +48,10 @@ common=(--user 0 --read-only --cap-drop=ALL --security-opt=no-new-privileges
     -e ALLOWED_ORIGINS=http://192.168.10.17:8089 -e PYTHONDONTWRITEBYTECODE=1)
 docker run --rm "${common[@]}" -v linux_ops_readonly_test_python:/testdeps:ro \
     -e PYTHONPATH=/testdeps:/app -e "PREVIEW_PASSWORD=$password" \
-    --entrypoint python linux-vuln-sentinel-backend /scripts/preview_readonly_workflow.py
+    --entrypoint python linux-aiops-platform-backend /scripts/preview_readonly_workflow.py
 
 docker run -d --name linux-ops-readonly-preview-api "${common[@]}" \
-    --network-alias backend --entrypoint python linux-vuln-sentinel-backend \
+    --network-alias backend --entrypoint python linux-aiops-platform-backend \
     -m uvicorn src.main:app --host 0.0.0.0 --port 8000 >/dev/null
 for attempt in {1..20}; do
     if docker exec linux-ops-readonly-preview-api python -c \
@@ -70,7 +70,7 @@ docker create --name linux-ops-readonly-preview-web --network "$edge_network" \
     --publish 192.168.10.17:8089:80 \
     -v "$workspace/frontend/dist:/usr/share/nginx/html:ro" \
     -v "$workspace/frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro" \
-    linux-vuln-sentinel-frontend >/dev/null
+    linux-aiops-platform-frontend >/dev/null
 docker network connect "$network" linux-ops-readonly-preview-web
 docker start linux-ops-readonly-preview-web >/dev/null
 printf 'Preview: http://192.168.10.17:8089/\nUser: preview-admin\nPassword: %s\n' "$password"

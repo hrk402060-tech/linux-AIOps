@@ -47,4 +47,4 @@ docker run --rm --pull never --network none --read-only \
     -v "${ALERT_SIMULATION_TEST_DEPS:-linux_ops_readonly_test_python}:/test-deps:ro" \
     -v "$root:/workspace:ro" -w /workspace/backend \
     --entrypoint "${command[0]}" \
-    "${ALERT_SIMULATION_IMAGE:-linux-vuln-sentinel-backend:latest}" "${command[@]:1}"
+    "${ALERT_SIMULATION_IMAGE:-linux-aiops-platform-backend:latest}" "${command[@]:1}"

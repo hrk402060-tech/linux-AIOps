@@ -25,7 +25,7 @@ if ! timeout 150s docker run --rm --name "$name-backend" --network none --read-o
   --workdir /app -e PYTHONPATH=/deps:/app -e PYTHONDONTWRITEBYTECODE=1 \
   -e "MYSQL_SKIP_TESTS=${MYSQL_SKIP_TESTS:-0}" \
   -e "MYSQL_TEST_TARGETS=${MYSQL_TEST_TARGETS:-tests/test_mysql_grants.py tests/test_mysql_diagnostics.py tests/test_mysql_transport.py tests/test_mysql_tls.py tests/test_diagnostic_grants.py tests/test_readonly_diagnostics_policy.py}" \
-  --entrypoint sh linux-vuln-sentinel-backend -c '
+  --entrypoint sh linux-aiops-platform-backend -c '
     if [ "$MYSQL_SKIP_TESTS" != 1 ]; then
       python -m pytest -q -p no:cacheprovider $MYSQL_TEST_TARGETS || exit $?
     fi

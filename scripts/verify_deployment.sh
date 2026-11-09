@@ -60,7 +60,7 @@ trap 'rm -f "$response_file" "$asset_response_file" "$knowledge_response_file" "
 
 for _ in $(seq 1 30); do
     health=$(docker inspect --format '{{.State.Health.Status}}' \
-        linux-vuln-sentinel-frontend-1 2>/dev/null || true)
+        linux-aiops-platform-frontend-1 2>/dev/null || true)
     if [[ "$health" == "healthy" ]]; then
         break
     fi

@@ -1,4 +1,4 @@
-name: linux-vuln-sentinel
+name: linux-aiops-platform
 
 services:
   postgres:
@@ -93,3 +93,5 @@ networks:
 
 volumes:
   postgres_data:
+    # Preserve the existing production database volume while the Compose project is renamed.
+    name: linux-vuln-sentinel_postgres_data
