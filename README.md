@@ -74,7 +74,7 @@ Run the project structure check:
 python -m unittest discover -s tests -v
 ```
 
-Copy `backend/.env.example` to a server-side environment configuration before starting the API. Generate independent secrets for the credential master key, initial administrator password, and break-glass token. Never commit these values.
+For Docker Compose deployment, copy `deploy/.env.example` to the server as `deploy/.env` before starting the stack. Generate independent secrets for the credential master key, initial administrator password, and break-glass token. Never commit these values. The `uv` and `pnpm` commands above are for development validation; they are not required as separate host commands when Docker builds the services.
 
 ## Target Environment
 
