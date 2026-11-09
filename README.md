@@ -47,38 +47,10 @@ docs/       Product and architecture documentation
 config/     Non-secret configuration templates
 ```
 
-## Development
-
-Development, builds, and tests use the repository toolchain. Python packages use the trusted Aliyun mirror through `uv.toml`; frontend packages use npmmirror through `frontend/.npmrc`.
-
-Install and test the backend:
-
-```bash
-uv sync --group dev --link-mode copy
-.venv/bin/ruff check backend/src backend/tests backend/migrations
-cd backend && ../.venv/bin/pytest -q
-```
-
-Install, test, and build the frontend:
-
-```bash
-cd frontend
-pnpm install --frozen-lockfile
-pnpm test
-pnpm run build
-```
-
-Run the project structure check:
-
-```bash
-python -m unittest discover -s tests -v
-```
-
-For Docker Compose deployment, copy `deploy/.env.example` to the server as `deploy/.env` before starting the stack. Generate independent secrets for the credential master key, initial administrator password, and break-glass token. Never commit these values. The `uv` and `pnpm` commands above are for development validation; they are not required as separate host commands when Docker builds the services.
-
-## Target Environment
+## 运行环境
 
 - Linux servers
+- Docker Engine and Docker Compose v2
 - UTF-8 files with LF line endings
 - Python 3.12 backend and scanner
 - React 18 with TypeScript and Ant Design
