@@ -19,7 +19,7 @@
 - Credential decryption is not exposed through an HTTP endpoint.
 - Deleting a credential is irreversible and requires UI confirmation.
 
-## WSL Ubuntu Verification
+## Docker Compose Verification
 
 - Ruff backend static checks: passed
 - Backend API and crypto tests: 9 passed

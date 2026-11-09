@@ -116,7 +116,7 @@ The alert must be manually marked in progress/resolved/closed and its asset enab
 
 ## Current Diagnostic Queue Contract
 
-Current development and acceptance run only in isolated Docker on `192.168.10.17`; this supersedes older local/WSL examples below. Development does not authorize publication or changes to production `.env`, Compose, Nginx, credentials or historical records.
+Current development and acceptance run only in the isolated Docker Compose stack on the Linux deployment host `192.168.10.17`. Development does not authorize publication or changes to production `.env`, Compose, Nginx, credentials or historical records.
 
 The backend defaults to two diagnostic workers, using database-shared slots and a 500-active-job admission limit. Migration `20261009_31` seeds exactly one admission row and two slots. Apply it before starting the candidate backend. `DIAGNOSTIC_WORKERS_ENABLED=false` is reserved for isolated tests/synthetic UI previews; normal operation defaults to true and needs no production Compose change.
 
@@ -130,7 +130,7 @@ The UI requires the exact Chinese phrase `提交只读诊断` or `取消只读�
 
 History: GET `/api/v1/alerts/{alert_id}/diagnostic-jobs?offset=0&limit=20`; attempts: GET `/api/v1/alerts/{alert_id}/analyses?job_id={job_id}&offset=0&limit=50`. Limits are capped at100. Job tokens and leases are never returned to the browser. Ninety-second expired claims seal only their own running attempt and enqueue its result once; retryable failures use 10/30-second backoff, three total attempts. Partial, authorization, key, host-policy and malformed-protocol outcomes do not automatically rerun. Notifications still need independently configured SMTP/recipients; an outbox record does not mean delivery.
 
-The supported development, build, test, and deployment-test environment is WSL Ubuntu 22.04. The same Compose stack can be moved to a Linux server with Docker Engine and Docker Compose.
+The supported development, build, test, and deployment-test environment is a Linux host with Docker Engine and Docker Compose. The same Compose files are the deployment contract for every environment.
 
 ## Services
 
@@ -159,7 +159,7 @@ docker compose --env-file deploy/.env ps
 ```
 
 Open `http://localhost:8080` unless `APP_PORT` was changed.
-Run the repeatable WSL deployment verification after the containers become healthy:
+Run the repeatable Docker Compose deployment verification after the containers become healthy:
 
 ```bash
 bash scripts/verify_deployment.sh
@@ -171,7 +171,7 @@ Normal console access uses usernames and passwords. Passwords are stored only as
 
 `API_ADMIN_TOKEN` remains a separate high-entropy break-glass secret for deployment verification and emergency recovery. Do not enter it in the browser or share it with normal users.
 
-For an Internet or production-network deployment, terminate TLS before Nginx, set `AUTH_COOKIE_SECURE=true`, and set `ALLOWED_ORIGINS` to the exact HTTPS console origin. Plain HTTP is limited to local WSL acceptance. The login endpoint is rate-limited by Nginx and repeated password failures lock the account temporarily.
+For an Internet or production-network deployment, terminate TLS before Nginx, set `AUTH_COOKIE_SECURE=true`, and set `ALLOWED_ORIGINS` to the exact HTTPS console origin. Plain HTTP is limited to local or isolated Compose acceptance. The login endpoint is rate-limited by Nginx and repeated password failures lock the account temporarily.
 
 The included production override terminates TLS inside the frontend container. Set `ALLOWED_ORIGINS=https://sentinel.example.com`, `TLS_CERT_PATH`, and `TLS_KEY_PATH` to protected host files, then run:
 

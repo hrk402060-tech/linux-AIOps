@@ -1,7 +1,6 @@
 .git
 .idea
 .venv
-.venv-wsl
 .uv-cache
 .pytest_cache
 .ruff_cache

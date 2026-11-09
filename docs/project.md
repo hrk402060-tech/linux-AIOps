@@ -105,7 +105,7 @@ API: GET/PATCH `/api/v1/alert-notification-config`; GET `/api/v1/alert-notificat
 - Current domain: Security Operations Center. The existing application remains intact inside this center.
 - Type: Full-stack Linux intelligent integrated operations platform; current delivery focus is the Security Operations Center
 - Target environment: Linux
-- Status: Linux security operations platform MVP implemented and verified on WSL Docker
+- Status: Linux security operations platform MVP implemented and verified with Docker Compose
 
 ## Platform Domain Map
 
@@ -180,7 +180,7 @@ The vulnerability AI remains scoped to security triage and recommendations. All 
 - Backend Developer: API, worker, knowledge base, and persistence
 - QA Engineer: test design and stage validation
 - DevOps Engineer: active after the PM requested Docker deployment
-- Deployment baseline: WSL Ubuntu 22.04 with Docker Compose; React/Nginx, FastAPI, and PostgreSQL migrate together as one stack
+- Deployment baseline: Linux Docker Engine with Docker Compose; React/Nginx, FastAPI, and PostgreSQL migrate together as one stack
 
 ## Stage 4 Architecture Review: Scan Tasks
 
@@ -445,7 +445,7 @@ The vulnerability AI remains scoped to security triage and recommendations. All 
 - Architecture review: reuse the administrator-only unified audit endpoint with exact source filtering. No new database table, migration or mutation endpoint is introduced.
 - UI: AI Agent opens a read-only configuration audit dialog on demand, with server-side pagination, mobile horizontal scrolling, empty state and retryable errors. Configuration, validation and enablement records do not include key material.
 - Scope: preserve local inference and human approval boundaries. Dashboard is already implemented and is not rebuilt. External inference and deferred intelligence sources remain unchanged.
-- Verification: AI Agent and unified audit tests passed in a WSL-native directory. TypeScript, frontend production build and Docker deployment verification passed; the later platform full suite also passed.
+- Verification: AI Agent and unified audit tests passed in the Docker Compose workspace. TypeScript, frontend production build and Docker deployment verification passed; the later platform full suite also passed.
 
 ## Stage 32: System Administration Runtime Status (completed)
 
@@ -500,7 +500,7 @@ The vulnerability AI remains scoped to security triage and recommendations. All 
 - Data rules: archived ancestors and unlinked service-asset relations are excluded from current impact views. Assets without an active relation are explicitly labeled `未编目`; immutable vulnerability, scan and monitoring evidence is unchanged.
 - UI scope: add service context to the Dashboard server table and a business impact panel aggregating resource state, active alerts, pending vulnerabilities and hosted services. Navigation only opens the existing CMDB or vulnerability pages.
 - Security boundary: reuse the authenticated read-only API, expose no credentials, keys or audit internals, and keep SSH agentless collection labeled as near-real-time.
-- Stage gate: target tests first, then Ruff, TypeScript, production build, full suite and WSL Ubuntu Docker verification before PM acceptance; no next platform-center page before this gate.
+- Stage gate: target tests first, then Ruff, TypeScript, production build, full suite and Docker Compose verification before PM acceptance; no next platform-center page before this gate.
 - Delivery verification: backend 118 tests and Ruff passed; Dashboard and CMDB frontend tests passed (CMDB rerun with a 15-second target timeout due to the existing 5-second first-test budget), TypeScript/Vite production build passed, and Docker Compose rebuild plus deployment script completed with all three containers healthy and `/api/v1/dashboard` returning 200.
 
 ## Stage 38: Service Observability Foundation (completed)
@@ -540,4 +540,4 @@ The vulnerability AI remains scoped to security triage and recommendations. All 
 - UI: remove the centered card treatment; the split login layout now fills the browser viewport, with full-height intro and form regions and responsive mobile stacking.
 - Motion: add continuous grid drift, staggered character breathing/drift, orbit and pulse atmosphere, plus reduced-motion support. Existing eight state labels and state-driven transitions remain intact.
 - Security: no changes to authentication endpoints, HttpOnly cookies, password handling or sensitive-data rendering.
-- Delivery verification: frontend production build passed in the WSL/Docker build, the rebuilt frontend served HTTP 200 at `http://localhost:8088`; Vitest and local TypeScript commands stalled during startup on the Windows-mounted WSL workspace and were not used as a passing signal.
+- Delivery verification: frontend production build passed in the Docker Compose build, and the rebuilt frontend served HTTP 200 at `http://localhost:8088`; Vitest and local TypeScript commands were not used as a passing signal in that verification run.

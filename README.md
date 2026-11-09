@@ -4,7 +4,7 @@ This repository is the Linux Intelligent Integrated Operations Platform. Its cur
 
 ## Status
 
-The approved Linux platform MVP is implemented on the WSL Ubuntu Docker Compose baseline. The current production authentication revision is `20260915_21`.
+The approved Linux platform MVP is implemented as a Docker Compose stack on a Linux host. The current production authentication revision is `20260915_21`.
 
 ## Product Scope
 
@@ -49,14 +49,14 @@ config/     Non-secret configuration templates
 
 ## Development
 
-Development, builds, and tests run in WSL Ubuntu. Python packages use the trusted Aliyun mirror through `uv.toml`; frontend packages use npmmirror through `frontend/.npmrc`.
+Development, builds, and tests use the repository toolchain. Python packages use the trusted Aliyun mirror through `uv.toml`; frontend packages use npmmirror through `frontend/.npmrc`.
 
 Install and test the backend:
 
 ```bash
-UV_PROJECT_ENVIRONMENT=.venv-wsl uv sync --group dev --link-mode copy
-.venv-wsl/bin/ruff check backend/src backend/tests backend/migrations
-cd backend && ../.venv-wsl/bin/pytest -q
+uv sync --group dev --link-mode copy
+.venv/bin/ruff check backend/src backend/tests backend/migrations
+cd backend && ../.venv/bin/pytest -q
 ```
 
 Install, test, and build the frontend:
@@ -86,4 +86,4 @@ Copy `backend/.env.example` to a server-side environment configuration before st
 
 ## Docker Deployment
 
-The current stage runs as a three-service Compose stack: React/Nginx, FastAPI, and PostgreSQL. See [docs/deployment.md](docs/deployment.md) for WSL startup, backup, and Linux migration instructions.
+The current stage runs as a three-service Compose stack: React/Nginx, FastAPI, and PostgreSQL. See [docs/deployment.md](docs/deployment.md) for Docker Compose startup, backup, and Linux deployment instructions.

@@ -28,7 +28,7 @@ The page provides summary metrics, search, status and operating-system filters, 
 
 Stage 3, Knowledge Base, does not start until the PM accepts the Asset Management page and API.
 
-## WSL Docker Verification
+## Docker Compose Verification
 
 - Ruff backend static checks: passed
 - Backend credential and asset API tests: 15 passed

@@ -80,7 +80,7 @@ auth_password="Verifier-$(openssl rand -hex 16)"
 curl --silent --show-error --output "$auth_users_file" --max-time 5 \
     --header "Authorization: Bearer $API_ADMIN_TOKEN" \
     "$base_url/api/v1/auth/users"
-auth_user_id=$(.venv-wsl/bin/python -c \
+auth_user_id=$(python3 -c \
     'import json,sys; print(next((x["id"] for x in json.load(open(sys.argv[1])) if x["username"] == "deployment-auth-verifier"), ""))' \
     "$auth_users_file")
 if [[ -z "$auth_user_id" ]]; then
@@ -92,7 +92,7 @@ if [[ -z "$auth_user_id" ]]; then
         --header "Authorization: Bearer $API_ADMIN_TOKEN" \
         --header 'Content-Type: application/json' \
         --data-binary "$auth_create_payload" "$base_url/api/v1/auth/users")
-    auth_user_id=$(.venv-wsl/bin/python -c \
+    auth_user_id=$(python3 -c \
         'import json,sys; print(json.load(open(sys.argv[1]))["id"])' "$auth_user_file")
 else
     auth_create_status=200
@@ -130,7 +130,7 @@ authorized_status=$(curl --silent --show-error --output "$response_file" \
     --header "Authorization: Bearer $API_ADMIN_TOKEN" \
     --header 'Content-Type: application/json' \
     --data-binary "$payload" "$base_url/api/v1/credentials")
-credential_id=$(.venv-wsl/bin/python -c 'import json,sys; print(json.load(open(sys.argv[1]))["id"])' "$response_file")
+credential_id=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["id"])' "$response_file")
 asset_payload=$(printf \
     '{"name":"asset-integration-%s","host":"127.0.0.1","ssh_port":22,"os_family":"openeuler","environment":"test","group_name":"deployment","credential_id":"%s","labels":["integration"]}' \
     "$(date +%s)" "$credential_id")
@@ -139,7 +139,7 @@ asset_status=$(curl --silent --show-error --output "$asset_response_file" \
     --header "Authorization: Bearer $API_ADMIN_TOKEN" \
     --header 'Content-Type: application/json' \
     --data-binary "$asset_payload" "$base_url/api/v1/assets")
-asset_id=$(.venv-wsl/bin/python -c 'import json,sys; print(json.load(open(sys.argv[1]))["id"])' "$asset_response_file")
+asset_id=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["id"])' "$asset_response_file")
 cmdb_marker="DEPLOY$(date +%s)"
 cmdb_trace_id="deployment-cmdb-$cmdb_marker"
 cmdb_business_status=$(curl --silent --show-error --output "$cmdb_business_file" \
@@ -148,21 +148,21 @@ cmdb_business_status=$(curl --silent --show-error --output "$cmdb_business_file"
     --header "X-Request-ID: $cmdb_trace_id" --header 'Content-Type: application/json' \
     --data-binary "{\"code\":\"$cmdb_marker\",\"name\":\"Deployment CMDB $cmdb_marker\"}" \
     "$base_url/api/v1/cmdb/businesses")
-cmdb_business_id=$(.venv-wsl/bin/python -c 'import json,sys; print(json.load(open(sys.argv[1]))["id"])' "$cmdb_business_file")
+cmdb_business_id=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["id"])' "$cmdb_business_file")
 cmdb_application_status=$(curl --silent --show-error --output "$cmdb_application_file" \
     --write-out '%{http_code}' --max-time 5 \
     --header "Authorization: Bearer $API_ADMIN_TOKEN" \
     --header "X-Request-ID: $cmdb_trace_id" --header 'Content-Type: application/json' \
     --data-binary "{\"business_id\":\"$cmdb_business_id\",\"code\":\"APP\",\"name\":\"Deployment Application\"}" \
     "$base_url/api/v1/cmdb/applications")
-cmdb_application_id=$(.venv-wsl/bin/python -c 'import json,sys; print(json.load(open(sys.argv[1]))["id"])' "$cmdb_application_file")
+cmdb_application_id=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["id"])' "$cmdb_application_file")
 cmdb_service_status=$(curl --silent --show-error --output "$cmdb_service_file" \
     --write-out '%{http_code}' --max-time 5 \
     --header "Authorization: Bearer $API_ADMIN_TOKEN" \
     --header "X-Request-ID: $cmdb_trace_id" --header 'Content-Type: application/json' \
     --data-binary "{\"application_id\":\"$cmdb_application_id\",\"code\":\"API-SVC\",\"name\":\"Deployment Service\",\"service_type\":\"api\"}" \
     "$base_url/api/v1/cmdb/services")
-cmdb_service_id=$(.venv-wsl/bin/python -c 'import json,sys; print(json.load(open(sys.argv[1]))["id"])' "$cmdb_service_file")
+cmdb_service_id=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["id"])' "$cmdb_service_file")
 cmdb_api_status=$(curl --silent --show-error --output "$cmdb_api_file" \
     --write-out '%{http_code}' --max-time 5 \
     --header "Authorization: Bearer $API_ADMIN_TOKEN" \
@@ -189,7 +189,7 @@ incident_status=$(curl --silent --show-error --output "$incident_file" \
     --header 'Content-Type: application/json' \
     --data-binary "{\"title\":\"Deployment incident\",\"description\":\"Verify immutable incident closure\",\"severity\":\"medium\",\"asset_id\":\"$asset_id\"}" \
     "$base_url/api/v1/incidents")
-incident_id=$(.venv-wsl/bin/python -c 'import json,sys; print(json.load(open(sys.argv[1]))["id"])' "$incident_file")
+incident_id=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["id"])' "$incident_file")
 for incident_state in acknowledged in_progress resolved closed; do
     incident_transition_status=$(curl --silent --show-error --output /dev/null \
         --write-out '%{http_code}' --max-time 5 --request PATCH \
@@ -219,7 +219,7 @@ schedule_status=$(curl --silent --show-error --output "$schedule_response_file" 
     --header "Authorization: Bearer $API_ADMIN_TOKEN" \
     --header 'Content-Type: application/json' \
     --data-binary "$schedule_payload" "$base_url/api/v1/scan-schedules")
-schedule_id=$(.venv-wsl/bin/python -c 'import json,sys; print(json.load(open(sys.argv[1]))["id"])' "$schedule_response_file")
+schedule_id=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["id"])' "$schedule_response_file")
 schedule_toggle_status=$(curl --silent --show-error --output "$schedule_toggle_file" \
     --write-out '%{http_code}' --max-time 5 \
     --header "Authorization: Bearer $API_ADMIN_TOKEN" \
@@ -234,7 +234,7 @@ baseline_status=$(curl --silent --show-error --output "$baseline_response_file" 
     --header "Authorization: Bearer $API_ADMIN_TOKEN" \
     --header 'Content-Type: application/json' \
     --data-binary "$baseline_payload" "$base_url/api/v1/baselines")
-baseline_id=$(.venv-wsl/bin/python -c 'import json,sys; print(json.load(open(sys.argv[1]))["id"])' "$baseline_response_file")
+baseline_id=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["id"])' "$baseline_response_file")
 baseline_cancel_status=$(curl --silent --show-error --output "$baseline_cancel_file" \
     --write-out '%{http_code}' --max-time 5 \
     --header "Authorization: Bearer $API_ADMIN_TOKEN" --request POST \
@@ -247,7 +247,7 @@ exposure_status=$(curl --silent --show-error --output "$exposure_response_file" 
     --header "Authorization: Bearer $API_ADMIN_TOKEN" \
     --header 'Content-Type: application/json' \
     --data-binary "$exposure_payload" "$base_url/api/v1/exposures")
-exposure_id=$(.venv-wsl/bin/python -c 'import json,sys; print(json.load(open(sys.argv[1]))["id"])' "$exposure_response_file")
+exposure_id=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["id"])' "$exposure_response_file")
 exposure_cancel_status=$(curl --silent --show-error --output "$exposure_cancel_file" \
     --write-out '%{http_code}' --max-time 5 \
     --header "Authorization: Bearer $API_ADMIN_TOKEN" --request POST \
@@ -260,7 +260,7 @@ credential_risk_status=$(curl --silent --show-error --output "$credential_risk_r
     --header "Authorization: Bearer $API_ADMIN_TOKEN" \
     --header 'Content-Type: application/json' \
     --data-binary "$credential_risk_payload" "$base_url/api/v1/credential-risks")
-credential_risk_id=$(.venv-wsl/bin/python -c 'import json,sys; print(json.load(open(sys.argv[1]))["id"])' "$credential_risk_response_file")
+credential_risk_id=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["id"])' "$credential_risk_response_file")
 credential_risk_cancel_status=$(curl --silent --show-error --output "$credential_risk_cancel_file" \
     --write-out '%{http_code}' --max-time 5 \
     --header "Authorization: Bearer $API_ADMIN_TOKEN" --request POST \
@@ -327,7 +327,7 @@ terminal_sessions_status=$(curl --silent --show-error --output "$terminal_sessio
     --write-out '%{http_code}' --max-time 5 \
     --header "Authorization: Bearer $API_ADMIN_TOKEN" \
     "$base_url/api/v1/terminal/sessions")
-terminal_session_id=$(.venv-wsl/bin/python -c 'import json,sys; print(json.load(open(sys.argv[1]))["session_id"])' "$terminal_ticket_file")
+terminal_session_id=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["session_id"])' "$terminal_ticket_file")
 terminal_assistant_payload=$(printf \
     '{"session_id":"%s","mode":"analysis_only","context":"service failed; password: deployment-verifier-secret","operator":"deployment-verifier"}' \
     "$terminal_session_id")
@@ -336,7 +336,7 @@ terminal_assistant_status=$(curl --silent --show-error --output "$terminal_assis
     --header "Authorization: Bearer $API_ADMIN_TOKEN" \
     --header 'Content-Type: application/json' \
     --data-binary "$terminal_assistant_payload" "$base_url/api/v1/terminal/assistant/analyze")
-scan_id=$(.venv-wsl/bin/python -c 'import json,sys; print(json.load(open(sys.argv[1]))["id"])' "$scan_response_file")
+scan_id=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["id"])' "$scan_response_file")
 curl --silent --show-error --output /dev/null --max-time 5 \
     --header "Authorization: Bearer $API_ADMIN_TOKEN" --request POST \
     "$base_url/api/v1/scan-tasks/$scan_id/cancel"
