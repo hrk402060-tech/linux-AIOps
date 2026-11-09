@@ -1,0 +1,11 @@
+services:
+  backend:
+    volumes:
+      - ./backend/src:/app/src:ro
+      - ./backend/migrations:/app/migrations:ro
+      - ./backend/alembic.ini:/app/alembic.ini:ro
+
+  frontend:
+    volumes:
+      - ./frontend/dist:/usr/share/nginx/html:ro
+      - ./frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro

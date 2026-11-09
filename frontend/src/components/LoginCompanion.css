@@ -1,0 +1,62 @@
+.character-tracking { transform: translate(var(--look-x, 0px), var(--look-y, 0px)); transition: transform 360ms cubic-bezier(.2,.8,.2,1); }
+.character-face { position: absolute; inset: 0; transform: translate(var(--gaze-x, 0px), var(--gaze-y, 0px)); transition: transform 240ms ease-out; }
+.pet-closed .character-face { transform: none; }
+.character-pose { position: relative; transform-origin: 50% 100%; transition: transform 480ms cubic-bezier(.2,.8,.2,1); transition-delay: var(--delay); }
+.character-head { transform-origin: 50% 85%; transition: transform 420ms ease; transition-delay: var(--delay); }
+.character-hand { position: absolute; z-index: 5; top: 86px; width: 22px; height: 36px; border-radius: 45%; background: #986eff; transform-origin: 50% 85%; transition: transform 420ms ease; transition-delay: var(--delay); }
+.hand-left { left: -8px; transform: rotate(12deg); }
+.hand-right { right: -8px; transform: rotate(-12deg); }
+.character-secondary .character-hand { top: 65px; width: 18px; background: #f3df70; }
+.character-tertiary .character-hand { top: 55px; width: 16px; height: 28px; background: #ffb084; }
+.character-sun .character-hand { top: 32px; width: 13px; height: 23px; background: #f7d66b; }
+.character-sun .pet-mouth { left: 23px; top: 34px; }
+.character-secondary .pet-mouth { left: 22px; top: 32px; }
+.character-tertiary .pet-mouth { left: 18px; top: 30px; }
+.character-head.is-blinking .pet-eye { transform: scaleY(.12); }
+.pet-idle .character-primary .character-pose { animation: pose-breathe 3.6s ease-in-out infinite; }
+.pet-idle .character-secondary .character-pose { animation: pose-breathe 4.3s ease-in-out 180ms infinite; }
+.pet-idle .character-tertiary .character-pose { animation: pose-breathe 2.9s ease-in-out 350ms infinite; }
+.pet-idle .character-sun .character-pose { animation: pose-curious 5.2s ease-in-out infinite; }
+.pet-idle .character-primary .character-head { animation: head-observe 7.4s ease-in-out infinite; }
+.pet-idle .character-secondary .character-head { animation: head-observe 8.8s ease-in-out 1.2s infinite reverse; }
+.pet-idle .character-tertiary .character-head { animation: head-observe 6.2s ease-in-out 2s infinite; }
+.pet-input .character-primary .character-pose { transform: translate(20px, 0) rotate(9deg); }
+.pet-input .character-secondary .character-pose { transform: translate(14px, -3px) rotate(7deg); }
+.pet-input .character-tertiary .character-pose { transform: translate(22px, 0) rotate(12deg); }
+.pet-input .character-sun .character-pose { transform: translate(16px, 12px) rotate(14deg); }
+.pet-input .character-head { transform: rotate(6deg); }
+.pet-closed .character-primary .hand-left { transform: translate(25px, -78px) rotate(58deg); }
+.pet-closed .character-primary .hand-right { transform: translate(-62px, -78px) rotate(-58deg); }
+.pet-closed .character-primary .character-pose { transform: translate(-12px, 0) rotate(-6deg); }
+.pet-closed .character-secondary .character-pose { transform: translate(-14px, 0) rotate(-12deg); }
+.pet-closed .character-secondary .character-head { transform: rotateY(65deg) rotate(-10deg); }
+.pet-closed .character-tertiary .character-head { transform: translateY(12px) rotate(14deg); }
+.pet-closed .character-sun .character-pose { transform: translate(12px, 14px) rotate(12deg); }
+.pet-closed .pet-eye { transform: scaleY(.12); }
+.pet-loading .character-pose { animation: pose-peek 1.65s ease-in-out var(--delay) infinite both; }
+.pet-loading .character-secondary .character-pose { animation-name: pose-peek-shy; }
+.pet-loading .character-sun .character-pose { animation-name: pose-curious; }
+.pet-failure .character-primary .character-pose { transform: translate(-24px, 4px) rotate(-9deg); }
+.pet-failure .character-primary .character-head { animation: head-no 600ms ease-in-out 2; }
+.pet-failure .character-secondary .character-pose { transform: translate(-16px, 8px) rotate(-6deg); }
+.pet-failure .character-secondary .character-head { transform: translateY(12px) rotate(-12deg); }
+.pet-failure .character-tertiary .character-pose { transform: translate(-18px, 6px) rotate(14deg); }
+.pet-failure .character-sun .character-pose { transform: translate(20px, 16px) rotate(-14deg); }
+.pet-failure .pet-mouth { transform: rotate(180deg); }
+.pet-success .character-pose { animation: pose-jump 650ms cubic-bezier(.3,.7,.4,1) var(--delay) both; }
+.pet-success .hand-right { animation: hand-wave 500ms ease-in-out 800ms infinite alternate; }
+.pet-wave .hand-right, .pet-welcome .hand-right { animation: hand-wave 650ms ease-in-out var(--delay) infinite alternate; }
+.pet-wave .character-head, .pet-welcome .character-head { transform: rotate(-8deg); }
+@keyframes pose-breathe { 0%,100% { transform: scale(1,1) rotate(-1deg); } 50% { transform: scale(1.035,1.07) rotate(1deg); } }
+@keyframes head-observe { 0%,30%,100% { transform: rotate(0); } 40%,55% { transform: rotate(-10deg); } 70%,85% { transform: rotate(8deg); } }
+@keyframes pose-curious { 0%,100% { transform: rotate(-8deg); } 40% { transform: translate(-12px, 8px) rotate(12deg); } 70% { transform: translate(5px, 0) rotate(-4deg); } }
+@keyframes pose-peek { 0%,100% { transform: translate(0, 0) rotate(-3deg); } 35%,55% { transform: translate(16px, -18px) rotate(9deg); } }
+@keyframes pose-peek-shy { 0%,100% { transform: rotate(-5deg); } 40%,65% { transform: translate(12px, -12px) rotate(6deg); } }
+@keyframes head-no { 0%,100% { transform: rotate(0); } 25%,75% { transform: rotate(-12deg); } 50% { transform: rotate(10deg); } }
+@keyframes pose-jump { 0% { transform: scale(1.06,.9); } 35% { transform: translateY(-28px) rotate(-6deg) scale(.97,1.05); } 70% { transform: translateY(0) scale(1.06,.94); } 100% { transform: none; } }
+@keyframes hand-wave { from { transform: translateY(-48px) rotate(-24deg); } to { transform: translateY(-48px) rotate(32deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .login-companion *, .character-tracking, .character-pose, .character-head, .character-hand { animation: none !important; transition: none !important; }
+  .character-tracking { transform: none; }
+  .character-face { transform: none; }
+}

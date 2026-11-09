@@ -1,0 +1,13 @@
+services:
+  backend:
+    environment:
+      AUTH_COOKIE_SECURE: "true"
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:?Set the exact HTTPS console origin}
+
+  frontend:
+    ports:
+      - "${HTTPS_PORT:-443}:443"
+    volumes:
+      - ./frontend/nginx.production.conf:/etc/nginx/conf.d/default.conf:ro
+      - ${TLS_CERT_PATH:?Set TLS_CERT_PATH}:/etc/nginx/tls/fullchain.pem:ro
+      - ${TLS_KEY_PATH:?Set TLS_KEY_PATH}:/etc/nginx/tls/privkey.pem:ro

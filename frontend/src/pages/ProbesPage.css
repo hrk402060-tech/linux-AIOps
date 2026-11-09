@@ -1,0 +1,9 @@
+.probes-page .probes-toolbar { display: flex; gap: 12px; margin: 18px 0; }
+.probes-toolbar .ant-select { width: 340px; max-width: 100%; }
+.probe-target { overflow-wrap: anywhere; }
+.probe-form-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.probe-form-row .ant-input-number { width: 100%; }
+@media (max-width: 600px) {
+  .probes-page .page-heading { flex-wrap: wrap; gap: 12px; }
+  .probe-form-row { grid-template-columns: 1fr; gap: 0; }
+}

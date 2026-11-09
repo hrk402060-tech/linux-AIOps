@@ -1,0 +1,95 @@
+name: linux-vuln-sentinel
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-sentinel}
+      POSTGRES_USER: ${POSTGRES_USER:-sentinel}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in deploy/.env}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - sentinel_internal
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      args:
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://mirrors.aliyun.com/pypi/simple/}
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-sentinel}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-sentinel}
+      CREDENTIAL_MASTER_KEY: ${CREDENTIAL_MASTER_KEY:?Set CREDENTIAL_MASTER_KEY in deploy/.env}
+      CREDENTIAL_KEY_VERSION: ${CREDENTIAL_KEY_VERSION:-v1}
+      API_ADMIN_TOKEN: ${API_ADMIN_TOKEN:?Set API_ADMIN_TOKEN in deploy/.env}
+      AUTH_BOOTSTRAP_USERNAME: ${AUTH_BOOTSTRAP_USERNAME:-}
+      AUTH_BOOTSTRAP_PASSWORD: ${AUTH_BOOTSTRAP_PASSWORD:-}
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
+      AUTH_SESSION_TTL_SECONDS: ${AUTH_SESSION_TTL_SECONDS:-43200}
+      AUTH_LOCK_THRESHOLD: ${AUTH_LOCK_THRESHOLD:-5}
+      AUTH_LOCK_SECONDS: ${AUTH_LOCK_SECONDS:-900}
+      KNOWLEDGE_TRUSTED_KEYS: ${KNOWLEDGE_TRUSTED_KEYS:-{}}
+      KNOWLEDGE_SOURCE_CONNECTORS: ${KNOWLEDGE_SOURCE_CONNECTORS:-{}}
+      KNOWLEDGE_SYNC_INTERVAL_SECONDS: ${KNOWLEDGE_SYNC_INTERVAL_SECONDS:-14400}
+      MONITORING_INTERVAL_SECONDS: ${MONITORING_INTERVAL_SECONDS:-300}
+      SENTINEL_PROBE_ALLOWED_CIDRS: ${SENTINEL_PROBE_ALLOWED_CIDRS:-}
+      TERMINAL_TICKET_TTL_SECONDS: ${TERMINAL_TICKET_TTL_SECONDS:-30}
+      TERMINAL_IDLE_TIMEOUT_SECONDS: ${TERMINAL_IDLE_TIMEOUT_SECONDS:-900}
+      TERMINAL_MAX_DURATION_SECONDS: ${TERMINAL_MAX_DURATION_SECONDS:-14400}
+      TERMINAL_MAX_CONNECTIONS: ${TERMINAL_MAX_CONNECTIONS:-10}
+      TERMINAL_AI_BASE_URL: ${TERMINAL_AI_BASE_URL:-}
+      TERMINAL_AI_MODEL: ${TERMINAL_AI_MODEL:-}
+      TERMINAL_AI_API_KEY: ${TERMINAL_AI_API_KEY:-}
+      TERMINAL_AI_TIMEOUT_SECONDS: ${TERMINAL_AI_TIMEOUT_SECONDS:-30}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:8080}
+      AUTO_CREATE_SCHEMA: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=2)
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+    networks:
+      - sentinel_internal
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com}
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${APP_PORT:-8080}:80"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+    networks:
+      - sentinel_internal
+
+networks:
+  sentinel_internal:
+    driver: bridge
+
+volumes:
+  postgres_data:

@@ -1,0 +1,16 @@
+.git
+.idea
+.venv
+.venv-wsl
+.uv-cache
+.pytest_cache
+.ruff_cache
+**/__pycache__
+**/*.py[cod]
+frontend/node_modules
+frontend/dist
+data
+logs
+reports
+deploy/.env
+

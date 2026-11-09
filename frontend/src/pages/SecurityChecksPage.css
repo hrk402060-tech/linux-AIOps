@@ -1,0 +1,4 @@
+.security-checks-page .ant-tabs-tabpane > .scan-tasks-page > .page-heading {
+  justify-content: flex-end;
+  margin-bottom: 16px;
+}
