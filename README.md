@@ -87,3 +87,42 @@ Copy `backend/.env.example` to a server-side environment configuration before st
 ## Docker Deployment
 
 The current stage runs as a three-service Compose stack named `linux-aiops-platform`: React/Nginx, FastAPI, and PostgreSQL. See [docs/deployment.md](docs/deployment.md) for Docker Compose startup, backup, and Linux deployment instructions.
+
+### Docker Compose 快速部署
+
+运行环境只需要 Linux、Docker Engine 和 Docker Compose v2，不需要 WSL 或本地开发环境。
+
+```bash
+git clone https://github.com/hrk402060-tech/linux-AIOps.git
+cd linux-AIOps
+cp deploy/.env.example deploy/.env
+```
+
+编辑 `deploy/.env`，至少替换以下配置：
+
+| 配置项 | 用途 |
+| --- | --- |
+| `POSTGRES_PASSWORD` | PostgreSQL 数据库密码 |
+| `CREDENTIAL_MASTER_KEY` | AES-256-GCM 凭据加密主密钥，使用 `openssl rand -base64 32` 生成 |
+| `API_ADMIN_TOKEN` | 部署校验和紧急恢复令牌，至少 32 个字符 |
+| `AUTH_BOOTSTRAP_USERNAME` | 首次管理员账号 |
+| `AUTH_BOOTSTRAP_PASSWORD` | 首次管理员临时密码，首次登录后必须修改 |
+| `APP_PORT` | Web 端口，默认 `8080`；需要 `8088` 时填写 `8088` |
+| `ALLOWED_ORIGINS` | IP 访问填写 `auto`；HTTPS 生产环境建议填写准确的 HTTPS 来源 |
+
+生成随机值示例：
+
+```bash
+openssl rand -hex 32
+openssl rand -base64 32
+```
+
+启动服务并检查状态：
+
+```bash
+docker compose --env-file deploy/.env up -d --build
+docker compose --env-file deploy/.env ps
+curl http://127.0.0.1:${APP_PORT:-8080}/api/health
+```
+
+浏览器访问 `http://服务器IP:${APP_PORT:-8080}/`。AI 服务地址、模型和 API 密钥由管理员登录后在“系统管理 → AI 配置”中维护，不需要写入 `.env`。`deploy/.env` 只保留在服务器，不能提交到 GitHub。
