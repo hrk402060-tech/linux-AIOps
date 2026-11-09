@@ -1,4 +1,4 @@
-.operations-assistant-page { width: min(1460px, 100%); margin: 0 auto; }
+.operations-assistant-page { width: 100%; max-width: none; margin: 0; }
 .operations-assistant-layout { display: grid; grid-template-columns: 238px minmax(0, 1fr); gap: 16px; align-items: start; }
 .operations-assistant-main { min-width: 0; }
 .operations-assistant-conversations { min-width: 0; min-height: 590px; padding: 14px 0; border-right: 1px solid #dfe4e8; }
