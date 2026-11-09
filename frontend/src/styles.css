@@ -238,8 +238,8 @@ button, input, textarea { letter-spacing: 0; }
 .vulnerabilities-data-shell.is-loading > * { visibility: hidden; }
 .operator-avatar { display: grid; flex: 0 0 32px; place-items: center; width: 32px; height: 32px; color: #325445; font-size: 12px; font-weight: 700; background: #dcebe4; border: 1px solid #bfd5ca; border-radius: 50%; }
 .mobile-menu-button { display: none; margin-right: 8px; }
-.workspace { min-width: 0; padding: 28px; background: #f3f5f4; }
-.credentials-page, .assets-page, .knowledge-page, .scan-tasks-page, .vulnerabilities-page, .reports-page, .dashboard-page, .ai-agent-page, .system-page, .cmdb-page, .observability-page { width: min(1360px, 100%); margin: 0 auto; }
+.workspace { min-width: 0; padding: clamp(20px, 2vw, 32px) clamp(16px, 2.2vw, 40px); background: #f3f5f4; }
+.credentials-page, .assets-page, .knowledge-page, .scan-tasks-page, .vulnerabilities-page, .reports-page, .dashboard-page, .ai-agent-page, .system-page, .cmdb-page, .observability-page { width: 100%; max-width: none; margin: 0; }
 .observability-metrics { margin-top: 16px; }
 .observability-toolbar { display: grid; grid-template-columns: minmax(240px, 1fr) 180px 36px; gap: 10px; margin: 14px 0 12px; }
 .icon-action { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 32px; color: #176f55; background: #fff; border: 1px solid #cfd9d3; border-radius: 5px; cursor: pointer; }

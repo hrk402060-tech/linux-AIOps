@@ -23,7 +23,7 @@ it('shows service status and security boundaries from the read-only endpoint', a
   }) }));
   render(<ConfigProvider><SystemPage currentUser={auditor} /></ConfigProvider>);
   expect(await screen.findByText('核心服务运行正常')).toBeInTheDocument();
-  expect(screen.getByText('严格校验')).toBeInTheDocument();
+  expect(screen.getByText('首次连接自动接受，仅内存使用')).toBeInTheDocument();
   expect(screen.getByText('禁止')).toBeInTheDocument();
   expect(screen.getByText('AES-256-GCM')).toBeInTheDocument();
   expect(screen.queryByRole('region', { name: 'AI 配置' })).not.toBeInTheDocument();
