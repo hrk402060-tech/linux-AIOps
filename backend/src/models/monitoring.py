@@ -28,6 +28,7 @@ class MonitoringPolicy(Base):
     recovery_notify: Mapped[bool] = mapped_column(Boolean, default=True)
     maintenance_start: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     maintenance_end: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    severity_rules: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, onupdate=utc_now
     )

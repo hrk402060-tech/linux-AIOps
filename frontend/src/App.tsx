@@ -14,6 +14,8 @@ import { KnowledgePage } from './pages/KnowledgePage';
 import { ScanTasksPage } from './pages/ScanTasksPage';
 import { VulnerabilitiesPage } from './pages/VulnerabilitiesPage';
 import { DashboardPage } from './pages/DashboardPage';
+import { ServerMonitoringPage } from './pages/ServerMonitoringPage';
+import { ServerMonitoringPreviewPage } from './pages/ServerMonitoringPreviewPage';
 import { AIAgentPage } from './pages/AIAgentPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { TerminalPage } from './pages/TerminalPage';
@@ -33,9 +35,11 @@ import { UserDocsPage } from './pages/UserDocsPage';
 import { openTerminalTab } from './utils/terminalNavigation';
 import { requestedPlatformPage } from './utils/userDocsNavigation';
 
-export type PageKey = 'dashboard' | 'cmdb' | 'terminal' | 'observability' | 'probes' | 'assets' | 'scans' | 'schedules' | 'baselines' | 'exposures' | 'credential-risks' | 'findings' | 'incidents' | 'reports' | 'audit-log' | 'patches' | 'credentials' | 'knowledge' | 'agent' | 'alerts' | 'system' | 'automation' | 'ops-assistant';
+export type PageKey = 'dashboard' | 'server-monitoring' | 'cmdb' | 'terminal' | 'observability' | 'probes' | 'assets' | 'scans' | 'schedules' | 'baselines' | 'exposures' | 'credential-risks' | 'findings' | 'incidents' | 'reports' | 'audit-log' | 'patches' | 'credentials' | 'knowledge' | 'agent' | 'alerts' | 'system' | 'automation' | 'ops-assistant';
 
 export default function App() {
+  const [monitorPreview, setMonitorPreview] = useState(() => import.meta.env.VITE_SERVER_MONITOR_PREVIEW === 'true'
+    && new URLSearchParams(window.location.search).get('view') === 'server-monitoring-preview');
   const [page, setPage] = useState<PageKey>(() => requestedPlatformPage() ?? 'dashboard');
   const [findingAssetId, setFindingAssetId] = useState<string | null>(null);
   const [terminalAssetId, setTerminalAssetId] = useState<string | null>(null);
@@ -52,6 +56,12 @@ export default function App() {
   const scopeKey = `${currentUser?.id ?? ''}:${currentUser?.role ?? ''}:${currentUser?.access_revision ?? 0}`;
   const standaloneTerminalAssetId = new URLSearchParams(window.location.search).get('terminal_asset');
   const navigate = (nextPage: PageKey) => {
+    if (monitorPreview) {
+      setMonitorPreview(false);
+      const url = new URL(window.location.href);
+      url.searchParams.delete('view');
+      window.history.replaceState(null, '', url);
+    }
     setSearchTarget(null);
     if (nextPage !== 'findings' || searchTarget?.page === 'findings') setFindingAssetId(null);
     if (nextPage !== 'terminal') setTerminalAssetId(null);
@@ -101,6 +111,13 @@ export default function App() {
   if (new URLSearchParams(window.location.search).get('view') === 'docs') {
     return <UserDocsPage key={scopeKey} />;
   }
+  if (monitorPreview) {
+    return <AppShell key={scopeKey} currentUser={currentUser} onLogout={() => void signOut()} selectedPage="server-monitoring"
+      onNavigate={navigate} onSearchNavigate={navigateToSearchResult}>
+      {terminalNoticeHolder}
+      <ServerMonitoringPreviewPage key={scopeKey} canManage={currentUser.role !== 'auditor'} />
+    </AppShell>;
+  }
   if (standaloneTerminalAssetId) {
     return <TerminalPage key={scopeKey} initialAssetId={standaloneTerminalAssetId} standalone />;
   }
@@ -109,6 +126,7 @@ export default function App() {
       onNavigate={navigate} onSearchNavigate={navigateToSearchResult}>
       {terminalNoticeHolder}
       {page === 'dashboard' ? <DashboardPage onNavigate={navigate} onViewFindings={viewAssetFindings} onOpenTerminal={openAssetTerminal} />
+        : page === 'server-monitoring' ? <ServerMonitoringPage />
         : page === 'cmdb' ? <CmdbPage currentUser={currentUser}
           key={searchTarget?.page === 'cmdb' ? `${searchTarget.serviceId}:${searchNavigationId}` : 'cmdb'}
           initialServiceId={searchTarget?.page === 'cmdb' ? searchTarget.serviceId : undefined} />

@@ -10,6 +10,14 @@ export const workspaceDocs: UserDocEntry[] = [
     commands: [{ title: '目标服务器人工核验负载和资源', text: 'uptime\nfree -m\ndf -P\ndf -Pi' }],
   },
   {
+    id: 'server-monitoring', group: 'workspace', title: '服务器监控', page: 'server-monitoring',
+    purpose: '查看服务器在线状态、CPU、内存、磁盘、负载和最近一次只读采集结果。',
+    requirements: ['服务器已添加并通过 SSH 连通性检查；目标主机允许平台执行只读采集。'],
+    steps: ['按名称或 IP 搜索服务器。', '查看在线、离线、未采集和陈旧状态，结合资源条和告警数量定位异常。', '需要处理时进入 SSH 远程或活动告警页面。'],
+    notes: ['当前使用 SSH 无 Agent 准实时采集；页面不会执行修改、删除或补丁操作。', '没有采集样本时显示未采集，不代表服务器正常。'],
+    commands: [{ title: '目标服务器人工核验资源', text: 'uptime\nfree -m\ndf -P\ndf -Pi' }],
+  },
+  {
     id: 'assets', group: 'workspace', title: '服务器资产', page: 'assets',
     purpose: '维护 Linux 服务器地址、SSH 连接资料、生命周期和资产关联。',
     requirements: ['准备管理 IP、SSH 端口、账号与密码或私钥；平台服务器须能访问目标端口。'],

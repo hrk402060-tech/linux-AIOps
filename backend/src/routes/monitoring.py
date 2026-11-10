@@ -9,9 +9,45 @@ from src.schemas.monitoring import (
     MonitoringEventResponse, MonitoringOverviewResponse, MonitoringPolicyResponse,
     MonitoringPolicyUpdate, MonitoringSnapshotResponse,
 )
+from src.schemas.monitoring_fleet import (
+    MonitoringFleetResponse, MonitoringFleetTrendsResponse,
+)
 from src.services import monitoring as service
+from src.services import monitoring_fleet
 
 router = APIRouter(prefix="/monitoring", tags=["monitoring"])
+
+
+@router.get("/fleet", response_model=MonitoringFleetResponse)
+def read_fleet(
+    request: Request,
+    principal: AuthPrincipal = Depends(require_admin),
+    session: Session = Depends(get_session),
+) -> MonitoringFleetResponse:
+    return MonitoringFleetResponse.model_validate(monitoring_fleet.get_fleet(
+        session, asset_access.visible_asset_ids(session, principal),
+        request.app.state.runtime_settings.monitoring_interval_seconds,
+    ))
+
+
+@router.get("/fleet/trends", response_model=MonitoringFleetTrendsResponse)
+def read_fleet_trends(
+    request: Request, asset_ids: list[str] = Query(default=[]),
+    hours: int = Query(default=24, ge=1, le=2160),
+    principal: AuthPrincipal = Depends(require_admin),
+    session: Session = Depends(get_session),
+) -> MonitoringFleetTrendsResponse:
+    selected = sorted({asset_id.strip() for asset_id in asset_ids if asset_id.strip()})
+    if selected:
+        asset_access.require_assets(session, principal, selected)
+    try:
+        result = monitoring_fleet.get_trends(
+            session, selected, hours,
+            request.app.state.runtime_settings.monitoring_interval_seconds,
+        )
+    except monitoring_fleet.MonitoringFleetError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return MonitoringFleetTrendsResponse.model_validate(result)
 
 
 @router.get("/overview", response_model=MonitoringOverviewResponse)

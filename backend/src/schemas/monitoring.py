@@ -1,6 +1,8 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from src.schemas.monitoring_rules import MonitoringSeverityRules
 
 
 class MonitoringPolicyUpdate(BaseModel):
@@ -14,6 +16,7 @@ class MonitoringPolicyUpdate(BaseModel):
     recovery_notify: bool | None = None
     maintenance_start: datetime | None = None
     maintenance_end: datetime | None = None
+    severity_rules: MonitoringSeverityRules | None = None
 
     @model_validator(mode="after")
     def validate_maintenance(self) -> "MonitoringPolicyUpdate":
@@ -37,7 +40,15 @@ class MonitoringPolicyResponse(BaseModel):
     recovery_notify: bool
     maintenance_start: datetime | None
     maintenance_end: datetime | None
-    updated_at: datetime
+    updated_at: datetime | None
+    severity_rules: MonitoringSeverityRules = Field(
+        default_factory=MonitoringSeverityRules
+    )
+
+    @field_validator("severity_rules", mode="before")
+    @classmethod
+    def use_default_severity_rules(cls, value: object) -> object:
+        return MonitoringSeverityRules() if value is None else value
 
     model_config = ConfigDict(from_attributes=True)
 

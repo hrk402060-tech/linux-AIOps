@@ -34,7 +34,12 @@ def test_parses_bounded_linux_metrics() -> None:
         "Filesystem 1024-blocks Used Available Capacity Mounted on\n/dev/vda 100 80 20 80% /",
         "Filesystem Inodes IUsed IFree IUse% Mounted on\n/dev/vda 100 40 60 40% /",
     )
-    assert disks == [{"mount": "/", "used_percent": 80.0, "inode_percent": 40.0, "inode_observed": True}]
+    assert disks == [{
+        "device": "/dev/vda", "mount": "/", "total_bytes": 102400,
+        "used_bytes": 81920, "available_bytes": 20480, "used_percent": 80.0,
+        "inode_total": 100, "inode_used": 40, "inode_available": 60,
+        "inode_percent": 40.0, "inode_observed": True,
+    }]
     assert _parse_disks("Filesystem 1024-blocks Used Available Capacity Mounted on\n/dev/vda 100 80 20 80% /", "")[0]['inode_observed'] is False
     assert _parse_network("Inter-| x\n face | x\n eth0: 10 0 0 0 0 0 0 0 20") == {
         "network_rx_bytes": 10, "network_tx_bytes": 20,

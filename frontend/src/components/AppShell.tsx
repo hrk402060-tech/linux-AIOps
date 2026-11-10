@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Button, ConfigProvider, Drawer, Dropdown, Layout, Menu, Tooltip } from 'antd';
 import {
+  Activity,
   Bot,
   Bell,
   Database,
@@ -46,6 +47,7 @@ type WorkspaceDefinition = {
 const workspaces: WorkspaceDefinition[] = [
   { key: 'workspace', label: '工作台', icon: <Gauge size={18} />, description: '资源与运维入口', defaultPage: 'dashboard', children: [
     { key: 'dashboard', icon: <Gauge size={16} />, label: '综合总览' },
+    { key: 'server-monitoring', icon: <Activity size={16} />, label: '服务器监控' },
     { key: 'assets', icon: <Server size={16} />, label: '服务器资产' },
     { key: 'cmdb', icon: <Network size={16} />, label: '系统/接口监控' },
     { key: 'automation', icon: <Wrench size={16} />, label: '自动化任务' },
@@ -74,7 +76,7 @@ const workspaces: WorkspaceDefinition[] = [
 ];
 
 const pageWorkspaces: Record<PageKey, WorkspaceKey> = {
-  dashboard: 'workspace', assets: 'workspace', cmdb: 'workspace', automation: 'workspace', terminal: 'workspace', 'ops-assistant': 'workspace', patches: 'workspace',
+  dashboard: 'workspace', 'server-monitoring': 'workspace', assets: 'workspace', cmdb: 'workspace', automation: 'workspace', terminal: 'workspace', 'ops-assistant': 'workspace', patches: 'workspace',
   observability: 'monitoring', probes: 'monitoring', alerts: 'monitoring', incidents: 'monitoring',
   scans: 'security', schedules: 'security', baselines: 'security', exposures: 'security', 'credential-risks': 'security', findings: 'security', knowledge: 'security', agent: 'security', reports: 'security',
   system: 'system', credentials: 'system', 'audit-log': 'system',
@@ -171,7 +173,7 @@ function Navigation({ selectedPage, onNavigate, onSwitchWorkspace, collapsed = f
 
 const roleLabels = { admin: '管理员', operator: '操作员', auditor: '审计员' };
 const pageLabels: Record<PageKey, string> = {
-  alerts: '活动告警', dashboard: '综合总览', cmdb: '系统/接口监控', terminal: 'SSH 远程', observability: '服务监控',
+  alerts: '活动告警', dashboard: '综合总览', 'server-monitoring': '服务器监控', cmdb: '系统/接口监控', terminal: 'SSH 远程', observability: '服务监控',
   assets: '服务器资产', scans: '漏洞扫描', schedules: '安全检查', baselines: '安全检查',
   exposures: '安全检查', 'credential-risks': '安全检查', findings: '漏洞治理',
   reports: '安全报告', 'audit-log': '审计日志', patches: '补丁管理', credentials: '连接凭据',
