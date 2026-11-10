@@ -14,7 +14,6 @@ import { KnowledgePage } from './pages/KnowledgePage';
 import { ScanTasksPage } from './pages/ScanTasksPage';
 import { VulnerabilitiesPage } from './pages/VulnerabilitiesPage';
 import { DashboardPage } from './pages/DashboardPage';
-import { ServerMonitoringPage } from './pages/ServerMonitoringPage';
 import { ServerMonitoringPreviewPage } from './pages/ServerMonitoringPreviewPage';
 import { AIAgentPage } from './pages/AIAgentPage';
 import { ReportsPage } from './pages/ReportsPage';
@@ -126,7 +125,7 @@ export default function App() {
       onNavigate={navigate} onSearchNavigate={navigateToSearchResult}>
       {terminalNoticeHolder}
       {page === 'dashboard' ? <DashboardPage onNavigate={navigate} onViewFindings={viewAssetFindings} onOpenTerminal={openAssetTerminal} />
-        : page === 'server-monitoring' ? <ServerMonitoringPage />
+        : page === 'server-monitoring' ? <ServerMonitoringPreviewPage key={scopeKey} canManage={currentUser.role !== 'auditor'} />
         : page === 'cmdb' ? <CmdbPage currentUser={currentUser}
           key={searchTarget?.page === 'cmdb' ? `${searchTarget.serviceId}:${searchNavigationId}` : 'cmdb'}
           initialServiceId={searchTarget?.page === 'cmdb' ? searchTarget.serviceId : undefined} />

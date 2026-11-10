@@ -101,7 +101,7 @@ curl http://127.0.0.1:${APP_PORT:-8080}/api/health
 
 ### 服务器监控开发验收
 
-新版监控尚未替换正式页面。独立开发构建设置 `VITE_SERVER_MONITOR_PREVIEW=true`，登录后访问 `/?view=server-monitoring-preview`。
+正式“服务器监控”页面使用新版卡片与详细监控。独立开发构建可设置 `VITE_SERVER_MONITOR_PREVIEW=true`，登录后访问 `/?view=server-monitoring-preview`。
 验收环境使用隔离数据库，后台调度关闭；只有点击“重新采集”才执行真实 SSH 只读采集。规则修改只写验收数据库。
 `scripts/start_monitoring_preview.sh` 用于已授权服务器的隔离候选目录：内部流式复制已有记录、不生成备份文件、不修改正式容器。
 CPU、内存趋势分别按有效服务器等权平均；离线、过期和缺失指标不补 0。资源分级规则与现有告警通知策略分别保留，旧快照缺少核数、网卡或容量时显示未知，需要重新采集。
