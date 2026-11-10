@@ -1,9 +1,3 @@
-.agent-safety-band { display: flex; gap: 24px; margin-bottom: 16px; padding: 13px 16px; color: #355249; background: #e9f3ee; border: 1px solid #c9ded3; border-radius: 6px; }
-.agent-safety-band > span { display: grid; grid-template-columns: 20px auto; column-gap: 8px; align-items: center; }
-.agent-safety-band svg { grid-row: 1 / 3; color: #1d785b; }
-.agent-safety-band strong, .agent-safety-band small { display: block; }
-.agent-safety-band strong { font-size: 12px; }
-.agent-safety-band small { color: #698078; font-size: 10px; }
 .agent-provider-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 16px; padding: 14px 16px; background: #fff; border: 1px solid #dfe4e1; border-radius: 6px; }
 .agent-provider-row .ant-select { width: 220px; max-width: 100%; }
 .agent-provider-row > div { display: flex; align-items: center; gap: 10px; }
@@ -50,7 +44,6 @@
 }
 
 @media (max-width: 600px) {
-  .agent-safety-band { display: grid; gap: 10px; }
   .agent-provider-row { grid-template-columns: 1fr auto; }
   .agent-provider-row > div { grid-column: 1 / -1; }
   .agent-provider-row .ant-select { min-width: 0; }

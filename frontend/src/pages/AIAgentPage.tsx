@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Empty, Pagination, Select, Spin, Tag, Tooltip, message } from 'antd';
 import {
-  BellRing, Bot, CheckCircle2, CircleAlert, History, RefreshCw, ShieldCheck, Sparkles,
+  BellRing, Bot, CheckCircle2, CircleAlert, History, RefreshCw, Sparkles,
   XCircle,
 } from 'lucide-react';
 
@@ -99,11 +99,6 @@ export function AIAgentPage({ currentUser }: { currentUser: AuthUser }) {
     <div className="page-heading agent-heading">
       <div><p className="eyebrow">本地安全智能体</p><h1>AI Agent</h1></div>
       <Tooltip title="刷新"><Button aria-label="刷新" aria-busy={loading} icon={<RefreshCw size={17} />} disabled={working} onClick={() => void load()} /></Tooltip>
-    </div>
-
-    <div className="agent-safety-band">
-      <span><ShieldCheck size={18} /><strong>数据不出域</strong><small>当前仅启用本地研判引擎</small></span>
-      <span><CircleAlert size={18} /><strong>AI 不会直接执行修复</strong><small>建议必须经人工确认</small></span>
     </div>
 
     <div className="metric-band agent-metrics">

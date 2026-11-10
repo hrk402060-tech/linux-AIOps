@@ -82,12 +82,14 @@ describe('AIAgentPage', () => {
     expect(fetchMock.mock.calls.every(([input]) => !String(input).includes('/providers/config'))).toBe(true);
   });
 
-  it('shows Chinese severity and the local-only safety boundary', async () => {
+  it('shows Chinese severity while keeping the analysis workflow focused', async () => {
     renderPage();
     await screen.findAllByText(finding.cve_id);
     expect(screen.getByText('严重')).toHaveClass('ant-tag-red');
-    expect(screen.getByText('数据不出域')).toBeInTheDocument();
-    expect(screen.getByText('AI 不会直接执行修复')).toBeInTheDocument();
+    expect(screen.queryByText('数据不出域')).not.toBeInTheDocument();
+    expect(screen.queryByText('AI 不会直接执行修复')).not.toBeInTheDocument();
+    expect(screen.getByText('研判队列')).toBeInTheDocument();
+    expect(screen.getByText('研判与修复建议')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '执行修复' })).not.toBeInTheDocument();
   });
 
