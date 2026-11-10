@@ -322,6 +322,30 @@ button, input, textarea { letter-spacing: 0; }
 .table-frame .ant-table-cell { vertical-align: middle; }
 .cmdb-heading-actions { flex-wrap: wrap; justify-content: flex-end; }
 .cmdb-toolbar { display: grid; grid-template-columns: minmax(220px, 1fr) repeat(5, minmax(120px, 155px)); gap: 10px; margin-bottom: 12px; }
+.cmdb-relationship-guide { display: grid; grid-template-columns: auto 1fr; gap: 4px 16px; align-items: center; margin-bottom: 12px; padding: 12px 16px; color: #58665f; background: #f7faf8; border: 1px solid #dfe8e2; border-radius: 6px; }
+.cmdb-relationship-guide strong { color: #26312b; font-size: 13px; }
+.cmdb-relationship-guide small { grid-column: 2; color: #78827d; font-size: 12px; }
+.cmdb-relationship-flow { display: flex; align-items: center; gap: 7px; color: #176f55; font-size: 12px; font-weight: 600; }
+.cmdb-relationship-flow svg { color: #a1ada6; }
+.cmdb-tree-frame { overflow: hidden; background: #fff; border: 1px solid #dfe4e1; border-radius: 6px; }
+.cmdb-tree-business { border-bottom: 1px solid #e5e9e7; }
+.cmdb-tree-business:last-child { border-bottom: 0; }
+.cmdb-tree-node { border-bottom: 1px solid #edf0ee; }
+.cmdb-tree-node:last-child { border-bottom: 0; }
+.cmdb-tree-node-main { display: grid; grid-template-columns: 30px minmax(180px, 1fr) 78px minmax(190px, 0.8fr) 78px auto; gap: 10px; align-items: center; min-height: 58px; padding: 9px 16px; }
+.cmdb-tree-node-application .cmdb-tree-node-main { padding-left: 42px; }
+.cmdb-tree-node-service .cmdb-tree-node-main { padding-left: 68px; }
+.cmdb-tree-node-api .cmdb-tree-node-main { padding-left: 94px; }
+.cmdb-tree-node-icon { display: grid; place-items: center; width: 30px; height: 30px; color: #176f55; background: #e6f2ed; border-radius: 5px; }
+.cmdb-tree-node-copy { min-width: 0; }
+.cmdb-tree-node-copy strong, .cmdb-tree-node-copy small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cmdb-tree-node-copy strong { color: #25302a; font-size: 13px; }
+.cmdb-tree-node-copy small { margin-top: 3px; color: #78827d; font-size: 11px; }
+.cmdb-tree-node-detail { overflow: hidden; color: #59645e; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.cmdb-node-actions { justify-content: flex-end; }
+.cmdb-node-actions .ant-btn { width: 30px; min-width: 30px; height: 30px; padding-inline: 5px; }
+.cmdb-tree-node-children { border-top: 1px solid #f1f4f2; }
+.cmdb-tree-loading { padding: 48px 16px; color: #78827d; text-align: center; }
 .cmdb-identity { display: flex; align-items: center; gap: 9px; min-width: 190px; }
 .cmdb-identity > span { display: grid; flex: 0 0 30px; place-items: center; width: 30px; height: 30px; color: #176f55; background: #e6f2ed; border-radius: 5px; }
 .cmdb-identity strong, .cmdb-identity small { display: block; }
@@ -719,6 +743,15 @@ button, input, textarea { letter-spacing: 0; }
   .finding-filter-row { grid-template-columns: 1fr; }
   .cmdb-toolbar { grid-template-columns: 1fr 1fr; overflow: visible; }
   .cmdb-toolbar .ant-input-affix-wrapper { grid-column: 1 / -1; }
+  .cmdb-relationship-guide { grid-template-columns: 1fr; gap: 7px; }
+  .cmdb-relationship-guide small { grid-column: auto; }
+  .cmdb-relationship-flow { flex-wrap: wrap; }
+  .cmdb-tree-node-main, .cmdb-tree-node-application .cmdb-tree-node-main, .cmdb-tree-node-service .cmdb-tree-node-main, .cmdb-tree-node-api .cmdb-tree-node-main { grid-template-columns: 30px minmax(0, 1fr) auto; gap: 8px; padding: 10px 12px; }
+  .cmdb-tree-node-application .cmdb-tree-node-main { padding-left: 28px; }
+  .cmdb-tree-node-service .cmdb-tree-node-main { padding-left: 44px; }
+  .cmdb-tree-node-api .cmdb-tree-node-main { padding-left: 60px; }
+  .cmdb-tree-node-main > .ant-tag, .cmdb-tree-node-detail { grid-column: 2 / -1; }
+  .cmdb-node-actions { grid-column: 2 / -1; justify-content: flex-start; }
   .finding-table { display: none; }
   .finding-list-mobile { display: grid; gap: 8px; }
   .finding-list-mobile .ant-pagination { justify-content: center; margin-top: 4px; }
