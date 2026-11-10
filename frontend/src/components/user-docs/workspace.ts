@@ -4,7 +4,7 @@ export const workspaceDocs: UserDocEntry[] = [
   {
     id: 'dashboard', group: 'workspace', title: '综合总览', page: 'dashboard',
     purpose: '汇总服务器运行、资源异常、漏洞、扫描、告警和任务，作为日常巡查入口。',
-    requirements: ['先登记服务器；真实指标需 SSH 采集成功，服务维度还需配置项管理绑定。'],
+    requirements: ['先登记服务器；真实指标需 SSH 采集成功，服务维度还需系统/接口监控绑定。'],
     steps: ['查看在线、离线、未采集及资源异常。', '核对最近采集时间和陈旧提示，再进入关联资产、告警或漏洞处理。'],
     notes: ['SSH 无 Agent 数据是准实时快照；没有数据、过期数据或采集失败不能视为正常。'],
     commands: [{ title: '目标服务器人工核验负载和资源', text: 'uptime\nfree -m\ndf -P\ndf -Pi' }],
@@ -19,12 +19,12 @@ export const workspaceDocs: UserDocEntry[] = [
     commands: [{ title: '由目标管理员核验 SSH 服务与账号权限', text: 'ss -lnt\nid\nssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new USER@SERVER_IP true' }],
   },
   {
-    id: 'cmdb', group: 'workspace', title: '配置项管理', page: 'cmdb',
+    id: 'cmdb', group: 'workspace', title: '系统/接口监控', page: 'cmdb',
     purpose: '建立业务系统、应用、服务、API 与承载服务器之间的关系，为服务监控和告警定位提供上下文。',
     requirements: ['准备业务名称和唯一编码、所属应用、服务及 API 信息；承载服务器须先登记。'],
     steps: ['按“业务 → 应用 → 服务 → API”创建对象。', '核对所属关系、服务类型、API 与承载服务器。',
       '按业务、服务、服务器及生命周期过滤，查看和维护关联。'],
-    notes: ['配置项管理是人工维护的关联模型，当前不是自动发现或自动依赖拓扑采集。', '此功能在页面操作，无需执行服务器命令。'],
+    notes: ['系统/接口监控是人工维护的关联模型，当前不是自动发现或自动依赖拓扑采集。', '此功能在页面操作，无需执行服务器命令。'],
   },
   {
     id: 'automation', group: 'workspace', title: '自动化任务', page: 'automation',

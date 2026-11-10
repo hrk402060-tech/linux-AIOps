@@ -75,7 +75,7 @@ describe('ProbesPage', () => {
   });
   it('loads the policy independently when catalog loading fails', async () => {
     vi.mocked(getProbes).mockResolvedValue({ items: [], total: 0 });
-    vi.mocked(getCmdbTree).mockRejectedValue(new Error('配置项管理暂时不可用'));
+    vi.mocked(getCmdbTree).mockRejectedValue(new Error('系统/接口监控暂时不可用'));
     render(<ProbesPage currentUser={currentUser} />);
     expect(await screen.findByText(/批准网段：192.0.2.0\/24/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '修改批准网段' })).toBeEnabled();

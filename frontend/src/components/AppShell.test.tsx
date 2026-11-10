@@ -13,7 +13,7 @@ const currentUser = {
   created_at: '2026-09-15T00:00:00Z', last_login_at: null,
 };
 const expectedPages: Record<PageKey, [string, string]> = {
-  dashboard: ['工作台', '综合总览'], cmdb: ['工作台', '配置项管理'],
+  dashboard: ['工作台', '综合总览'], cmdb: ['工作台', '系统/接口监控'],
   assets: ['工作台', '服务器资产'], automation: ['工作台', '自动化任务'],
   terminal: ['工作台', 'SSH 远程'], 'ops-assistant': ['工作台', 'AI 运维助手'], patches: ['工作台', '补丁管理'],
   observability: ['监控告警', '服务监控'], probes: ['监控告警', 'API 拨测'],
@@ -26,7 +26,7 @@ const expectedPages: Record<PageKey, [string, string]> = {
   credentials: ['系统管理', '连接凭据'], 'audit-log': ['系统管理', '审计日志'],
 };
 const groupEntries: Record<string, string[]> = {
-  工作台: ['综合总览', '服务器资产', '配置项管理', '自动化任务', 'SSH 远程', 'AI 运维助手', '补丁管理'],
+  工作台: ['综合总览', '服务器资产', '系统/接口监控', '自动化任务', 'SSH 远程', 'AI 运维助手', '补丁管理'],
   监控告警: ['服务监控', 'API 拨测', '活动告警', '故障管理'],
   安全中心: ['漏洞扫描', '安全检查', '漏洞治理', '漏洞知识库', '漏洞 AI 助手', '安全报告'],
   系统管理: ['系统状态', '审计日志'],

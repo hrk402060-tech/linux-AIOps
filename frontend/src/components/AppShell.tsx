@@ -47,7 +47,7 @@ const workspaces: WorkspaceDefinition[] = [
   { key: 'workspace', label: '工作台', icon: <Gauge size={18} />, description: '资源与运维入口', defaultPage: 'dashboard', children: [
     { key: 'dashboard', icon: <Gauge size={16} />, label: '综合总览' },
     { key: 'assets', icon: <Server size={16} />, label: '服务器资产' },
-    { key: 'cmdb', icon: <Network size={16} />, label: '配置项管理' },
+    { key: 'cmdb', icon: <Network size={16} />, label: '系统/接口监控' },
     { key: 'automation', icon: <Wrench size={16} />, label: '自动化任务' },
     { key: 'terminal', icon: <SquareTerminal size={16} />, label: 'SSH 远程' },
     { key: 'ops-assistant', icon: <Bot size={16} />, label: 'AI 运维助手' },
@@ -171,7 +171,7 @@ function Navigation({ selectedPage, onNavigate, onSwitchWorkspace, collapsed = f
 
 const roleLabels = { admin: '管理员', operator: '操作员', auditor: '审计员' };
 const pageLabels: Record<PageKey, string> = {
-  alerts: '活动告警', dashboard: '综合总览', cmdb: '配置项管理', terminal: 'SSH 远程', observability: '服务监控',
+  alerts: '活动告警', dashboard: '综合总览', cmdb: '系统/接口监控', terminal: 'SSH 远程', observability: '服务监控',
   assets: '服务器资产', scans: '漏洞扫描', schedules: '安全检查', baselines: '安全检查',
   exposures: '安全检查', 'credential-risks': '安全检查', findings: '漏洞治理',
   reports: '安全报告', 'audit-log': '审计日志', patches: '补丁管理', credentials: '连接凭据',

@@ -20,6 +20,9 @@ describe('使用文档', () => {
       'scans', 'schedules', 'baselines', 'exposures', 'credential-risks', 'findings',
       'knowledge', 'agent', 'reports', 'system', 'audit-log'];
     expect(new Set(userDocs.map((entry) => entry.page))).toEqual(new Set(pages));
+    expect(userDocs.find((entry) => entry.id === 'cmdb')).toMatchObject({
+      title: '系统/接口监控', page: 'cmdb',
+    });
     expect(new Set(userDocs.map((entry) => entry.id)).size).toBe(userDocs.length);
     for (const entry of userDocs) {
       expect(entry.purpose).toBeTruthy();

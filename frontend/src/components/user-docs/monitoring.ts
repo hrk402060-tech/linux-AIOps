@@ -4,7 +4,7 @@ export const monitoringDocs: UserDocEntry[] = [
   {
     id: 'observability', group: 'monitoring', title: '服务监控', page: 'observability',
     purpose: '按配置项服务聚合服务器快照、资源峰值、活动告警和严重高危漏洞。',
-    requirements: ['在配置项管理创建服务并绑定已启用服务器；等待 SSH 采集产生有效快照。'],
+    requirements: ['在系统/接口监控创建服务并绑定已启用服务器；等待 SSH 采集产生有效快照。'],
     steps: ['按业务或服务搜索，并按健康、降级、不可用、未观测状态筛选。',
       '对照承载资产和最后采集时间，到资产、告警或 SSH 页面进一步核验。'],
     notes: ['当前聚合已有数据，不是秒级指标、日志或链路采集系统；未观测不等于健康。'],

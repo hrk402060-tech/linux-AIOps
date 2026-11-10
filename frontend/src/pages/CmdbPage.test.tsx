@@ -158,6 +158,8 @@ describe('CmdbPage', () => {
       .mockResolvedValueOnce(response(assets)));
     render(<ConfigProvider><CmdbPage currentUser={admin} /></ConfigProvider>);
 
+    expect(screen.getByRole('heading', { name: '系统/接口监控', level: 1 })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '刷新系统/接口监控' })).toBeInTheDocument();
     expect(screen.queryByText('目录关系')).not.toBeInTheDocument();
     expect(screen.queryByText('服务器资产挂在“服务”下面；点击任意节点可查看详情和关联关系。')).not.toBeInTheDocument();
     expect((await screen.findAllByText('支付业务')).length).toBeGreaterThan(0);

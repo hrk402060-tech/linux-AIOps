@@ -31,7 +31,7 @@ export interface CmdbDiscoveryResponse {
   assets: CmdbDiscoveryAsset[];
 }
 
-function request<T>(url: string, options?: RequestInit, fallback = '配置项管理请求失败'): Promise<T> {
+function request<T>(url: string, options?: RequestInit, fallback = '系统/接口监控请求失败'): Promise<T> {
   return apiFetch(url, {
     ...options,
     headers: options?.body ? { 'Content-Type': 'application/json', ...options.headers } : options?.headers,
