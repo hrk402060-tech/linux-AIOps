@@ -158,8 +158,8 @@ describe('CmdbPage', () => {
       .mockResolvedValueOnce(response(assets)));
     render(<ConfigProvider><CmdbPage currentUser={admin} /></ConfigProvider>);
 
-    expect(screen.getByText('目录关系')).toBeInTheDocument();
-    expect(screen.getByText('服务器资产挂在“服务”下面；点击任意节点可查看详情和关联关系。')).toBeInTheDocument();
+    expect(screen.queryByText('目录关系')).not.toBeInTheDocument();
+    expect(screen.queryByText('服务器资产挂在“服务”下面；点击任意节点可查看详情和关联关系。')).not.toBeInTheDocument();
     expect((await screen.findAllByText('支付业务')).length).toBeGreaterThan(0);
     expect(screen.getAllByText('支付网关').length).toBeGreaterThan(0);
     expect(screen.getAllByText('支付 API').length).toBeGreaterThan(0);
