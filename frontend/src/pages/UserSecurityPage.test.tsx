@@ -61,3 +61,15 @@ it('keeps the disable action unavailable when policy requires MFA', async () => 
   await waitFor(() => expect(screen.getByText('由管理员策略强制')).toBeInTheDocument());
   expect(screen.queryByRole('button', { name: '关闭 MFA' })).not.toBeInTheDocument();
 });
+
+it('renders embedded personal MFA without adding another page heading and keeps refresh available', async () => {
+  const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({
+    enabled: true, enforcement: 'off', required: false, can_disable: true,
+  }) });
+  vi.stubGlobal('fetch', fetchMock);
+  render(<ConfigProvider><UserSecurityPage embedded onLogout={vi.fn()} /></ConfigProvider>);
+  expect(await screen.findByRole('button', { name: '关闭 MFA' })).toBeEnabled();
+  expect(screen.queryByRole('heading', { level: 1 })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: '刷新个人安全设置' }));
+  await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+});

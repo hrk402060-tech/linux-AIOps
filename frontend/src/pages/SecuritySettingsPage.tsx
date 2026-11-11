@@ -1,12 +1,17 @@
+import type { AuthUser } from '../api/auth';
 import { AuthPolicyPanel } from '../components/AuthPolicyPanel';
 import { AISettingsPanel } from '../components/AISettingsPanel';
+import { UserSecurityPage } from './UserSecurityPage';
 
-export function SecuritySettingsPage() {
+export function SecuritySettingsPage({ currentUser, onLogout }: { currentUser: AuthUser; onLogout: () => void }) {
   return <section className="system-page">
     <div className="page-heading">
-      <div><p className="eyebrow">平台安全</p><h1>安全设置</h1><p>管理员配置 MFA 强制范围、登录安全和运维 AI 接入。</p></div>
+      <div><p className="eyebrow">账号与平台安全</p><h1>安全设置</h1></div>
     </div>
-    <AuthPolicyPanel />
-    <AISettingsPanel />
+    <UserSecurityPage key={currentUser.id} embedded onLogout={onLogout} />
+    {currentUser.role === 'admin' ? <>
+      <AuthPolicyPanel />
+      <AISettingsPanel />
+    </> : null}
   </section>;
 }

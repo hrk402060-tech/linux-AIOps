@@ -14,5 +14,6 @@ export function isSecurityCheckPage(key: string): key is SecurityCheckPageKey {
 }
 
 export function getNavigationPageKey(page: PageKey): PageKey {
+  if (page === 'user-security') return 'security-settings';
   return isSecurityCheckPage(page) ? 'schedules' : page;
 }

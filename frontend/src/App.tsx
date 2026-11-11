@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Button, notification, Spin } from 'antd';
+import { Button, notification, Spin } from 'antd';
 import { SquareTerminal } from 'lucide-react';
 
 import { logout } from './api/auth';
@@ -25,7 +25,6 @@ import { AuditLogPage } from './pages/AuditLogPage';
 import { PatchesPage } from './pages/PatchesPage';
 import { SystemPage } from './pages/SystemPage';
 import { SecuritySettingsPage } from './pages/SecuritySettingsPage';
-import { UserSecurityPage } from './pages/UserSecurityPage';
 import { AutomationPage } from './pages/AutomationPage';
 import { CmdbPage } from './pages/CmdbPage';
 import { ObservabilityPage } from './pages/ObservabilityPage';
@@ -66,7 +65,7 @@ export default function App() {
     setSearchTarget(null);
     if (nextPage !== 'findings' || searchTarget?.page === 'findings') setFindingAssetId(null);
     if (nextPage !== 'terminal') setTerminalAssetId(null);
-    setPage(nextPage);
+    setPage(nextPage === 'user-security' ? 'security-settings' : nextPage);
   };
   const navigateToSearchResult = (target: SearchTarget) => {
     navigate(target.page);
@@ -132,9 +131,8 @@ export default function App() {
           key={searchTarget?.page === 'cmdb' ? `${searchTarget.serviceId}:${searchNavigationId}` : 'cmdb'}
           initialServiceId={searchTarget?.page === 'cmdb' ? searchTarget.serviceId : undefined} />
         : page === 'system' ? <SystemPage currentUser={currentUser} onLogout={() => void signOut()} />
-        : page === 'user-security' ? <UserSecurityPage onLogout={() => void signOut()} />
-        : page === 'security-settings' ? currentUser.role === 'admin' ? <SecuritySettingsPage />
-          : <Alert type="error" showIcon message="仅管理员可访问安全设置" />
+        : page === 'user-security' || page === 'security-settings'
+          ? <SecuritySettingsPage currentUser={currentUser} onLogout={() => void signOut()} />
         : page === 'patches' ? <PatchesPage />
         : page === 'automation' ? <AutomationPage onNavigate={navigate} />
         : page === 'audit-log' ? <AuditLogPage />

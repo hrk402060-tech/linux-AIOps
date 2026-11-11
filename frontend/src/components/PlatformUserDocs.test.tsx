@@ -18,7 +18,7 @@ describe('使用文档', () => {
     const pages: PageKey[] = ['dashboard', 'server-monitoring', 'assets', 'cmdb', 'automation', 'terminal',
       'ops-assistant', 'patches', 'observability', 'probes', 'alerts', 'incidents',
       'scans', 'schedules', 'baselines', 'exposures', 'credential-risks', 'findings',
-      'knowledge', 'agent', 'reports', 'system', 'user-security', 'security-settings', 'audit-log'];
+      'knowledge', 'agent', 'reports', 'system', 'security-settings', 'audit-log'];
     expect(new Set(userDocs.map((entry) => entry.page))).toEqual(new Set(pages));
     expect(userDocs.find((entry) => entry.id === 'cmdb')).toMatchObject({
       title: '系统/接口监控', page: 'cmdb',

@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Button, Card, Descriptions, Form, Input, Modal, QRCode, Spin, Tag, message } from 'antd';
+import { Alert, Button, Card, Descriptions, Form, Input, Modal, QRCode, Space, Spin, Tag, message } from 'antd';
 import { KeyRound, RefreshCw, ShieldCheck } from 'lucide-react';
 import {
   confirmOwnMfa, getOwnMfa, resetOwnMfa, setupOwnMfa,
   type MfaSelfStatus, type MfaSetup,
 } from '../api/auth';
 
-export function UserSecurityPage({ onLogout }: { onLogout: () => void }) {
+export function UserSecurityPage({ onLogout, embedded = false }: { onLogout: () => void; embedded?: boolean }) {
   const [status, setStatus] = useState<MfaSelfStatus | null>(null);
   const [setup, setSetup] = useState<MfaSetup | null>(null);
   const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null);
@@ -64,14 +64,19 @@ export function UserSecurityPage({ onLogout }: { onLogout: () => void }) {
     });
   };
 
-  return <section className="system-page">{holder}
-    <div className="page-heading">
+  const refresh = <Button aria-label="刷新个人安全设置" icon={<RefreshCw size={17} />} loading={loading}
+    disabled={saving || setup !== null || recoveryCodes !== null} onClick={() => void load()} />;
+  const statusTag = status ? status.enabled ? <Tag color="green">已启用</Tag> : <Tag>未启用</Tag>
+    : <Tag>{loading ? '加载中' : '状态未知'}</Tag>;
+
+  return <section className={embedded ? 'user-security-settings' : 'system-page'} aria-label="个人 MFA">{holder}
+    {!embedded ? <div className="page-heading">
       <div><p className="eyebrow">账号安全</p><h1>个人安全</h1></div>
-      <Button aria-label="刷新个人安全设置" icon={<RefreshCw size={17} />} loading={loading} disabled={saving || setup !== null || recoveryCodes !== null} onClick={() => void load()} />
-    </div>
+      {refresh}
+    </div> : null}
     {loadError ? <Alert type="error" showIcon message={loadError} /> : null}
     <Spin spinning={loading}>
-      <Card title={<><ShieldCheck size={17} /> MFA 多因素认证</>} extra={status ? status.enabled ? <Tag color="green">已启用</Tag> : <Tag>未启用</Tag> : <Tag>{loading ? '加载中' : '状态未知'}</Tag>}>
+      <Card title={<><ShieldCheck size={17} /> MFA 多因素认证</>} extra={<Space size={8}>{statusTag}{embedded ? refresh : null}</Space>}>
         <p>使用验证器应用扫码绑定。平台不会显示已保存的 MFA 密钥，恢复码只在绑定完成时展示一次。</p>
         {status?.required ? <Alert type="warning" showIcon message="当前策略要求保持 MFA 绑定" description="如需重置，请联系管理员调整策略或执行管理员重置。" /> : null}
         <div style={{ marginTop: 16 }}>

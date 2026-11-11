@@ -196,7 +196,9 @@ and can be revoked through the session controls.
 
 Administrators configure MFA under System Management > Security Settings:
 optional, administrators only, or all users. Users bind their own authenticator
-under Personal Security by scanning a QR code and confirming a six-digit code.
+under the same Security Settings page by scanning a QR code and confirming a
+six-digit code. All signed-in users can manage their own MFA; only administrators
+can view or change the global login policy and AI settings.
 Unbound users subject to enforcement must complete the QR enrollment flow before
 logging in. Enrollment expires after ten minutes, is single use, and becomes
 invalid after password, account permission or pending-secret changes. No login

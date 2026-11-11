@@ -72,6 +72,10 @@ vi.mock('./pages/VulnerabilitiesPage', () => ({
     <p>漏洞搜索上下文 {initialQuery ?? ''} {initialDisposition ?? 'active'}</p></>,
 }));
 vi.mock('./pages/ReportsPage', () => ({ ReportsPage: () => <p>报告测试页</p> }));
+vi.mock('./pages/SecuritySettingsPage', () => ({
+  SecuritySettingsPage: ({ currentUser }: { currentUser: typeof auth.user }) =>
+    <p>安全设置测试页 {currentUser.role}</p>,
+}));
 vi.mock('./pages/EventsPage', () => ({
   EventsPage: ({ onOpenTerminal }: { onOpenTerminal?: (assetId: string) => void }) =>
     <button onClick={() => onOpenTerminal?.('alert-asset-88')}>告警资产 SSH 跳转</button>,
@@ -91,6 +95,16 @@ afterEach(() => {
 });
 
 describe('使用文档独立页面', () => {
+  it.each(['user-security', 'security-settings'])('security_navigation: 旧新入口 %s 都进入统一安全设置', async (page) => {
+    window.history.replaceState({}, '', `/?page=${page}`);
+    auth.getCurrentUser.mockResolvedValue({ ...auth.user, role: 'operator' });
+    render(<App />);
+    expect(await screen.findByText('安全设置测试页 operator')).toBeVisible();
+    expect(document.querySelector('.topbar-context strong')).toHaveTextContent('安全设置');
+    expect(screen.queryByRole('menuitem', { name: '个人安全' })).not.toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: '安全设置' })).toHaveClass('ant-menu-item-selected');
+  });
+
   it('登录后展示完整文档，不挂载主侧栏或终端，相关功能另开安全标签', async () => {
     window.history.replaceState({}, '', '/?view=docs&terminal_asset=scope-node');
     let opened: { href: string; target: string; rel: string } | undefined;

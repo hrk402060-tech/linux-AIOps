@@ -31,10 +31,10 @@ export const systemDocs: UserDocEntry[] = [
       '强制策略下，最后一名已绑定 MFA 的管理员重置前需先调整策略或准备另一名管理员。'],
   },
   {
-    id: 'personal-mfa', group: 'system', title: '个人 MFA', page: 'user-security',
+    id: 'personal-mfa', group: 'system', title: '个人 MFA', page: 'security-settings',
     purpose: '用户自行绑定验证器，管理个人多因素认证。',
     requirements: ['普通用户登录会话；准备验证器应用。'],
-    steps: ['打开“系统管理 → 个人安全”，点击“启用 MFA”。',
+    steps: ['打开“系统管理 → 安全设置”，在 MFA 多因素认证区点击“启用 MFA”。',
       '使用验证器扫描二维码，输入 6 位验证码完成绑定；无法扫码时可展开手动绑定信息。',
       '安全保存仅显示一次的恢复码，重新登录时输入验证码或一次性恢复码。'],
     notes: ['MFA 密钥加密保存；恢复码不要提供给 AI。', '管理员强制绑定时无法自行关闭 MFA。'],
