@@ -115,7 +115,7 @@ def test_coverage_lists_every_source_and_discloses_incomplete_data(client: TestC
     assert body["publication_policy"] == "stage_validate_publish"
     assert body["failure_policy"] == "retain_active_release_and_alert"
     assert body["critical_check_interval_hours"] == 4
-    assert len(body["sources"]) == 9
+    assert len(body["sources"]) == 10
     by_name = {item["source_name"]: item for item in body["sources"]}
     assert by_name["openEuler Security Advisories"]["advisory_count"] == 1
     assert by_name["openEuler Security Advisories"]["latest_advisory_at"] is not None
@@ -123,6 +123,8 @@ def test_coverage_lists_every_source_and_discloses_incomplete_data(client: TestC
     assert by_name["openEuler Security Advisories"]["daily_schedule"] == "0 2 * * *"
     assert by_name["CNVD"]["sync_mode"] == "offline_package"
     assert by_name["CNVD"]["health"] == "never_synced"
+    assert by_name["Upstream Service Advisories"]["sync_mode"] == "online_secondary"
+    assert by_name["Upstream Service Advisories"]["health"] == "never_synced"
 
 
 def test_failed_update_retains_active_release_and_raises_coverage_alert(

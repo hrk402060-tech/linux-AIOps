@@ -15,6 +15,7 @@ from src.services.knowledge_backfill import ACTIVE_STATUSES
 from src.schemas.knowledge import KnowledgeImportRequest
 from src.services import knowledge
 from src.services import openeuler_sync
+from src.services import official_source_sync
 
 DOWNLOAD_LIMIT = 50 * 1024 * 1024
 
@@ -26,6 +27,8 @@ def configure_sources(
         connector = connectors.get(source.name)
         if source.name == openeuler_sync.SOURCE_NAME:
             source.online_url = openeuler_sync.LIST_URL
+        elif official_source_sync.online_url(source.name):
+            source.online_url = official_source_sync.online_url(source.name)
         else:
             source.online_url = connector.get("package_url") if connector else None
     session.commit()
@@ -72,10 +75,14 @@ async def run_scheduler(
         if stop_event.is_set():
             return
         for source_name, connector in connectors.items():
-            if source_name == openeuler_sync.SOURCE_NAME:
+            if source_name == openeuler_sync.SOURCE_NAME or official_source_sync.is_supported(source_name):
                 continue
             await asyncio.to_thread(
                 _sync_with_session, session_factory, source_name, connector, trusted_keys
+            )
+        for source_name in official_source_sync.SOURCE_ADAPTERS:
+            await asyncio.to_thread(
+                _sync_official_with_session, session_factory, source_name
             )
         await asyncio.to_thread(_sync_openeuler, session_factory)
 
@@ -120,6 +127,19 @@ def _sync_with_session(
     with session_factory() as session:
         try:
             sync_source(session, source_name, connector, trusted_keys)
+        except (knowledge.KnowledgeImportError, knowledge.KnowledgeConflictError):
+            return
+
+
+def _sync_official_with_session(
+    session_factory: sessionmaker[Session], source_name: str,
+) -> None:
+    with session_factory() as session:
+        source = session.query(KnowledgeSource).filter_by(name=source_name).one_or_none()
+        if source is None or not source.enabled:
+            return
+        try:
+            official_source_sync.sync_source(session, source)
         except (knowledge.KnowledgeImportError, knowledge.KnowledgeConflictError):
             return
 

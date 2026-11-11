@@ -15,6 +15,7 @@ from src.services import knowledge_coverage
 from src.services import knowledge_backfill
 from src.services import knowledge_sync
 from src.services import openeuler_sync
+from src.services import official_source_sync
 
 router = APIRouter(prefix="/knowledge", tags=["knowledge"])
 
@@ -55,6 +56,8 @@ def sync_source(
     try:
         if source.name == openeuler_sync.SOURCE_NAME:
             run = openeuler_sync.sync_source(session, source)
+        elif official_source_sync.is_supported(source.name):
+            run = official_source_sync.sync_source(session, source)
         else:
             connector = request.app.state.knowledge_connectors.get(source.name)
             if connector is None:

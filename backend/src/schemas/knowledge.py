@@ -11,12 +11,24 @@ OsFamily = Literal[
 ]
 
 
+class UpstreamRange(BaseModel):
+    introduced: str = Field(pattern=r"^\d+(?:\.\d+){0,3}$")
+    fixed: str | None = Field(default=None, pattern=r"^\d+(?:\.\d+){0,3}$")
+    last_affected: str | None = Field(default=None, pattern=r"^\d+(?:\.\d+){0,3}$")
+
+
 class AffectedPackage(BaseModel):
     name: str = Field(min_length=1, max_length=150)
+    package_scope: Literal["binary", "source"] = "binary"
     affected_version: str = Field(min_length=1, max_length=200)
     fixed_version: str = Field(min_length=1, max_length=200)
     os_versions: list[str] = Field(default_factory=list, max_length=100)
     service_banner_keywords: list[str] = Field(default_factory=list, max_length=20)
+    upstream_product: str | None = Field(default=None, max_length=80)
+    upstream_ranges: list[UpstreamRange] = Field(default_factory=list, max_length=100)
+    upstream_fixed_versions: list[str] = Field(default_factory=list, max_length=100)
+    requires_manual_confirmation: bool = False
+    evidence_reason: str | None = Field(default=None, max_length=500)
 
 
 class AdvisoryPackage(BaseModel):

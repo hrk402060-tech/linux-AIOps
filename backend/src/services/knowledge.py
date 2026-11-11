@@ -16,16 +16,18 @@ from src.models.knowledge import (
     KnowledgeAdvisory, KnowledgeRelease, KnowledgeSource, KnowledgeSyncRun,
 )
 from src.schemas.knowledge import KnowledgeImportRequest, OfflineKnowledgePackage
+from src.services.knowledge_lock import lock_publication
 
 MAX_PACKAGE_BYTES = 50 * 1024 * 1024
 SOURCE_DEFINITIONS = (
-    ("Ubuntu Security Notices", "Canonical", "online_secondary", 10, "0 2 * * *"),
-    ("Debian Security Advisories", "Debian", "online_secondary", 10, "0 2 * * *"),
-    ("Red Hat Security Advisories", "Red Hat", "online_secondary", 10, "0 2 * * *"),
+    ("Ubuntu Security Notices", "Canonical", "vendor_official_api", 10, "0 2 * * *"),
+    ("Debian Security Advisories", "Debian", "vendor_official_api", 10, "0 2 * * *"),
+    ("Red Hat Security Advisories", "Red Hat", "vendor_official_api", 10, "0 2 * * *"),
     ("openEuler Security Advisories", "openEuler", "vendor_official_api", 10, "0 2 * * *"),
     ("Kylin Security Advisories", "Kylinsoft", "offline_package", 10, None),
     ("UnionTech Security Advisories", "UnionTech", "offline_package", 10, None),
-    ("Anolis Security Advisories", "OpenAnolis", "online_secondary", 10, "0 2 * * *"),
+    ("Anolis Security Advisories", "OpenAnolis", "vendor_official_api", 10, "0 2 * * *"),
+    ("Upstream Service Advisories", "nginx / Apache HTTP Server", "online_secondary", 20, "0 2 * * *"),
     ("CNVD", "CNCERT", "offline_package", 50, None),
     ("CNNVD", "CNNVD", "offline_package", 50, None),
 )
@@ -103,6 +105,7 @@ def import_package(
         )
         if source is None:
             raise KnowledgeImportError("离线包来源未在服务端登记")
+        lock_publication(session)
         existing = session.scalar(
             select(KnowledgeRelease).where(KnowledgeRelease.version == package.version)
         )
@@ -142,6 +145,7 @@ def import_package(
 
 
 def rollback_release(session: Session, release_id: str) -> KnowledgeRelease | None:
+    lock_publication(session)
     release = session.get(KnowledgeRelease, release_id)
     if release is None:
         return None
