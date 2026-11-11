@@ -42,6 +42,8 @@ def setup(session: Session, user: User, vault: "CredentialVault") -> dict[str, s
 
 
 def confirm(session: Session, user: User, code: str, vault: "CredentialVault") -> list[str]:
+    if user.mfa_enabled or not user.enabled:
+        raise MfaInvalidError
     secret = _decrypt_secret(user, vault)
     if not verify_totp(secret, code):
         raise MfaInvalidError

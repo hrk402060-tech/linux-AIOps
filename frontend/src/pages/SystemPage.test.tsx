@@ -53,8 +53,8 @@ it('shows user management only to administrators', async () => {
   expect(await screen.findByText('用户与权限')).toBeInTheDocument();
   expect(await screen.findByText('audit-user')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: '新建用户' })).toBeInTheDocument();
-  expect(screen.getByRole('region', { name: 'AI 配置' })).toBeInTheDocument();
-  expect(screen.getByRole('region', { name: '登录安全策略' })).toBeInTheDocument();
+  expect(screen.queryByRole('region', { name: 'AI 配置' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('region', { name: '登录安全策略' })).not.toBeInTheDocument();
 });
 
 it('lets an administrator inspect and revoke one active session', async () => {

@@ -194,9 +194,15 @@ is required. Until the first save, the existing server defaults remain active.
 Changing the lifetime affects new logins; existing sessions keep their expiry
 and can be revoked through the session controls.
 
-All enabled users must bind MFA before mandatory MFA can be enabled. Invalid
-MFA codes count toward account lockout; an initial missing-code challenge does
-not. With mandatory MFA enabled, resetting the last enabled, MFA-bound
+Administrators configure MFA under System Management > Security Settings:
+optional, administrators only, or all users. Users bind their own authenticator
+under Personal Security by scanning a QR code and confirming a six-digit code.
+Unbound users subject to enforcement must complete the QR enrollment flow before
+logging in. Enrollment expires after ten minutes, is single use, and becomes
+invalid after password, account permission or pending-secret changes. No login
+session is issued before enrollment is completed. Invalid MFA codes count toward
+account lockout; an initial missing-code challenge does not.
+With mandatory MFA enabled, resetting the last enabled, MFA-bound
 administrator is rejected. Disable the mandatory policy first or bind another
 administrator. Successful MFA resets revoke that user's browser sessions and
 terminate their SSH connections; the reset and its audit commit together.

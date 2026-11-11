@@ -50,7 +50,7 @@ export function useUserMfa({ currentUser, loadUsers, messages, onLogout }: UserM
   const reset = (user: AuthUser) => {
     Modal.confirm({
       title: `重置 ${user.username} 的 MFA？`,
-      content: `重置后原恢复码、登录会话和 SSH 连接立即失效；启用强制 MFA 时，该用户需由管理员重新绑定后才能登录。${user.id === currentUser.id ? '当前账号也将退出登录，请确认有其他管理员可协助绑定。' : ''}`,
+      content: `重置后原恢复码、登录会话和 SSH 连接立即失效；启用强制 MFA 时，用户下次登录需重新扫码绑定。${user.id === currentUser.id ? '当前账号也将退出登录。' : ''}`,
       okText: '确认重置', cancelText: '取消',
       onOk: async () => {
         try {

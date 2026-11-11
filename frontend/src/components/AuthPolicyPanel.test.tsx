@@ -9,6 +9,8 @@ const policy = {
   lock_duration_seconds: 900,
   session_ttl_seconds: 43200,
   require_mfa: false,
+  mfa_enforcement: 'off' as const,
+  allow_user_mfa_reset: true,
   source: '平台配置',
   updated_by: 'admin',
   updated_at: '2026-10-31T10:00:00Z',
@@ -42,29 +44,34 @@ it('loads and saves the administrator login security policy', async () => {
         lock_duration_seconds: 900,
         session_ttl_seconds: 43200,
         require_mfa: false,
+        mfa_enforcement: 'off',
+        allow_user_mfa_reset: true,
       }),
     }),
   ));
 });
 
-it('shows the server validation error when forced MFA cannot be enabled', async () => {
+it('allows forced MFA and explains that unbound users enroll at their next login', async () => {
   const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => Promise.resolve({
-    ok: init?.method === 'PUT' ? false : true,
-    json: async () => init?.method === 'PUT' ? { detail: '仍有 1 个启用用户未绑定 MFA，不能启用强制 MFA' } : policy,
+    ok: true,
+    json: async () => init?.method === 'PUT' ? { ...policy, require_mfa: true, mfa_enforcement: 'all' } : policy,
   }));
   vi.stubGlobal('fetch', fetchMock);
   render(<ConfigProvider><AuthPolicyPanel /></ConfigProvider>);
 
   await waitFor(() => expect(screen.getByRole('button', { name: '保存登录策略' })).toBeEnabled());
-  fireEvent.click(screen.getByRole('switch', { name: '强制所有启用用户使用 MFA' }));
+  fireEvent.mouseDown(screen.getByRole('combobox', { name: 'MFA 强制范围' }));
+  fireEvent.click(await screen.findByText('所有启用用户强制'));
   fireEvent.click(screen.getByRole('button', { name: '保存登录策略' }));
 
-  expect(await screen.findByText('仍有 1 个启用用户未绑定 MFA，不能启用强制 MFA')).toBeInTheDocument();
+  expect(screen.getByText('未绑定用户下次登录会直接进入二维码绑定流程，绑定完成后才能进入平台。')).toBeInTheDocument();
+  expect(await screen.findByText('登录安全策略已保存')).toBeInTheDocument();
   const request = fetchMock.mock.calls.find(([, init]) => init?.method === 'PUT');
   expect(request).toBeDefined();
   expect(JSON.parse(String(request?.[1]?.body))).toEqual({
     login_failure_threshold: 5, lock_duration_seconds: 900,
     session_ttl_seconds: 43200, require_mfa: true,
+    mfa_enforcement: 'all', allow_user_mfa_reset: true,
   });
 });
 

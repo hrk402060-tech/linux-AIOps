@@ -15,10 +15,10 @@ function renderDocs() {
 
 describe('使用文档', () => {
   it('覆盖全部现有入口及安全检查子功能，不新增移除的凭据入口', () => {
-    const pages: PageKey[] = ['dashboard', 'assets', 'cmdb', 'automation', 'terminal',
+    const pages: PageKey[] = ['dashboard', 'server-monitoring', 'assets', 'cmdb', 'automation', 'terminal',
       'ops-assistant', 'patches', 'observability', 'probes', 'alerts', 'incidents',
       'scans', 'schedules', 'baselines', 'exposures', 'credential-risks', 'findings',
-      'knowledge', 'agent', 'reports', 'system', 'audit-log'];
+      'knowledge', 'agent', 'reports', 'system', 'user-security', 'security-settings', 'audit-log'];
     expect(new Set(userDocs.map((entry) => entry.page))).toEqual(new Set(pages));
     expect(userDocs.find((entry) => entry.id === 'cmdb')).toMatchObject({
       title: '系统/接口监控', page: 'cmdb',

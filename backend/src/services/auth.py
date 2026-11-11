@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 import secrets
+from typing import Literal
 
 from pwdlib import PasswordHash
 from sqlalchemy import select, update
@@ -79,6 +80,8 @@ def authenticate(
     user_agent: str | None, ttl_seconds: int, lock_threshold: int,
     lock_seconds: int, otp_code: str | None = None, vault: object | None = None,
     require_mfa: bool = False,
+    mfa_enforcement: Literal["off", "admins", "all"] | None = None,
+    issue_session: bool = True,
 ) -> tuple[User, str]:
     now = datetime.now(timezone.utc)
     normalized = normalize_username(username)
@@ -102,7 +105,11 @@ def authenticate(
         raise AuthenticationError
     if updated_hash is not None:
         user.password_hash = updated_hash
-    if require_mfa and not user.mfa_enabled:
+    enforced = require_mfa if mfa_enforcement is None else (
+        mfa_enforcement == "all"
+        or (mfa_enforcement == "admins" and user.role == "admin")
+    )
+    if enforced and not user.mfa_enabled:
         _record_login(session, user, normalized, False, "mfa_setup_required", client_ip, user_agent)
         raise MfaSetupRequiredError
     if user.mfa_enabled:
@@ -117,6 +124,8 @@ def authenticate(
             _record_failed_attempt(user, now, lock_threshold, lock_seconds)
             _record_login(session, user, normalized, False, "invalid_mfa", client_ip, user_agent)
             raise MfaInvalidError from exc
+    if not issue_session:
+        return user, ""
     user.failed_login_attempts = 0
     user.locked_until = None
     user.last_login_at = now

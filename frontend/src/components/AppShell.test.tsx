@@ -25,12 +25,13 @@ const expectedPages: Record<PageKey, [string, string]> = {
   knowledge: ['安全中心', '漏洞知识库'], agent: ['安全中心', '漏洞 AI 助手'],
   reports: ['安全中心', '安全报告'], system: ['系统管理', '系统状态'],
   credentials: ['系统管理', '连接凭据'], 'audit-log': ['系统管理', '审计日志'],
+  'user-security': ['系统管理', '个人安全'], 'security-settings': ['系统管理', '安全设置'],
 };
 const groupEntries: Record<string, string[]> = {
   工作台: ['综合总览', '服务器监控', '服务器资产', '系统/接口监控', '自动化任务', 'SSH 远程', 'AI 运维助手', '补丁管理'],
   监控告警: ['服务监控', 'API 拨测', '活动告警', '故障管理'],
   安全中心: ['漏洞扫描', '安全检查', '漏洞治理', '漏洞知识库', '漏洞 AI 助手', '安全报告'],
-  系统管理: ['系统状态', '审计日志'],
+  系统管理: ['个人安全', '安全设置', '系统状态', '审计日志'],
 };
 
 function Harness({ initialPage = 'dashboard', user = currentUser }: {
@@ -195,7 +196,8 @@ describe('AppShell 四工作台导航', () => {
   it.each(['admin', 'operator', 'auditor'] as const)('角色 %s 保留现有入口和系统页权限边界', async (role) => {
     const { container } = render(<AppShell currentUser={{ ...currentUser, role }} onLogout={vi.fn()}
       selectedPage="system" onNavigate={vi.fn()}>内容</AppShell>);
-    expect(menu().getAllByRole('menuitem').map((item) => item.textContent)).toEqual(groupEntries.系统管理);
+    const entries = role === 'admin' ? groupEntries.系统管理 : ['个人安全', '系统状态', '审计日志'];
+    expect(menu().getAllByRole('menuitem').map((item) => item.textContent)).toEqual(entries);
     expect(container.querySelector('.ant-menu-item-selected')).toHaveTextContent('系统状态');
     expect(menu().queryByText('用户权限')).not.toBeInTheDocument();
     expect(menu().queryByText('AI 配置')).not.toBeInTheDocument();
@@ -204,7 +206,7 @@ describe('AppShell 四工作台导航', () => {
   it('系统管理不再展示连接凭据入口，但保留旧 PageKey 兼容', () => {
     render(<AppShell currentUser={currentUser} onLogout={vi.fn()}
       selectedPage="system" onNavigate={vi.fn()}>内容</AppShell>);
-    expect(menu().getAllByRole('menuitem').map((item) => item.textContent)).toEqual(['系统状态', '审计日志']);
+    expect(menu().getAllByRole('menuitem').map((item) => item.textContent)).toEqual(['个人安全', '安全设置', '系统状态', '审计日志']);
     expect(menu().queryByText('连接凭据')).not.toBeInTheDocument();
   });
 

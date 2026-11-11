@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Button, notification, Spin } from 'antd';
+import { Alert, Button, notification, Spin } from 'antd';
 import { SquareTerminal } from 'lucide-react';
 
 import { logout } from './api/auth';
@@ -24,6 +24,8 @@ import { isSecurityCheckPage } from './types/security-check';
 import { AuditLogPage } from './pages/AuditLogPage';
 import { PatchesPage } from './pages/PatchesPage';
 import { SystemPage } from './pages/SystemPage';
+import { SecuritySettingsPage } from './pages/SecuritySettingsPage';
+import { UserSecurityPage } from './pages/UserSecurityPage';
 import { AutomationPage } from './pages/AutomationPage';
 import { CmdbPage } from './pages/CmdbPage';
 import { ObservabilityPage } from './pages/ObservabilityPage';
@@ -34,7 +36,7 @@ import { UserDocsPage } from './pages/UserDocsPage';
 import { openTerminalTab } from './utils/terminalNavigation';
 import { requestedPlatformPage } from './utils/userDocsNavigation';
 
-export type PageKey = 'dashboard' | 'server-monitoring' | 'cmdb' | 'terminal' | 'observability' | 'probes' | 'assets' | 'scans' | 'schedules' | 'baselines' | 'exposures' | 'credential-risks' | 'findings' | 'incidents' | 'reports' | 'audit-log' | 'patches' | 'credentials' | 'knowledge' | 'agent' | 'alerts' | 'system' | 'automation' | 'ops-assistant';
+export type PageKey = 'dashboard' | 'server-monitoring' | 'cmdb' | 'terminal' | 'observability' | 'probes' | 'assets' | 'scans' | 'schedules' | 'baselines' | 'exposures' | 'credential-risks' | 'findings' | 'incidents' | 'reports' | 'audit-log' | 'patches' | 'credentials' | 'knowledge' | 'agent' | 'alerts' | 'system' | 'automation' | 'ops-assistant' | 'user-security' | 'security-settings';
 
 export default function App() {
   const [monitorPreview, setMonitorPreview] = useState(() => import.meta.env.VITE_SERVER_MONITOR_PREVIEW === 'true'
@@ -130,6 +132,9 @@ export default function App() {
           key={searchTarget?.page === 'cmdb' ? `${searchTarget.serviceId}:${searchNavigationId}` : 'cmdb'}
           initialServiceId={searchTarget?.page === 'cmdb' ? searchTarget.serviceId : undefined} />
         : page === 'system' ? <SystemPage currentUser={currentUser} onLogout={() => void signOut()} />
+        : page === 'user-security' ? <UserSecurityPage onLogout={() => void signOut()} />
+        : page === 'security-settings' ? currentUser.role === 'admin' ? <SecuritySettingsPage />
+          : <Alert type="error" showIcon message="仅管理员可访问安全设置" />
         : page === 'patches' ? <PatchesPage />
         : page === 'automation' ? <AutomationPage onNavigate={navigate} />
         : page === 'audit-log' ? <AuditLogPage />

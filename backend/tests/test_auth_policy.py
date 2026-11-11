@@ -20,6 +20,8 @@ def policy_payload(**overrides: object) -> dict[str, object]:
         "lock_duration_seconds": 900,
         "session_ttl_seconds": 43200,
         "require_mfa": False,
+        "mfa_enforcement": "off",
+        "allow_user_mfa_reset": True,
     }
     payload.update(overrides)
     return payload

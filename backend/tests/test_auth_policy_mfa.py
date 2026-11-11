@@ -13,11 +13,11 @@ from src.services import mfa
 from test_auth_policy import PASSWORD, create_policy_user, enable_user_mfa, policy_payload
 
 
-def test_force_mfa_is_rejected_until_enabled_users_are_bound(client: TestClient) -> None:
+def test_force_mfa_allows_unbound_users_to_self_enroll(client: TestClient) -> None:
     create_policy_user(client, "unbound-mfa-user")
     response = client.put("/api/v1/system/auth-policy", json=policy_payload(require_mfa=True))
-    assert response.status_code == 409
-    assert "未绑定 MFA" in response.json()["detail"]
+    assert response.status_code == 200
+    assert response.json()["mfa_enforcement"] == "all"
 
 
 def test_force_mfa_blocks_new_unbound_user_with_specific_error(client: TestClient) -> None:

@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { Button, Form, Input, Modal } from 'antd';
+import { Alert, Button, Descriptions, Form, Input, Modal, QRCode } from 'antd';
 import { ArrowRight, CircleHelp, Eye, EyeOff, Headphones, KeyRound, Layers, LockKeyhole, UserRound } from 'lucide-react';
 
 import { ApiError } from '../api/client';
-import { login, type AuthUser } from '../api/auth';
+import {
+  confirmMfaEnrollment, login, startMfaEnrollment,
+  type AuthUser, type MfaEnrollmentSetup,
+} from '../api/auth';
 import type { PetState } from './LoginCompanion';
 import { LoginPlatformScene } from './LoginPlatformScene';
 import './AccessGate.css';
@@ -12,9 +15,13 @@ export function AccessGate({ onAuthenticated }: { onAuthenticated: (user: AuthUs
   const [loading, setLoading] = useState(false);
   const [petState, setPetState] = useState<PetState>('idle');
   const [mfaRequired, setMfaRequired] = useState(false);
+  const [enrollmentSetup, setEnrollmentSetup] = useState<MfaEnrollmentSetup | null>(null);
+  const [enrollmentRecoveryCodes, setEnrollmentRecoveryCodes] = useState<string[] | null>(null);
+  const [enrollmentError, setEnrollmentError] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [form] = Form.useForm();
   const loadingRef = useRef(false);
   const successTimer = useRef<number | undefined>(undefined);
   useEffect(() => () => {
@@ -24,7 +31,7 @@ export function AccessGate({ onAuthenticated }: { onAuthenticated: (user: AuthUs
   const authenticate = async ({ username, password, otp_code }: {
     username: string; password: string; otp_code?: string;
   }) => {
-    if (loadingRef.current || successTimer.current !== undefined) return;
+    if (loadingRef.current || successTimer.current !== undefined || enrollmentSetup || enrollmentRecoveryCodes) return;
     loadingRef.current = true;
     setLoading(true);
     setPetState('loading');
@@ -41,9 +48,22 @@ export function AccessGate({ onAuthenticated }: { onAuthenticated: (user: AuthUs
         setMfaRequired(true);
         setPetState('idle');
       } else {
-        if (error instanceof ApiError && error.code === 'mfa_setup_required') setMfaRequired(false);
-        setPetState('failure');
-        setErrorMessage(error instanceof Error ? error.message : '登录失败');
+        if (error instanceof ApiError && error.code === 'mfa_setup_required') {
+          setMfaRequired(false);
+          try {
+            const setup = await startMfaEnrollment(username.trim(), password);
+            setEnrollmentSetup(setup);
+            setEnrollmentError('');
+            setErrorMessage('');
+            setPetState('idle');
+          } catch (enrollmentError) {
+            setPetState('failure');
+            setErrorMessage(enrollmentError instanceof Error ? enrollmentError.message : 'MFA 绑定启动失败');
+          }
+        } else {
+          setPetState('failure');
+          setErrorMessage(error instanceof Error ? error.message : '登录失败');
+        }
       }
     } finally {
       if (successTimer.current === undefined) {
@@ -79,7 +99,7 @@ export function AccessGate({ onAuthenticated }: { onAuthenticated: (user: AuthUs
               <h2 id="platform-login-heading">登录工作台</h2>
               <p>欢迎回来，请使用平台账号登录</p>
             </div>
-            <Form layout="vertical" requiredMark={false} onFinish={authenticate}
+            <Form form={form} layout="vertical" requiredMark={false} onFinish={authenticate}
               onValuesChange={() => setErrorMessage('')}>
               <Form.Item name="username" label="用户名"
                 rules={[{ required: true, whitespace: true, message: '请输入用户名' }]}>
@@ -136,6 +156,48 @@ export function AccessGate({ onAuthenticated }: { onAuthenticated: (user: AuthUs
         getContainer={false} width={400} closable={false}
         footer={<Button type="primary" onClick={() => setHelpOpen(false)}>知道了</Button>}>
         <p className="pl-help-text">账号开通、密码重置或二次验证问题，请联系平台管理员。</p>
+      </Modal>
+      <Modal title="首次绑定 MFA" open={enrollmentSetup !== null} footer={null}
+        onCancel={() => { if (!loadingRef.current) { setEnrollmentSetup(null); setEnrollmentError(''); } }}
+        closable={!loading} maskClosable={!loading} keyboard={!loading} destroyOnHidden>
+        {enrollmentSetup ? <>
+          <Alert type="warning" showIcon message="管理员已启用强制 MFA，请先完成扫码绑定后再登录。" />
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '20px 0 12px' }}>
+            <QRCode type="svg" value={enrollmentSetup.otpauth_uri} size={220} aria-label="MFA 二维码" />
+          </div>
+          <details style={{ marginBottom: 16 }}>
+            <summary style={{ cursor: 'pointer', color: '#1677ff' }}>无法扫码时手动绑定</summary>
+            <Descriptions column={1} size="small" style={{ marginTop: 12 }} items={[
+              { key: 'secret', label: '绑定密钥', children: <code>{enrollmentSetup.secret}</code> },
+              { key: 'uri', label: '绑定地址', children: <code style={{ wordBreak: 'break-all' }}>{enrollmentSetup.otpauth_uri}</code> },
+            ]} />
+          </details>
+          {enrollmentError ? <Alert type="error" showIcon message={enrollmentError} style={{ marginBottom: 16 }} /> : null}
+          <Form layout="vertical" onFinish={async ({ code }: { code: string }) => {
+            if (loadingRef.current) return;
+            loadingRef.current = true;
+            setLoading(true);
+            setEnrollmentError('');
+            try {
+              const result = await confirmMfaEnrollment(enrollmentSetup.enrollment_token, code);
+              setEnrollmentSetup(null);
+              setEnrollmentRecoveryCodes(result.recovery_codes);
+            } catch (confirmError) {
+              setEnrollmentError(confirmError instanceof Error ? confirmError.message : 'MFA 验证失败');
+            } finally { loadingRef.current = false; setLoading(false); }
+          }}>
+            <Form.Item name="code" label="验证器验证码" rules={[{ required: true, pattern: /^\d{6}$/, message: '请输入 6 位数字验证码' }]}>
+              <Input autoComplete="one-time-code" inputMode="numeric" maxLength={6} disabled={loading} />
+            </Form.Item>
+            <Button block type="primary" htmlType="submit" loading={loading}>确认绑定</Button>
+          </Form>
+        </> : null}
+      </Modal>
+      <Modal title="MFA 已绑定" open={enrollmentRecoveryCodes !== null}
+        footer={<Button type="primary" onClick={() => { setEnrollmentRecoveryCodes(null); form.resetFields(); }}>返回登录</Button>}
+        closable={false}>
+        <Alert type="warning" showIcon message="恢复码只显示这一次，请安全保存。" />
+        <pre className="mfa-recovery-codes">{enrollmentRecoveryCodes?.join('\n')}</pre>
       </Modal>
     </main>
   );

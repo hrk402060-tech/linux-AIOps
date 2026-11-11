@@ -17,8 +17,6 @@ import {
 import { getAssets } from '../api/assets';
 import type { Asset } from '../types/asset';
 import { PASSWORD_POLICY_MESSAGE, validatePassword } from '../passwordPolicy';
-import { AISettingsPanel } from '../components/AISettingsPanel';
-import { AuthPolicyPanel } from '../components/AuthPolicyPanel';
 import { RevokeUserSessionsModal, UserSessionsModal } from '../components/UserSessionsModal';
 import { UserMfaModal } from '../components/UserMfaModal';
 import { useUserMfa } from '../hooks/useUserMfa';
@@ -194,8 +192,6 @@ export function SystemPage({
         <section className="ops-panel"><div className="panel-heading"><div><strong>终端连接策略</strong><span>Web SSH 网关运行边界</span></div></div><Descriptions column={1} size="small" items={[{ key: 'connections', label: '最大并发连接', children: `${status.terminal.max_connections} 个` }, { key: 'idle', label: '空闲超时', children: duration(status.terminal.idle_timeout_seconds) }, { key: 'duration', label: '最长会话', children: duration(status.terminal.max_duration_seconds) }, { key: 'host-key', label: '主机密钥策略', children: <Tag color="green">首次连接自动接受，仅内存使用</Tag> }]} /></section>
         <section className="ops-panel"><div className="panel-heading"><div><strong>安全边界</strong><span>只读与凭据保护策略</span></div><ShieldCheck size={20} /></div><Descriptions column={1} size="small" items={[{ key: 'scan', label: '扫描默认模式', children: status.security.scan_read_only_default ? <Tag color="green">只读</Tag> : <Tag color="red">需检查</Tag> }, { key: 'ai', label: 'AI 直接执行', children: status.security.ai_direct_execution ? <Tag color="red">允许</Tag> : <Tag color="green">禁止</Tag> }, { key: 'encryption', label: '凭据加密', children: status.security.credential_encryption }, { key: 'auth', label: '认证方式', children: status.security.authentication }]} /></section>
       </div>
-      {currentUser.role === 'admin' ? <AuthPolicyPanel /> : null}
-      {currentUser.role === 'admin' ? <AISettingsPanel /> : null}
       {currentUser.role === 'admin' ? <section className="user-management">
         <div className="panel-heading">
           <div><strong>用户与权限</strong><span>用户密码不可查看，停用和重置密码会撤销已有会话</span></div>

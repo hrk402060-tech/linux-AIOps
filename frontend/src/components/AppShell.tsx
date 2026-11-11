@@ -22,6 +22,7 @@ import {
   SquareTerminal,
   Wrench,
   Settings,
+  KeyRound,
   LogOut,
 } from 'lucide-react';
 import type { PageKey } from '../App';
@@ -70,6 +71,8 @@ const workspaces: WorkspaceDefinition[] = [
     { key: 'reports', icon: <FileText size={16} />, label: '安全报告' },
   ] },
   { key: 'system', label: '系统管理', icon: <Settings size={18} />, description: '用户、凭据与平台设置', defaultPage: 'system', children: [
+    { key: 'user-security', icon: <ShieldCheck size={16} />, label: '个人安全' },
+    { key: 'security-settings', icon: <KeyRound size={16} />, label: '安全设置' },
     { key: 'system', icon: <Settings size={16} />, label: '系统状态' },
     { key: 'audit-log', icon: <FileText size={16} />, label: '审计日志' },
   ] },
@@ -80,6 +83,7 @@ const pageWorkspaces: Record<PageKey, WorkspaceKey> = {
   observability: 'monitoring', probes: 'monitoring', alerts: 'monitoring', incidents: 'monitoring',
   scans: 'security', schedules: 'security', baselines: 'security', exposures: 'security', 'credential-risks': 'security', findings: 'security', knowledge: 'security', agent: 'security', reports: 'security',
   system: 'system', credentials: 'system', 'audit-log': 'system',
+  'user-security': 'system', 'security-settings': 'system',
 };
 
 type NavigationMemory = Partial<Record<WorkspaceKey, PageKey>> & { activePage?: PageKey };
@@ -115,13 +119,16 @@ function writeNavigationMemory(userId: string, memory: NavigationMemory) {
   }
 }
 
-function Navigation({ selectedPage, onNavigate, onSwitchWorkspace, collapsed = false }: {
+function Navigation({ currentUser, selectedPage, onNavigate, onSwitchWorkspace, collapsed = false }: {
+  currentUser: AuthUser;
   selectedPage: PageKey; onNavigate: (page: PageKey) => void;
   onSwitchWorkspace: (workspace: WorkspaceDefinition) => void;
   collapsed?: boolean;
 }) {
   const activeWorkspace = workspaces.find((workspace) => workspace.key === pageWorkspaces[selectedPage]) ?? workspaces[0];
-  const items = activeWorkspace.children.map((entry) => ({ key: entry.key, icon: entry.icon, label: entry.label }));
+  const items = activeWorkspace.children
+    .filter((entry) => entry.key !== 'security-settings' || currentUser.role === 'admin')
+    .map((entry) => ({ key: entry.key, icon: entry.icon, label: entry.label }));
   return (
     <div className="nav-content">
       <div className="brand" aria-label="Linux 智能综合运维平台">
@@ -179,6 +186,7 @@ const pageLabels: Record<PageKey, string> = {
   reports: '安全报告', 'audit-log': '审计日志', patches: '补丁管理', credentials: '连接凭据',
   incidents: '故障管理',
   knowledge: '漏洞知识库', agent: '漏洞 AI 助手', system: '系统状态', automation: '自动化任务', 'ops-assistant': 'AI 运维助手',
+  'user-security': '个人安全', 'security-settings': '安全设置',
   probes: 'API 拨测',
 };
 
@@ -217,7 +225,7 @@ export function AppShell({ children, currentUser, onLogout, selectedPage, onNavi
   };
   return (
     <Layout className={`app-layout${collapsed ? ' sidebar-collapsed' : ''}`}>
-      <Sider width={232} collapsedWidth={72} collapsed={collapsed} trigger={null} className="desktop-sider"><Navigation collapsed={collapsed} selectedPage={selectedPage} onNavigate={onNavigate} onSwitchWorkspace={switchWorkspace} /><Tooltip title={collapsed ? '展开侧栏' : '收起侧栏'}><Button className="sidebar-collapse" type="text" aria-label={collapsed ? '展开侧栏' : '收起侧栏'} icon={collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />} onClick={() => setCollapsed((value) => !value)} /></Tooltip></Sider>
+      <Sider width={232} collapsedWidth={72} collapsed={collapsed} trigger={null} className="desktop-sider"><Navigation currentUser={currentUser} collapsed={collapsed} selectedPage={selectedPage} onNavigate={onNavigate} onSwitchWorkspace={switchWorkspace} /><Tooltip title={collapsed ? '展开侧栏' : '收起侧栏'}><Button className="sidebar-collapse" type="text" aria-label={collapsed ? '展开侧栏' : '收起侧栏'} icon={collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />} onClick={() => setCollapsed((value) => !value)} /></Tooltip></Sider>
       <Drawer
         className="mobile-navigation"
         placement="left"
@@ -226,7 +234,7 @@ export function AppShell({ children, currentUser, onLogout, selectedPage, onNavi
         width={300}
         closable={false}
       >
-        <Navigation selectedPage={selectedPage} onNavigate={(page) => { onNavigate(page); setMobileOpen(false); }} onSwitchWorkspace={switchWorkspace} />
+        <Navigation currentUser={currentUser} selectedPage={selectedPage} onNavigate={(page) => { onNavigate(page); setMobileOpen(false); }} onSwitchWorkspace={switchWorkspace} />
       </Drawer>
       <Layout>
         <Header className="topbar">

@@ -42,6 +42,7 @@ def login(
             policy.login_failure_threshold, policy.lock_duration_seconds,
             payload.otp_code, request.app.state.credential_vault,
             policy.require_mfa,
+            policy.mfa_enforcement,
         )
     except service.MfaSetupRequiredError as exc:
         raise HTTPException(status_code=401, detail="mfa_setup_required") from exc

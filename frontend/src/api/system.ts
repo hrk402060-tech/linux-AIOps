@@ -28,6 +28,8 @@ export interface AuthPolicy {
   lock_duration_seconds: number;
   session_ttl_seconds: number;
   require_mfa: boolean;
+  mfa_enforcement: 'off' | 'admins' | 'all';
+  allow_user_mfa_reset: boolean;
   source: string;
   updated_by: string;
   updated_at: string | null;
@@ -48,7 +50,7 @@ export async function getAuthPolicy(): Promise<AuthPolicy> {
 }
 
 export async function saveAuthPolicy(
-  payload: Pick<AuthPolicy, 'login_failure_threshold' | 'lock_duration_seconds' | 'session_ttl_seconds' | 'require_mfa'>,
+  payload: Pick<AuthPolicy, 'login_failure_threshold' | 'lock_duration_seconds' | 'session_ttl_seconds' | 'mfa_enforcement' | 'allow_user_mfa_reset'>,
 ): Promise<AuthPolicy> {
   const response = await apiFetch('/api/v1/system/auth-policy', {
     method: 'PUT',
@@ -57,7 +59,9 @@ export async function saveAuthPolicy(
       login_failure_threshold: payload.login_failure_threshold,
       lock_duration_seconds: payload.lock_duration_seconds,
       session_ttl_seconds: payload.session_ttl_seconds,
-      require_mfa: payload.require_mfa,
+      require_mfa: payload.mfa_enforcement !== 'off',
+      mfa_enforcement: payload.mfa_enforcement,
+      allow_user_mfa_reset: payload.allow_user_mfa_reset,
     }),
   });
   return readAuthPolicy(response, '登录安全策略保存失败');
@@ -76,6 +80,8 @@ async function readAuthPolicy(response: Response, fallback: string): Promise<Aut
     || !integerInRange('lock_duration_seconds', 60, 86400)
     || !integerInRange('session_ttl_seconds', 900, 604800)
     || typeof policy.require_mfa !== 'boolean' || typeof policy.source !== 'string'
+    || !['off', 'admins', 'all'].includes(policy.mfa_enforcement as string)
+    || typeof policy.allow_user_mfa_reset !== 'boolean'
     || typeof policy.updated_by !== 'string'
     || !(policy.updated_at === null || (
       typeof policy.updated_at === 'string' && !Number.isNaN(Date.parse(policy.updated_at))

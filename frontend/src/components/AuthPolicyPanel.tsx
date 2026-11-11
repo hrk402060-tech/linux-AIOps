@@ -1,17 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Button, Form, InputNumber, Space, Spin, Switch, Tag, message } from 'antd';
+import { Alert, Button, Form, InputNumber, Select, Space, Spin, Switch, Tag, message } from 'antd';
 import { RefreshCw, Save } from 'lucide-react';
 
 import { getAuthPolicy, saveAuthPolicy, type AuthPolicy } from '../api/system';
 
-type AuthPolicyForm = Pick<AuthPolicy, 'login_failure_threshold' | 'lock_duration_seconds' | 'session_ttl_seconds' | 'require_mfa'>;
+type AuthPolicyForm = Pick<AuthPolicy, 'login_failure_threshold' | 'lock_duration_seconds' | 'session_ttl_seconds' | 'mfa_enforcement' | 'allow_user_mfa_reset'>;
 
 function policyFields(policy: AuthPolicyForm): AuthPolicyForm {
   return {
     login_failure_threshold: policy.login_failure_threshold,
     lock_duration_seconds: policy.lock_duration_seconds,
     session_ttl_seconds: policy.session_ttl_seconds,
-    require_mfa: policy.require_mfa,
+    mfa_enforcement: policy.mfa_enforcement,
+    allow_user_mfa_reset: policy.allow_user_mfa_reset,
   };
 }
 
@@ -108,15 +109,23 @@ export function AuthPolicyPanel() {
             <InputNumber min={900} max={604800} precision={0} />
           </Form.Item>
         </Space>
-        <Form.Item name="require_mfa" label="强制所有启用用户使用 MFA" valuePropName="checked">
-          <Switch aria-label="强制所有启用用户使用 MFA" />
+        <Form.Item name="mfa_enforcement" label="MFA 强制范围">
+          <Select aria-label="MFA 强制范围" options={[
+            { value: 'off', label: '不强制（用户可自行启用）' },
+            { value: 'admins', label: '仅管理员强制' },
+            { value: 'all', label: '所有启用用户强制' },
+          ]} />
+        </Form.Item>
+        <Form.Item name="allow_user_mfa_reset" label="允许用户自行关闭 MFA" valuePropName="checked">
+          <Switch aria-label="允许用户自行关闭 MFA" />
         </Form.Item>
         <Alert
           type="info"
           showIcon
-          message="启用强制 MFA 前，所有启用用户必须完成 MFA 绑定。"
+          message="用户可在“个人安全”中扫码绑定 MFA；强制策略只影响后续登录。"
           description={<>
             <div>新策略仅适用于后续登录；已有会话需在“活动会话”或“撤销全部会话”中撤销后重新认证。</div>
+            <div>未绑定用户下次登录会直接进入二维码绑定流程，绑定完成后才能进入平台。</div>
             {policy ? <div>当前来源：{policy.source}；锁定 {formatDuration(policy.lock_duration_seconds)}；会话 {formatDuration(policy.session_ttl_seconds)}。</div> : null}
           </>}
         />

@@ -4,7 +4,7 @@ import json
 import logging
 from uuid import uuid4
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -12,7 +12,7 @@ from src.config import Settings
 from src.models.auth import User
 from src.models.cmdb import CmdbChangeAudit
 from src.models.platform_setting import PlatformSetting
-from src.schemas.auth_policy import AuthPolicyResponse, AuthPolicyUpdate
+from src.schemas.auth_policy import AuthPolicyResponse, AuthPolicyUpdate, MfaEnforcement
 
 AUTH_POLICY_KEY = "auth_policy"
 AUTH_POLICY_LOCK_KEY = "auth_policy_lock"
@@ -29,6 +29,8 @@ class AuthPolicy:
     lock_duration_seconds: int
     session_ttl_seconds: int
     require_mfa: bool
+    mfa_enforcement: MfaEnforcement
+    allow_user_mfa_reset: bool
 
 
 def defaults(settings: Settings) -> AuthPolicy:
@@ -37,6 +39,8 @@ def defaults(settings: Settings) -> AuthPolicy:
         lock_duration_seconds=settings.auth_lock_seconds,
         session_ttl_seconds=settings.auth_session_ttl_seconds,
         require_mfa=False,
+        mfa_enforcement="off",
+        allow_user_mfa_reset=True,
     )
 
 
@@ -113,11 +117,26 @@ def ensure_mfa_reset_allowed(
     ensure_bound_mfa_admin_remains(session, settings, user_id, action="重置")
 
 
+def is_mfa_required(policy: AuthPolicy, role: str) -> bool:
+    return policy.mfa_enforcement == "all" or (
+        policy.mfa_enforcement == "admins" and role == "admin"
+    )
+
+
+def can_user_reset_mfa(policy: AuthPolicy, role: str) -> bool:
+    return policy.allow_user_mfa_reset and not is_mfa_required(policy, role)
+
+
+def lock_policy(session: Session, settings: Settings) -> AuthPolicy:
+    _lock_setting(session)
+    return resolve(session, settings)
+
+
 def ensure_bound_mfa_admin_remains(
     session: Session, settings: Settings, user_id: str, *, action: str,
 ) -> None:
     _lock_setting(session)
-    if not resolve(session, settings).require_mfa:
+    if resolve(session, settings).mfa_enforcement == "off":
         return
     bound_admin = (
         User.role == "admin", User.enabled.is_(True), User.mfa_enabled.is_(True),
@@ -137,21 +156,6 @@ def ensure_bound_mfa_admin_remains(
         )
 
 
-def _ensure_all_enabled_users_bound(session: Session) -> None:
-    try:
-        unbound = session.scalar(select(func.count()).select_from(User).where(
-            User.enabled.is_(True), User.mfa_enabled.is_(False),
-        )) or 0
-    except SQLAlchemyError as error:
-        session.rollback()
-        logger.error("Authentication policy user count failed: %s", type(error).__name__)
-        raise AuthPolicyUnavailableError(
-            "登录安全策略检查用户状态失败，请稍后重试"
-        ) from error
-    if unbound:
-        raise ValueError(f"仍有 {unbound} 个启用用户未绑定 MFA，不能启用强制 MFA")
-
-
 def save(
     session: Session,
     settings: Settings,
@@ -159,8 +163,9 @@ def save(
     operator: str,
 ) -> AuthPolicyResponse:
     setting = _lock_setting(session)
-    if payload.require_mfa:
-        _ensure_all_enabled_users_bound(session)
+    # Unbound users receive the QR enrollment flow on their next login when
+    # enforcement is enabled; forcing a pre-bind would make self-service MFA
+    # impossible for existing accounts.
     try:
         previous_snapshot: dict[str, object] | None = read(
             session, settings,

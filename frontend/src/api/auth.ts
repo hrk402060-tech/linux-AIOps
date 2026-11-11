@@ -45,9 +45,20 @@ export interface MfaSetup {
   otpauth_uri: string;
 }
 
+export interface MfaEnrollmentSetup extends MfaSetup {
+  enrollment_token: string;
+}
+
 export interface MfaConfirmation {
   enabled: boolean;
   recovery_codes: string[];
+}
+
+export interface MfaSelfStatus {
+  enabled: boolean;
+  enforcement: 'off' | 'admins' | 'all';
+  required: boolean;
+  can_disable: boolean;
 }
 
 export interface AuthSession {
@@ -144,6 +155,44 @@ export function confirmUserMfa(id: string, code: string): Promise<MfaConfirmatio
 export function resetUserMfa(id: string): Promise<{ enabled: boolean }> {
   return apiFetch(`/api/v1/auth/users/${encodeURIComponent(id)}/mfa/reset`, { method: 'POST' })
     .then((response) => parseApiResponse<{ enabled: boolean }>(response, 'MFA 重置失败'));
+}
+
+export function getOwnMfa(): Promise<MfaSelfStatus> {
+  return apiFetch('/api/v1/auth/me/mfa')
+    .then((response) => parseApiResponse<MfaSelfStatus>(response, '个人 MFA 状态加载失败'));
+}
+
+export function setupOwnMfa(): Promise<MfaSetup> {
+  return apiFetch('/api/v1/auth/me/mfa/setup', { method: 'POST' })
+    .then((response) => parseApiResponse<MfaSetup>(response, '个人 MFA 设置失败'));
+}
+
+export function confirmOwnMfa(code: string): Promise<MfaConfirmation> {
+  return apiFetch('/api/v1/auth/me/mfa/confirm', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code }),
+  }).then((response) => parseApiResponse<MfaConfirmation>(response, '个人 MFA 验证失败'));
+}
+
+export function resetOwnMfa(): Promise<{ enabled: boolean }> {
+  return apiFetch('/api/v1/auth/me/mfa/reset', { method: 'POST' })
+    .then((response) => parseApiResponse<{ enabled: boolean }>(response, '个人 MFA 关闭失败'));
+}
+
+export function startMfaEnrollment(username: string, password: string): Promise<MfaEnrollmentSetup> {
+  return apiFetch('/api/v1/auth/mfa/enroll/start', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password }),
+  }).then((response) => parseApiResponse<MfaEnrollmentSetup>(response, '强制 MFA 绑定启动失败'));
+}
+
+export function confirmMfaEnrollment(
+  enrollmentToken: string, code: string,
+): Promise<MfaConfirmation> {
+  return apiFetch('/api/v1/auth/mfa/enroll/confirm', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enrollment_token: enrollmentToken, code }),
+  }).then((response) => parseApiResponse<MfaConfirmation>(response, '强制 MFA 验证失败'));
 }
 
 export function revokeUserSessions(id: string): Promise<void> {

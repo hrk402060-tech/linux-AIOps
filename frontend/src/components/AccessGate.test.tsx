@@ -127,16 +127,66 @@ it.each(['123456', 'recovery-code-ABC123'])('requests MFA only when required and
   expect(onAuthenticated).toHaveBeenCalledOnce();
 });
 
-it('shows a required MFA setup error without bypassing authentication', async () => {
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-    ok: false, status: 401, json: async () => ({ detail: 'mfa_setup_required' }),
-  }));
+it('enrolls required MFA with a QR code and requires a fresh login after saving recovery codes', async () => {
+  const fetchMock = vi.fn()
+    .mockResolvedValueOnce({ ok: false, status: 401, json: async () => ({ detail: 'mfa_setup_required' }) })
+    .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({
+      enabled: false, secret: 'SETUP-SECRET', otpauth_uri: 'otpauth://totp/Linux:admin?secret=SETUPSECRET',
+      enrollment_token: 'enrollment-only-token',
+    }) })
+    .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({
+      enabled: true, recovery_codes: ['RECOVERY-ONCE'],
+    }) });
+  vi.stubGlobal('fetch', fetchMock);
   const { onAuthenticated } = renderLogin();
   enterCredentials();
   fireEvent.click(screen.getByRole('button', { name: '登录' }));
-  expect(await screen.findByRole('alert')).toHaveTextContent('当前账号尚未绑定 MFA，请联系管理员完成绑定后登录');
+  const dialog = within(await screen.findByRole('dialog', { name: '首次绑定 MFA' }));
+  expect(dialog.getByLabelText('MFA 二维码')).toBeInTheDocument();
+  expect(dialog.getByText('无法扫码时手动绑定')).toBeInTheDocument();
+  expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/v1/auth/mfa/enroll/start', expect.objectContaining({
+    body: JSON.stringify({ username: 'security-admin', password: 'Correct-Horse-Battery-2026' }),
+  }));
+  fireEvent.change(dialog.getByLabelText('验证器验证码'), { target: { value: '123456' } });
+  fireEvent.click(dialog.getByRole('button', { name: '确认绑定' }));
+  const recovery = within(await screen.findByRole('dialog', { name: 'MFA 已绑定' }));
+  expect(recovery.getByText('RECOVERY-ONCE')).toBeInTheDocument();
+  expect(fetchMock).toHaveBeenLastCalledWith('/api/v1/auth/mfa/enroll/confirm', expect.objectContaining({
+    body: JSON.stringify({ enrollment_token: 'enrollment-only-token', code: '123456' }),
+  }));
+  expect(onAuthenticated).not.toHaveBeenCalled();
+  fireEvent.click(recovery.getByRole('button', { name: '返回登录' }));
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  expect(screen.getByLabelText('用户名')).toHaveValue('');
+  expect(screen.getByLabelText('密码')).toHaveValue('');
   expect(screen.queryByLabelText('MFA 验证码')).not.toBeInTheDocument();
   expect(onAuthenticated).not.toHaveBeenCalled();
+});
+
+it('shows enrollment confirmation errors inside the QR dialog without bypassing login', async () => {
+  const fetchMock = vi.fn()
+    .mockResolvedValueOnce({ ok: false, status: 401, json: async () => ({ detail: 'mfa_setup_required' }) })
+    .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({
+      enabled: false, secret: 'SETUP-SECRET', otpauth_uri: 'otpauth://totp/Linux:admin?secret=SETUPSECRET',
+      enrollment_token: 'enrollment-only-token',
+    }) })
+    .mockResolvedValue({ ok: false, status: 400, json: async () => ({ detail: '验证码不正确，请重新输入' }) });
+  vi.stubGlobal('fetch', fetchMock);
+  const { onAuthenticated } = renderLogin();
+  enterCredentials();
+  fireEvent.click(screen.getByRole('button', { name: '登录' }));
+  const dialog = within(await screen.findByRole('dialog', { name: '首次绑定 MFA' }));
+  fireEvent.change(dialog.getByLabelText('验证器验证码'), { target: { value: 'ABCDEF' } });
+  fireEvent.click(dialog.getByRole('button', { name: '确认绑定' }));
+  expect(await dialog.findByText('请输入 6 位数字验证码')).toBeInTheDocument();
+  expect(fetchMock).toHaveBeenCalledTimes(2);
+  fireEvent.change(dialog.getByLabelText('验证器验证码'), { target: { value: '000000' } });
+  fireEvent.click(dialog.getByRole('button', { name: '确认绑定' }));
+  expect(await dialog.findByText('验证码不正确，请重新输入')).toBeInTheDocument();
+  expect(dialog.getByLabelText('MFA 二维码')).toBeInTheDocument();
+  expect(dialog.getByRole('button', { name: '确认绑定' })).toBeEnabled();
+  expect(onAuthenticated).not.toHaveBeenCalled();
+  expect(screen.queryByRole('dialog', { name: 'MFA 已绑定' })).not.toBeInTheDocument();
 });
 
 it('keeps credentials disabled while loading and shows a readable error after failure', async () => {
