@@ -94,6 +94,8 @@ def _package(record: dict[str, object]) -> tuple[str, AffectedPackage] | None:
     identity = str(record.get("advisory", ""))
     if not product or not cpe or not match or not ADVISORY_PATTERN.fullmatch(identity):
         return None
+    if product.group(1).split(".")[0] != cpe.group(1).split(".")[0]:
+        return None
     version = cpe.group(1)
     branch = re.search(r"\.el(\d+)[_.](\d+)(?:\D|$)", match.group(2))
     if branch:

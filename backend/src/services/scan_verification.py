@@ -26,6 +26,8 @@ def record_remediation_check(
 ) -> None:
     if checks is None or advisory.source_name not in VENDOR_SOURCES:
         return
+    if package.get('requires_manual_confirmation'):
+        return
     if installed is not None and vulnerable is not False:
         return
     checks.append({

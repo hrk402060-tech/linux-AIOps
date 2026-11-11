@@ -43,23 +43,17 @@ def publish_source_package(
     if package.source_name != source.name:
         raise knowledge.KnowledgeImportError("厂商公告来源与数据源不一致")
     lock_publication(session)
+    session.refresh(run)
+    if run.status != "running" or run.source_id != source.id:
+        session.rollback()
+        raise knowledge.KnowledgeConflictError("同步任务已结束或与当前来源不匹配")
     active_advisories = knowledge.list_advisories(session)
     incoming_advisories = {
         (item.cve_id, item.advisory_id, item.os_family) for item in package.advisories
     }
-    preserve_source_history = source.last_sync_at is not None or session.scalar(
-        select(KnowledgeSyncRun.id).where(
-            KnowledgeSyncRun.source_id == source.id,
-            KnowledgeSyncRun.mode.in_({"official_https_api", "official_history_backfill"}),
-            KnowledgeSyncRun.status == "completed",
-        ).limit(1)
-    ) is not None
     inherited = [item for item in active_advisories if (
         item.source_name != source.name
-        or (
-            preserve_source_history
-            and (item.cve_id, item.advisory_id, item.os_family) not in incoming_advisories
-        )
+        or (item.cve_id, item.advisory_id, item.os_family) not in incoming_advisories
     )]
     digest = _release_digest(package, inherited)
     stamp = package.published_at.astimezone(timezone.utc).strftime("%Y%m%d%H%M%S")

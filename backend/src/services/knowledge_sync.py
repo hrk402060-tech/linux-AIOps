@@ -1,6 +1,7 @@
 import asyncio
 import base64
 from datetime import datetime, timedelta, timezone
+import logging
 from pathlib import PurePosixPath
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
@@ -16,8 +17,11 @@ from src.schemas.knowledge import KnowledgeImportRequest
 from src.services import knowledge
 from src.services import openeuler_sync
 from src.services import official_source_sync
+from src.services import knowledge_publish
+from src.services.knowledge_lock import lock_publication
 
 DOWNLOAD_LIMIT = 50 * 1024 * 1024
+logger = logging.getLogger(__name__)
 
 
 def configure_sources(
@@ -31,6 +35,8 @@ def configure_sources(
             source.online_url = official_source_sync.online_url(source.name)
         else:
             source.online_url = connector.get("package_url") if connector else None
+    lock_publication(session)
+    knowledge_publish.recover_interrupted_runs(session)
     session.commit()
 
 
@@ -114,8 +120,8 @@ def _sync_openeuler(session_factory: sessionmaker[Session]) -> None:
             return
         try:
             openeuler_sync.sync_source(session, source)
-        except knowledge.KnowledgeImportError:
-            return
+        except (knowledge.KnowledgeImportError, knowledge.KnowledgeConflictError) as exc:
+            logger.warning("Official knowledge sync did not publish: %s (%s)", source.name, type(exc).__name__)
 
 
 def _sync_with_session(
@@ -125,10 +131,13 @@ def _sync_with_session(
     trusted_keys: dict[str, str],
 ) -> None:
     with session_factory() as session:
+        source = session.query(KnowledgeSource).filter_by(name=source_name).one_or_none()
+        if source is None or not source.enabled or source.sync_mode == "offline_package":
+            return
         try:
             sync_source(session, source_name, connector, trusted_keys)
-        except (knowledge.KnowledgeImportError, knowledge.KnowledgeConflictError):
-            return
+        except (knowledge.KnowledgeImportError, knowledge.KnowledgeConflictError) as exc:
+            logger.warning("Signed knowledge connector did not publish: %s (%s)", source_name, type(exc).__name__)
 
 
 def _sync_official_with_session(
@@ -140,8 +149,8 @@ def _sync_official_with_session(
             return
         try:
             official_source_sync.sync_source(session, source)
-        except (knowledge.KnowledgeImportError, knowledge.KnowledgeConflictError):
-            return
+        except (knowledge.KnowledgeImportError, knowledge.KnowledgeConflictError) as exc:
+            logger.warning("Official knowledge sync did not publish: %s (%s)", source_name, type(exc).__name__)
 
 
 def _required_https_url(connector: dict[str, str], key: str) -> str:

@@ -26,36 +26,23 @@ def _credential() -> Credential:
     )
 
 
-def test_connect_registers_only_confirmed_host_key() -> None:
-    expected = paramiko.RSAKey.generate(1024)
+def test_connect_uses_shared_direct_ssh_client() -> None:
+    asset, credential = _asset(port=2222), _credential()
     client = Mock()
-    client.get_transport.return_value.get_remote_server_key.return_value = expected
-
-    with patch("src.services.scan_engine.paramiko.SSHClient", return_value=client):
-        connected = scan_engine._connect(
-            _asset(port=2222), _credential(), "secret", expected
-        )
+    with patch("src.services.scan_engine.open_client", return_value=client) as connect:
+        connected = scan_engine._connect(asset, credential, "secret")
 
     assert connected is client
-    client.get_host_keys.return_value.add.assert_called_once_with(
-        "[10.0.0.50]:2222", expected.get_name(), expected
-    )
-    policy = client.set_missing_host_key_policy.call_args.args[0]
-    assert isinstance(policy, paramiko.RejectPolicy)
-    client.load_system_host_keys.assert_not_called()
+    connect.assert_called_once_with(asset, credential, "secret")
 
 
-def test_connect_rejects_remote_host_key_mismatch() -> None:
-    expected = paramiko.RSAKey.generate(1024)
-    actual = paramiko.RSAKey.generate(1024)
-    client = Mock()
-    client.get_transport.return_value.get_remote_server_key.return_value = actual
-
-    with patch("src.services.scan_engine.paramiko.SSHClient", return_value=client):
-        with pytest.raises(scan_engine.ScanCollectionError, match="主机密钥不匹配"):
-            scan_engine._connect(_asset(), _credential(), "secret", expected)
-
-    client.close.assert_called_once()
+def test_connect_reports_authentication_failure_without_fingerprint_flow() -> None:
+    with patch(
+        "src.services.scan_engine.open_client",
+        side_effect=paramiko.AuthenticationException("rejected"),
+    ):
+        with pytest.raises(scan_engine.ScanCollectionError, match="认证失败"):
+            scan_engine._connect(_asset(), _credential(), "secret")
 
 
 def _advisory(source: str, advisory_id: str) -> KnowledgeAdvisory:

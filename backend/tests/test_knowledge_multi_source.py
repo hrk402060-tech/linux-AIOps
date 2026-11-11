@@ -57,3 +57,22 @@ def test_latest_unchanged_source_does_not_reactivate_older_cross_source_snapshot
             knowledge_publish.publish_source_package(session, source, incoming, second, "official-https-api")
         build.assert_not_called()
         assert second.status == "completed"
+
+
+def test_unchanged_source_after_another_source_keeps_both_in_active_release(client: TestClient) -> None:
+    with client.app.state.session_factory() as session:
+        for source_name, family in [
+            ("Ubuntu Security Notices", "ubuntu"),
+            ("Red Hat Security Advisories", "rhel"),
+            ("Ubuntu Security Notices", "ubuntu"),
+        ]:
+            source = session.scalar(select(KnowledgeSource).where(KnowledgeSource.name == source_name))
+            run = knowledge_publish.start_source_run(session, source, "official_https_api")
+            knowledge_publish.publish_source_package(
+                session, source, package(source_name, family, "CVE-2026-12345"),
+                run, "official-https-adapter",
+            )
+        releases = list(session.scalars(select(KnowledgeRelease)))
+        assert len(releases) == 2
+        active = next(release for release in releases if release.status == "active")
+        assert {item.os_family for item in active.advisories} == {"ubuntu", "rhel"}

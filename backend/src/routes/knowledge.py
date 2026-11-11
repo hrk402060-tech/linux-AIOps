@@ -54,6 +54,10 @@ def sync_source(
     if source is None:
         raise HTTPException(status_code=404, detail="数据源不存在")
     try:
+        if not source.enabled:
+            raise service.KnowledgeConflictError("该数据源已停用")
+        if source.sync_mode == "offline_package":
+            raise service.KnowledgeConflictError("该数据源仅支持离线签名包导入")
         if source.name == openeuler_sync.SOURCE_NAME:
             run = openeuler_sync.sync_source(session, source)
         elif official_source_sync.is_supported(source.name):

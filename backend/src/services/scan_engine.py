@@ -13,6 +13,7 @@ from src.services.scan_verification import VENDOR_SOURCES, record_remediation_ch
 from src.services.service_identity import MAX_BANNER_PROBES, listen_port, probe_banner
 from src.services.service_advisory_matching import SOURCE_NAME as UPSTREAM_SERVICE_SOURCE
 from src.services.service_advisory_matching import match_service_advisories
+from src.services.scan_package_inventory import advisory_packages, parse_inventory
 from src.services.ssh_connection import open_client, parse_private_key
 
 MAX_OUTPUT_BYTES = 5 * 1024 * 1024
@@ -115,20 +116,11 @@ def _detect_package_manager(client: paramiko.SSHClient) -> str:
 
 def _collect_packages(client: paramiko.SSHClient, manager: str) -> dict[str, str]:
     command = (
-        "dpkg-query -W -f='${binary:Package}\t${Version}\t${source:Package}\n'"
+        "dpkg-query -W -f='${binary:Package}\t${Version}\t${source:Package}\t${source:Version}\t${db:Status-Status}\n'"
         if manager == 'dpkg'
         else "rpm -qa --qf '%{NAME}\t%{EPOCHNUM}:%{VERSION}-%{RELEASE}\n'"
     )
-    packages: dict[str, str] = {}
-    for line in _execute(client, command).splitlines():
-        fields = line.split('	')
-        name, separator, version = fields[0], len(fields) > 1, fields[1] if len(fields) > 1 else ''
-        if separator:
-            packages[name.split(':', 1)[0]] = version
-            if manager == 'dpkg' and len(fields) > 2:
-                source = fields[2].split(':', 1)[0].split('(', 1)[0].strip()
-                if source:
-                    packages[f'__source__:{source}'] = version
+    packages = parse_inventory(_execute(client, command), manager)
     if not packages:
         raise ScanCollectionError('未采集到已安装软件包')
     return packages
@@ -210,7 +202,6 @@ def _match_advisories(
 ) -> list[dict[str, object]]:
     findings: list[dict[str, object]] = []
     checks = remediation_checks if remediation_checks is not None else []
-    aliases = {'rhel': {'rhel', 'centos', 'rocky', 'almalinux'}}
     # Keep vendor evidence ahead of supplemental sources so repeated CVEs are
     # deterministic in task results and downstream aggregation.
     ordered_advisories = sorted(
@@ -224,19 +215,15 @@ def _match_advisories(
     for advisory in ordered_advisories:
         if advisory.source_name == UPSTREAM_SERVICE_SOURCE:
             continue
-        accepted = aliases.get(advisory.os_family, {advisory.os_family})
-        if os_family.lower() not in accepted:
+        if os_family.casefold() != advisory.os_family.casefold():
             continue
-        for package in sorted(
-            advisory.affected_packages, key=lambda item: str(item.get('name', ''))
+        for package, installed, comparison_version in advisory_packages(
+            advisory.affected_packages, packages,
         ):
             supported_versions = package.get('os_versions', [])
             if supported_versions and not _matches_os_version(os_version, supported_versions):
                 continue
-            scope = package.get('package_scope', 'binary')
             package_name = str(package['name'])
-            lookup_name = f'__source__:{package_name}' if scope == 'source' else package_name
-            installed = packages.get(lookup_name)
             if installed is None:
                 record_remediation_check(checks, advisory, package, None, None)
                 continue
@@ -249,7 +236,10 @@ def _match_advisories(
                 matching_services = _filter_banner_services(matching_services, package)
                 if not matching_services:
                     continue
-            vulnerable = _is_older(client, manager, package['name'], installed, package['fixed_version'])
+            vulnerable = _is_older(
+                client, manager, package_name, comparison_version or installed,
+                str(package['fixed_version']),
+            )
             record_remediation_check(checks, advisory, package, installed, vulnerable)
             if vulnerable is False:
                 continue
@@ -338,7 +328,7 @@ def _is_older(
 
 
 def _finding(
-    advisory: KnowledgeAdvisory, package: dict[str, str], installed: str, confirmed: bool,
+    advisory: KnowledgeAdvisory, package: dict[str, object], installed: str, confirmed: bool,
     service: dict[str, str] | None = None,
 ) -> dict[str, object]:
     conclusion = 'confirmed' if confirmed else 'manual_confirmation'
@@ -353,6 +343,11 @@ def _finding(
             'type': 'limitation',
             'value': package.get('evidence_reason') or '公告与目标软件包对应关系需人工确认',
         })
+    if package.get('source_package'):
+        evidence.extend([
+            {'type': 'source_package', 'value': package['source_package']},
+            {'type': 'source_installed_version', 'value': package['source_installed_version']},
+        ])
     if service is not None:
         evidence.extend([
             {'type': 'service_listener', 'value': service['listen']},

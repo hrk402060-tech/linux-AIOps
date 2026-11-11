@@ -27,12 +27,14 @@
 
 ## 定时更新
 
-服务端每天检查已配置的在线厂商连接器。连接器必须提供 HTTPS 数据包地址、HTTPS 原始签名地址和已登记的密钥标识；下载后仍经过 Ed25519、包结构、来源和版本摘要校验。未配置连接器时调度器保持静默，界面显示“待配置”。CNVD/CNNVD 不参与定时在线下载。
+官方适配器使用固定的 HTTPS 来源，无需另填连接器地址；默认按 Asia/Shanghai 每日 02:00 起、每 4 小时检查一次近期增量。每个来源独立校验并发布，失败保留上一活动版本，在同步记录和覆盖状态中提示。自定义签名包连接器仍需 HTTPS 数据包地址、HTTPS 签名地址和可信密钥标识，下载后校验 Ed25519、包结构、来源和版本摘要。CNVD/CNNVD、Kylin、UnionTech 不参与定时在线下载。
 
 ## 官方源适配范围（2026-11-11）
 
 - 已接入 Canonical Ubuntu、Debian、Red Hat、OpenAnolis 及 nginx/Apache HTTP Server 官方适配器。每个适配器先暂存、校验公告和修复包，再由统一发布锁激活 `knowledge-*` 快照。
 - Ubuntu 的公告级 CVE 与发行版软件包关联、OpenAnolis 的 RPM 文件与 CVE 关联存在证据边界，结果保留“需人工确认”；上游 nginx/Apache 结果始终为低置信度人工确认。
 - Red Hat 仅接受明确的 RHEL 产品 CPE、RHSA、NEVRA 和发行分支；不会把 CentOS、Rocky、AlmaLinux 等兼容发行版自动等同于 RHEL。
+- Debian DSA 与 tracker 的 CVE、发行版和修复源包版本必须一致；采集目标机真实二进制包及对应源包版本后再匹配，不能用包名猜测或用不同二进制版本互相覆盖。人工确认来源不产生自动“已修复”的证据。
 - 服务漏洞扫描必须同时存在 TCP 监听、确切进程/可执行路径以及包版本或 banner 证据；缺失证据时不推断。
 - 当前官方源可用性由同步记录透明显示。服务器本次验证 Red Hat 与 nginx/Apache 可达，Ubuntu/Debian TLS 失败，OpenAnolis API 返回 403；失败保留上一活动版本，不代表知识库完整。
+- 每次默认只拉取近期公告，保留既有来源历史；这不是全量回填。当前全历史分页回填仍仅适用于 openEuler。服务器隔离默认批次实测：Red Hat 3 条、nginx/Apache 20 条，合并活动版本为 23 条；未导入生产数据库。
