@@ -84,7 +84,9 @@ def summarize_findings(
 def update_disposition(
     session: Session, finding: VulnerabilityFinding, payload: VulnerabilityDispositionUpdate
 ) -> dict[str, object]:
-    case = session.get(VulnerabilityCase, finding.case_id)
+    case = session.scalar(select(VulnerabilityCase).where(
+        VulnerabilityCase.id == finding.case_id
+    ).with_for_update())
     if case is None:
         raise ValueError("漏洞处置记录不存在")
     if case.status == "fixed":

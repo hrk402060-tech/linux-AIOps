@@ -18,10 +18,16 @@ def parse_private_key(secret: str) -> paramiko.PKey:
 def open_client(
     asset: Asset, credential: Credential, secret: str,
     timeout: float = 10,
+    *, host_key: paramiko.PKey | None = None,
 ) -> paramiko.SSHClient:
     client = paramiko.SSHClient()
-    # Asset enrollment is the trust boundary: accept the first key only in memory.
-    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    if host_key is None:
+        # Read-only collection and interactive access keep their existing trust policy.
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    else:
+        host = asset.host if asset.ssh_port == 22 else f"[{asset.host}]:{asset.ssh_port}"
+        client.get_host_keys().add(host, host_key.get_name(), host_key)
+        client.set_missing_host_key_policy(paramiko.RejectPolicy())
     try:
         client.connect(
             hostname=asset.host,

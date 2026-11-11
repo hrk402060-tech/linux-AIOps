@@ -49,13 +49,63 @@ it.each<{ name: string; overrides: Partial<PatchAdvice>; statusText: string; exp
   expect(fetchMock).toHaveBeenCalledTimes(1);
 });
 
-it('shows that patch execution is disabled by default', async () => {
+it('does not offer automatic updates without an eligible recommendation', async () => {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => [] }));
   render(<ConfigProvider><PatchesPage /></ConfigProvider>);
   expect(await screen.findByText('补丁与变更中心')).toBeInTheDocument();
-  expect(screen.getByText('执行状态')).toBeInTheDocument();
-  expect(screen.getByText('关闭')).toBeInTheDocument();
+  expect(screen.getByText('支持自动更新')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: '自动更新' })).not.toBeInTheDocument();
 });
+
+async function showExecution() {
+  const rpmAdvice: PatchAdvice = {
+    ...advice, current_version: '0:1.1.1-1', target_version: '0:1.1.1-2',
+    execution_enabled: true, status: 'manual_confirmation', target_version_relation: 'unknown',
+  };
+  const fetchMock = vi.fn().mockResolvedValueOnce(response([rpmAdvice]));
+  vi.stubGlobal('fetch', fetchMock);
+  render(<ConfigProvider theme={{ token: { motion: false } }}><PatchesPage /></ConfigProvider>);
+  fireEvent.click(await screen.findByRole('button', { name: '自动更新' }));
+  const dialog = within(await screen.findByRole('dialog', { name: '自动更新软件包' }));
+  return { rpmAdvice, fetchMock, dialog };
+}
+
+it('submits a package update only after a separate explicit confirmation', async () => {
+  const { rpmAdvice, dialog, fetchMock } = await showExecution();
+  expect(dialog.getByText(/YUM \/ DNF 仓库/)).toBeInTheDocument();
+  expect(dialog.getByText(/0:1\.1\.1-2/)).toBeInTheDocument();
+  const confirm = dialog.getByRole('button', { name: '确认并更新' });
+  fireEvent.change(dialog.getByLabelText('更新原因'), { target: { value: '  安全修复  ' } });
+  fireEvent.change(dialog.getByLabelText('确认文本'), { target: { value: '确认补丁建议' } });
+  expect(confirm).toBeDisabled();
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+  fireEvent.change(dialog.getByLabelText('确认文本'), { target: { value: '  确认更新软件包  ' } });
+  expect(confirm).toBeEnabled();
+  const updated = { ...rpmAdvice, execution_enabled: false, status: 'pending_verification' };
+  fetchMock.mockResolvedValueOnce(response(updated)).mockResolvedValueOnce(response([updated]));
+  fireEvent.click(confirm); fireEvent.click(confirm);
+  await waitFor(() => expect(screen.getByText('待复扫验证', { selector: '.ant-tag' })).toBeInTheDocument());
+  expect(fetchMock).toHaveBeenCalledTimes(3);
+  expect(fetchMock.mock.calls[1]).toEqual(['/api/v1/patches/finding-1/execute', expect.objectContaining({
+    method: 'POST', body: JSON.stringify({ reason: '安全修复', confirmation: '确认更新软件包' }),
+  })]);
+  expect(screen.queryByRole('button', { name: '自动更新' })).not.toBeInTheDocument();
+}, 15_000);
+
+it('reloads the advice after an update failure without automatically resubmitting', async () => {
+  const { rpmAdvice, dialog, fetchMock } = await showExecution();
+  fetchMock.mockResolvedValueOnce({ ok: false, json: async () => ({ detail: '更新结果未确认，请复扫' }) })
+    .mockResolvedValueOnce(response([{ ...rpmAdvice, execution_enabled: false, status: 'pending_verification' }]));
+  fireEvent.change(dialog.getByLabelText('确认文本'), { target: { value: '确认更新软件包' } });
+  const confirm = dialog.getByRole('button', { name: '确认并更新' });
+  expect(confirm).toBeDisabled();
+  fireEvent.change(dialog.getByLabelText('更新原因'), { target: { value: '维护窗口修复' } });
+  fireEvent.click(confirm);
+  expect(await screen.findByText('更新结果未确认，请复扫')).toBeInTheDocument();
+  await waitFor(() => expect(screen.getByText('待复扫验证', { selector: '.ant-tag' })).toBeInTheDocument());
+  expect(fetchMock).toHaveBeenCalledTimes(3);
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+}, 15_000);
 it('shows Chinese severity, target and exact human confirmation without displaying a machine token', async () => {
   const { dialog, fetchMock } = await showApproval();
   expect(screen.getByText('高危', { selector: '.ant-tag' })).toBeInTheDocument();
@@ -90,7 +140,7 @@ it('shows Chinese severity, target and exact human confirmation without displayi
     method: 'POST', body: JSON.stringify({ reason: '变更已经完成', confirmation: 'APPROVE finding-1' }),
   }));
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-  expect(screen.queryByRole('button', { name: '执行补丁' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: '自动更新' })).not.toBeInTheDocument();
 }, 15_000);
 it('requires fresh confirmation after closing and reopening', async () => {
   const { dialog, fetchMock } = await showApproval();

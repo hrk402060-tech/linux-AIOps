@@ -4,11 +4,12 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from src.database import get_session
-from src.auth import AuthPrincipal, authenticated_operator, require_admin
-from src.models.vulnerability import VulnerabilityFinding
+from src.auth import AuthPrincipal, authenticated_operator, require_admin, require_system_admin
+from src.models.asset import Asset
+from src.models.vulnerability import VulnerabilityCase, VulnerabilityFinding
 from src.services import vulnerabilities as vulnerability_service
 from src.services.version_safety import compare_obvious_versions
-from src.services import asset_access
+from src.services import asset_access, patch_execution, rpm_patch
 from src.schemas.vulnerability import VulnerabilityDispositionUpdate
 
 router = APIRouter(prefix="/patches", tags=["patches"])
@@ -41,6 +42,8 @@ def read_patch_advice(
     findings = list(session.scalars(statement.order_by(
         VulnerabilityFinding.detected_at.desc()
     ).limit(200)))
+    eligible_ids = {item.asset_id for item in findings if rpm_patch.is_rpm_advice(item)}
+    assets = {asset.id: asset for asset in session.scalars(select(Asset).where(Asset.id.in_(eligible_ids)))} if eligible_ids else {}
     return [{
         "id": item.id, "finding_id": item.id, "asset_id": item.asset_id,
         "asset_name": item.asset_name, "cve_id": item.cve_id,
@@ -55,7 +58,7 @@ def read_patch_advice(
         "target_version_issue": _target_version_issue(item),
         "rollback_plan": _rollback_plan(item),
         "approval_phrase": f"APPROVE {item.id}",
-        "execution_enabled": False,
+        **_execution_fields(session, principal, item, assets.get(item.asset_id)),
         "history_count": session.scalar(select(func.count()).where(
             VulnerabilityFinding.asset_id == item.asset_id,
             VulnerabilityFinding.cve_id == item.cve_id,
@@ -64,6 +67,19 @@ def read_patch_advice(
         "latest_scan_name": item.scan_task_name,
         "latest_detected_at": item.detected_at,
     } for item in findings]
+
+
+def _execution_fields(
+    session: Session, principal: AuthPrincipal, item: VulnerabilityFinding,
+    asset: Asset | None,
+) -> dict[str, object]:
+    case = session.get(VulnerabilityCase, item.case_id) if item.case_id else None
+    if principal.role != "admin" or principal.auth_type != "session" or case is None or case.status != "open":
+        return {"execution_enabled": False}
+    if not rpm_patch.is_rpm_advice(item):
+        return {"execution_enabled": False, "execution_issue": "缺少可自动更新的 RPM 修复版本证据"}
+    issue = patch_execution.availability_issue(asset)
+    return {"execution_enabled": issue is None, "execution_issue": issue}
 
 
 def _patch_status(session: Session, finding: VulnerabilityFinding) -> str:
@@ -97,7 +113,7 @@ def _rollback_plan(finding: VulnerabilityFinding) -> str:
     return (
         f"变更前记录 {finding.package_name} 当前版本 {finding.installed_version}；"
         "复扫未通过时由人工按厂商公告恢复原版本，确认服务状态后再次复扫。"
-        "平台不会自动执行安装、卸载或回滚。"
+        "平台不会自动卸载或回滚。"
     )
 
 
@@ -135,3 +151,22 @@ def approve_patch_advice(
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     return {**updated, "status": "pending_verification", "execution_enabled": False}
+
+
+@router.post("/{finding_id}/execute")
+def execute_patch_advice(
+    finding_id: str, payload: PatchApprovalRequest, request: Request,
+    principal: AuthPrincipal = Depends(require_system_admin),
+    session: Session = Depends(get_session),
+) -> dict[str, object]:
+    if principal.auth_type != "session":
+        raise HTTPException(403, "请使用管理员账号登录后执行更新")
+    if payload.confirmation.strip() != patch_execution.CONFIRMATION or len(payload.reason.strip()) < 2:
+        raise HTTPException(400, f"请输入“{patch_execution.CONFIRMATION}”并填写更新原因")
+    finding = session.get(VulnerabilityFinding, finding_id)
+    if finding is None:
+        raise HTTPException(404, "补丁建议不存在")
+    asset_access.require_asset(session, principal, finding.asset_id, ssh=True)
+    return patch_execution.execute(
+        session, request.app.state.credential_vault, finding, principal.username, payload.reason.strip(),
+    )
