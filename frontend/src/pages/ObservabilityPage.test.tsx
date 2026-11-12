@@ -47,10 +47,10 @@ describe('ObservabilityPage', () => {
   });
 
   it('opens evidence and passes the selected asset, probe and alert context without executing', async () => {
-    const onOpenProbeHistory = vi.fn(), onOpenAlerts = vi.fn(), onOpenTerminal = vi.fn(), onOpenAssistant = vi.fn();
+    const onOpenProbeHistory = vi.fn(), onOpenAlerts = vi.fn(), onOpenFindings = vi.fn(), onOpenTerminal = vi.fn(), onOpenAssistant = vi.fn();
     render(<ConfigProvider theme={{ token: { motion: false } }}><ObservabilityPage
       onOpenProbeHistory={onOpenProbeHistory} onOpenAlerts={onOpenAlerts}
-      onOpenTerminal={onOpenTerminal} onOpenAssistant={onOpenAssistant} /></ConfigProvider>);
+      onOpenFindings={onOpenFindings} onOpenTerminal={onOpenTerminal} onOpenAssistant={onOpenAssistant} /></ConfigProvider>);
     await screen.findByText('订单 API');
     expect(onOpenAssistant).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: '查看 订单 API 证据' }));
@@ -59,6 +59,8 @@ describe('ObservabilityPage', () => {
     expect(onOpenProbeHistory).toHaveBeenCalledWith('service-1', { id: 'probe-1', name: '订单健康检查' });
     fireEvent.click(screen.getByRole('button', { name: '定位 订单服务异常 告警' }));
     expect(onOpenAlerts).toHaveBeenCalledWith('asset-1', 'external');
+    fireEvent.click(screen.getByRole('button', { name: '查看 api-01 漏洞' }));
+    expect(onOpenFindings).toHaveBeenCalledWith('asset-1');
     fireEvent.click(screen.getByRole('button', { name: '打开 api-01 SSH' }));
     expect(onOpenTerminal).toHaveBeenCalledWith('asset-1');
     fireEvent.click(screen.getByRole('button', { name: '使用 AI 排查 api-01' }));

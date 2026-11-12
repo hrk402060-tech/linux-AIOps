@@ -5,6 +5,7 @@ import type { ObservableService, ServiceProbeEvidence } from '../api/observabili
 export interface ServiceMonitoringActions {
   onOpenProbeHistory?: (serviceId: string, probe: { id: string; name: string }) => void;
   onOpenAlerts?: (assetId: string, tab?: 'activity' | 'external') => void;
+  onOpenFindings?: (assetId: string) => void;
   onOpenTerminal?: (assetId: string) => void;
   onOpenAssistant?: (assetId: string, context: string) => void;
 }
@@ -24,6 +25,7 @@ const assetStates: Record<string, string> = { online: '在线', offline: '离线
 export function serviceEvidenceContext(service: ObservableService): string {
   return [
     `服务：${service.service_name}（${service.service_code}）；业务：${service.business_name}；应用：${service.application_name}`,
+    `漏洞风险：${service.critical} 个严重、${service.high} 个高危、共 ${service.pending_vulnerabilities} 个待处理`,
     ...service.health_reasons.map((reason) => reason.message),
     ...service.probes.map((probe) => `${probe.probe_name}：${probeStates[probe.status].label}；检查时间：${probe.checked_at ?? '未检查'}`),
   ].join('\n').slice(0, 12000);
@@ -43,11 +45,20 @@ export function ServiceMonitoringDetail({ service, ...actions }: { service: Obse
           {actions.onOpenAlerts ? <Button size="small" icon={<Bell size={14} />} aria-label={`定位 ${alert.message} 告警`} onClick={() => actions.onOpenAlerts?.(alert.asset_id, alert.alert_id ? 'external' : 'activity')}>查看告警</Button> : null}
         </div>)}</div> : <span className="service-evidence-empty">当前范围无活动告警</span>}
     </section>
+    <section><h3>漏洞风险</h3>
+      <div className="service-risk-summary">
+        <span><strong className="risk-critical">{service.critical}</strong> 严重</span>
+        <span><strong className="risk-high">{service.high}</strong> 高危</span>
+        <span><strong>{service.pending_vulnerabilities}</strong> 待处理</span>
+      </div>
+      <span className="service-evidence-empty">可在承载服务器中按资产查看漏洞</span>
+    </section>
     <section className="service-health-assets"><h3>承载服务器</h3>
       {service.assets.length ? service.assets.map((asset) => <div className="service-evidence-row" key={asset.asset_id}>
         <div><strong>{asset.asset_name} · {asset.host}</strong><small>{assetStates[asset.status] ?? '状态未知'} · {asset.freshness === 'stale' ? '数据过期' : asset.freshness === 'fresh' ? '数据有效' : '缺少有效快照'} · {formatEvidenceTime(asset.collected_at)}</small></div>
         <div className="service-evidence-actions">
           {actions.onOpenAlerts ? <Button size="small" icon={<Bell size={14} />} aria-label={`查看 ${asset.asset_name} 告警`} onClick={() => actions.onOpenAlerts?.(asset.asset_id)}>告警</Button> : null}
+          {actions.onOpenFindings ? <Button size="small" aria-label={`查看 ${asset.asset_name} 漏洞`} onClick={() => actions.onOpenFindings?.(asset.asset_id)}>漏洞</Button> : null}
           {actions.onOpenTerminal ? <Button size="small" icon={<SquareTerminal size={14} />} disabled={asset.status === 'disabled'} aria-label={`打开 ${asset.asset_name} SSH`} onClick={() => actions.onOpenTerminal?.(asset.asset_id)}>SSH</Button> : null}
           {actions.onOpenAssistant ? <Button size="small" icon={<Bot size={14} />} disabled={asset.status === 'disabled'} aria-label={`使用 AI 排查 ${asset.asset_name}`} onClick={() => actions.onOpenAssistant?.(asset.asset_id, serviceEvidenceContext(service))}>AI 排查</Button> : null}
         </div>

@@ -159,7 +159,7 @@ export default function App() {
           initialTab={serviceAlertContext?.tab} onOpenTerminal={openAssetTerminal} onOpenIncidents={() => navigate('incidents')} />
         : page === 'incidents' ? <IncidentsPage currentUser={currentUser} />
         : page === 'observability' ? <ObservabilityPage onOpenProbeHistory={openServiceProbeHistory} onOpenAlerts={openServiceAlerts}
-          onOpenTerminal={openAssetTerminal} onOpenAssistant={openServiceAssistant} />
+          onOpenFindings={viewAssetFindings} onOpenTerminal={openAssetTerminal} onOpenAssistant={openServiceAssistant} />
         : page === 'probes' ? <ProbesPage currentUser={currentUser} initialServiceId={serviceProbeContext?.serviceId} initialProbe={serviceProbeContext?.probe} />
         : page === 'terminal' ? <TerminalPage initialAssetId={terminalAssetId} />
         : page === 'ops-assistant' ? <OperationsAssistantPage userId={currentUser.id}

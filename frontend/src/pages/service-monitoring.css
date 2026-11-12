@@ -11,6 +11,10 @@
 .observability-page .service-evidence-row small { display: block; margin-top: 5px; font-size: 12px; color: #687686; }
 .observability-page .service-evidence-row .ant-btn { flex-shrink: 0; }
 .observability-page .service-evidence-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; flex-shrink: 0; }
+.observability-page .service-risk-summary { display: flex; flex-wrap: wrap; gap: 18px; margin-bottom: 12px; color: #687686; font-size: 13px; }
+.observability-page .service-risk-summary strong { margin-right: 4px; color: #263644; font-size: 18px; }
+.observability-page .service-risk-summary .risk-critical { color: #b42318; }
+.observability-page .service-risk-summary .risk-high { color: #d97706; }
 .observability-page .service-evidence-empty { color: #687686; font-size: 13px; }
 @media (max-width: 800px) {
   .observability-page .service-health-detail { grid-template-columns: minmax(0, 1fr); gap: 18px; }
