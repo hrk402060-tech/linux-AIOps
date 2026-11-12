@@ -54,13 +54,14 @@ const timelineStatusLabels: Record<string, string> = {
 const options = (values: Record<string, string>) =>
   Object.entries(values).map(([value, label]) => ({ value, label }));
 
-export function ExternalAlertsTab({ currentUser, onOpenTerminal, onOpenIncidents }: {
+export function ExternalAlertsTab({ currentUser, initialAssetId, onOpenTerminal, onOpenIncidents }: {
   currentUser: Pick<AuthUser, 'role'>;
+  initialAssetId?: string;
   onOpenTerminal?: (assetId: string) => void;
   onOpenIncidents?: () => void;
 }) {
   const [assets, setAssets] = useState<Asset[]>([]);
-  const [serverFilters, setServerFilters] = useState<Record<string, string>>({});
+  const [serverFilters, setServerFilters] = useState<Record<string, string>>((): Record<string, string> => initialAssetId ? { asset_id: initialAssetId } : {});
   const [page, setPage] = useState(1);
   const [searchInput, setSearchInput] = useState('');
   const [operationLoading, setOperationLoading] = useState(false);
@@ -123,7 +124,7 @@ export function ExternalAlertsTab({ currentUser, onOpenTerminal, onOpenIncidents
       <Select allowClear aria-label="外部告警级别" placeholder="严重度" options={options(severityLabels)} onChange={(value) => setServerFilter('severity', value)} />
       <Select allowClear aria-label="外部告警状态" placeholder="处置状态" options={options(statusLabels)} onChange={(value) => setServerFilter('status', value)} />
       <Select allowClear aria-label="根因分析状态" placeholder="研判状态" options={options({ ...analysisLabels, unassessed: '未研判' })} onChange={(value) => setServerFilter('analysis_status', value)} />
-      <Select allowClear showSearch optionFilterProp="label" aria-label="外部告警资产" placeholder="服务器资产" options={assets.map((item) => ({ value: item.id, label: `${item.name} · ${item.host}` }))} onChange={(value) => setServerFilter('asset_id', value)} />
+      <Select allowClear showSearch optionFilterProp="label" aria-label="外部告警资产" placeholder="服务器资产" value={serverFilters.asset_id} options={assets.map((item) => ({ value: item.id, label: `${item.name} · ${item.host}` }))} onChange={(value) => setServerFilter('asset_id', value)} />
       <Button aria-label="刷新外部告警" icon={<RefreshCw size={16} />} onClick={() => void load()} />
     </div>
     <div className="table-frame"><Table<ExternalAlert> rowKey="id" loading={loading} dataSource={data.items} pagination={{ current: page, pageSize: PAGE_SIZE, total: data.total, showSizeChanger: false, onChange: setPage }} scroll={{ x: 1220 }} locale={{ emptyText: <Empty description="暂无符合条件的告警" /> }} columns={[

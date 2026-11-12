@@ -1,0 +1,19 @@
+.observability-page .service-expand { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; padding: 0; border: 0; background: transparent; color: #566373; cursor: pointer; }
+.observability-page .service-expand:hover { color: #1677ff; background: #edf4fb; }
+.observability-page .service-expand:focus-visible { outline: 2px solid #1677ff; outline-offset: 2px; }
+.observability-page .service-health-reasons { margin: 0; padding-left: 16px; font-size: 12px; line-height: 1.8; overflow-wrap: anywhere; }
+.observability-page .service-health-detail { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; padding: 12px 8px; }
+.observability-page .service-health-detail h3 { margin: 0 0 10px; color: #263644; font-size: 14px; font-weight: 600; }
+.observability-page .service-health-assets { grid-column: 1 / -1; }
+.observability-page .service-evidence-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 0; border-bottom: 1px solid #e8edf1; }
+.observability-page .service-evidence-row > div:first-child { min-width: 0; overflow-wrap: anywhere; }
+.observability-page .service-evidence-row strong { font-size: 13px; font-weight: 500; }
+.observability-page .service-evidence-row small { display: block; margin-top: 5px; font-size: 12px; color: #687686; }
+.observability-page .service-evidence-row .ant-btn { flex-shrink: 0; }
+.observability-page .service-evidence-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; flex-shrink: 0; }
+.observability-page .service-evidence-empty { color: #687686; font-size: 13px; }
+@media (max-width: 800px) {
+  .observability-page .service-health-detail { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  .observability-page .observability-toolbar { grid-template-columns: minmax(0, 1fr) 110px 34px; }
+  .observability-page .service-evidence-row { align-items: flex-start; flex-wrap: wrap; }
+}

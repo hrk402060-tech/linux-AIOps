@@ -63,7 +63,8 @@ def test_dashboard_and_shared_service_only_aggregate_visible_assets(
     service = body["service_health"]["services"][0]
     assert service["asset_count"] == 1
     assert service["resource_peaks"]["cpu_percent"] == 42
-    assert service["status"] == "healthy"
+    assert service["runtime_status"] == "healthy"
+    assert service["status"] == "unobserved"
     assert hidden not in response.text
     observed = client.get("/api/v1/observability/services")
     assert observed.status_code == 200, observed.text

@@ -12,13 +12,15 @@ function resultTag(result: ProbeResult | null) {
 }
 function time(value: string) { return value ? new Date(value).toLocaleString('zh-CN', { hour12: false }) : '-'; }
 
-export function ProbesPage({ currentUser }: { currentUser: AuthUser }) {
+export function ProbesPage({ currentUser, initialServiceId, initialProbe }: {
+  currentUser: AuthUser; initialServiceId?: string; initialProbe?: { id: string; name: string };
+}) {
   const readOnly = currentUser.role === 'auditor';
   const isAdmin = currentUser.role === 'admin';
   const [items, setItems] = useState<HttpProbe[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [filter, setFilter] = useState<string>();
+  const [filter, setFilter] = useState<string | undefined>(initialServiceId);
   const [services, setServices] = useState<CmdbServiceTree[]>([]);
   const [cidrs, setCidrs] = useState<string[]>([]);
   const [policySource, setPolicySource] = useState('');
@@ -40,6 +42,7 @@ export function ProbesPage({ currentUser }: { currentUser: AuthUser }) {
   const [historyTotal, setHistoryTotal] = useState(0);
   const [historyPage, setHistoryPage] = useState(1);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [initialHistoryOpened, setInitialHistoryOpened] = useState(false);
   const [form] = Form.useForm<ProbeCreate>();
   const [messageApi, contextHolder] = message.useMessage();
   const serviceId = Form.useWatch('service_id', form);
@@ -101,6 +104,12 @@ export function ProbesPage({ currentUser }: { currentUser: AuthUser }) {
     try { const data = await getProbeResults(target.id, next); setHistory(data.items); setHistoryTotal(data.total); }
     catch (value) { fail(value); } finally { setHistoryLoading(false); }
   };
+  useEffect(() => {
+    if (!initialProbe || initialHistoryOpened) return;
+    setInitialHistoryOpened(true);
+    const target: HttpProbe = { ...initialProbe, service_id: initialServiceId ?? '', service_name: '', asset_id: '', asset_name: '', api_id: null, url: '', method: 'HEAD', expected_status: 200, timeout_seconds: 5, enabled: true, created_at: '', latest_result: null };
+    void readHistory(target);
+  }, [initialProbe, initialHistoryOpened, initialServiceId]);
   const save = async (payload: ProbeCreate) => {
     if (readOnly || !canProbe) return;
     setSaving(true); setError('');

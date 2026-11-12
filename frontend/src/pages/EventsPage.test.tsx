@@ -81,6 +81,20 @@ function stubApi(analysisStatus = 'completed', rotateResponse?: Promise<unknown>
 
 afterEach(() => vi.unstubAllGlobals());
 
+it('service_health: carries the selected asset into alert and event filters without executing', async () => {
+  const fetchMock = stubApi();
+  render(<ConfigProvider theme={{ token: { motion: false } }}><EventsPage currentUser={auditor}
+    initialAssetId="asset-1" initialTab="external" /></ConfigProvider>);
+  await screen.findByText('Prometheus CPU 告警');
+  expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/api/v1/alerts?')
+    && new URL(String(url), 'http://localhost').searchParams.get('asset_id') === 'asset-1')).toBe(true);
+  fireEvent.click(screen.getByRole('tab', { name: '活动告警' }));
+  await screen.findByText('CPU 高负载');
+  expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/api/v1/events?')
+    && new URL(String(url), 'http://localhost').searchParams.get('asset_id') === 'asset-1')).toBe(true);
+  expect(fetchMock.mock.calls.some(([, init]) => init?.method && init.method !== 'GET')).toBe(false);
+}, 15_000);
+
 it('adds administrator notification configuration to the existing alert page without a new route', async () => {
   stubApi();
   render(<ConfigProvider theme={{ token: { motion: false } }}><EventsPage currentUser={auditor} /></ConfigProvider>);

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button, Input, Select, Spin, Tag, message } from 'antd';
 import { Archive, ArchiveRestore, Bot, CheckCircle2, CircleAlert, ClipboardCheck, Send, ShieldCheck } from 'lucide-react';
 
@@ -10,19 +10,20 @@ import { useOperationsConversations } from './useOperationsConversations';
 import type { OpsAssistantMessage, OpsAssistantChatResponse } from '../api/ops-assistant';
 import './operations-assistant.css';
 
-interface Props { userId?: string; }
+interface Props { userId?: string; initialAssetId?: string; initialContext?: string; }
 
-export function OperationsAssistantPage({ userId = '' }: Props) {
-  return <OperationsAssistantWorkspace key={userId} />;
+export function OperationsAssistantPage({ userId = '', initialAssetId, initialContext }: Props) {
+  return <OperationsAssistantWorkspace key={userId} initialAssetId={initialAssetId} initialContext={initialContext} />;
 }
 
-function OperationsAssistantWorkspace() {
+function OperationsAssistantWorkspace({ initialAssetId, initialContext }: Pick<Props, 'initialAssetId' | 'initialContext'>) {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [assetsLoading, setAssetsLoading] = useState(true);
   const [messageApi, holder] = message.useMessage();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
-  const assistant = useOperationsConversations();
+  const assistant = useOperationsConversations({ restoreLatest: !initialAssetId && !initialContext });
+  const initialApplied = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -36,6 +37,13 @@ function OperationsAssistantWorkspace() {
     }).finally(() => { if (active) setAssetsLoading(false); });
     return () => { active = false; window.removeEventListener('sentinel:session-expired', expire); };
   }, [messageApi]);
+  useEffect(() => {
+    if (initialApplied.current || assetsLoading || (!initialAssetId && !initialContext)) return;
+    initialApplied.current = true;
+    assistant.newDraft();
+    if (initialAssetId && assets.some((asset) => asset.id === initialAssetId)) assistant.setAssetId(initialAssetId);
+    if (initialContext) assistant.setContext(initialContext);
+  }, [assetsLoading, assets, initialAssetId, initialContext]);
   const saveTitle = async () => {
     const title = editingTitle.trim();
     if (!title) return;

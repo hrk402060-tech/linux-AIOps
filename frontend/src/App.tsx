@@ -45,12 +45,18 @@ export default function App() {
   const [terminalAssetId, setTerminalAssetId] = useState<string | null>(null);
   const [searchTarget, setSearchTarget] = useState<SearchTarget | null>(null);
   const [searchNavigationId, setSearchNavigationId] = useState(0);
+  const [serviceProbeContext, setServiceProbeContext] = useState<{ serviceId: string; probe: { id: string; name: string } }>();
+  const [serviceAlertContext, setServiceAlertContext] = useState<{ assetId: string; tab: 'activity' | 'external' }>();
+  const [serviceAssistantContext, setServiceAssistantContext] = useState<{ assetId: string; context: string }>();
   const [terminalNotice, terminalNoticeHolder] = notification.useNotification();
   const resetScopedState = useCallback(() => {
     setPage('dashboard');
     setFindingAssetId(null);
     setTerminalAssetId(null);
     setSearchTarget(null);
+    setServiceProbeContext(undefined);
+    setServiceAlertContext(undefined);
+    setServiceAssistantContext(undefined);
   }, []);
   const { currentUser, authLoading, setCurrentUser } = useCurrentUser(resetScopedState);
   const scopeKey = `${currentUser?.id ?? ''}:${currentUser?.role ?? ''}:${currentUser?.access_revision ?? 0}`;
@@ -63,6 +69,9 @@ export default function App() {
       window.history.replaceState(null, '', url);
     }
     setSearchTarget(null);
+    setServiceProbeContext(undefined);
+    setServiceAlertContext(undefined);
+    setServiceAssistantContext(undefined);
     if (nextPage !== 'findings' || searchTarget?.page === 'findings') setFindingAssetId(null);
     if (nextPage !== 'terminal') setTerminalAssetId(null);
     setPage(nextPage === 'user-security' ? 'security-settings' : nextPage);
@@ -98,6 +107,15 @@ export default function App() {
       actions: <Button size="small" icon={<SquareTerminal size={15} />}
         onClick={() => openTerminalInPage(assetId)}>在当前页打开 SSH</Button>,
     });
+  };
+  const openServiceProbeHistory = (serviceId: string, probe: { id: string; name: string }) => {
+    setServiceProbeContext({ serviceId, probe }); setPage('probes');
+  };
+  const openServiceAlerts = (assetId: string, tab: 'activity' | 'external' = 'activity') => {
+    setServiceAlertContext({ assetId, tab }); setPage('alerts');
+  };
+  const openServiceAssistant = (assetId: string, context: string) => {
+    setServiceAssistantContext({ assetId, context }); setPage('ops-assistant');
   };
   useEffect(() => () => terminalNotice.destroy('terminal-tab-request'), [scopeKey, terminalNotice]);
   const signOut = async () => {
@@ -137,12 +155,15 @@ export default function App() {
         : page === 'automation' ? <AutomationPage onNavigate={navigate} />
         : page === 'audit-log' ? <AuditLogPage />
         : isSecurityCheckPage(page) ? <SecurityChecksPage activeKey={page} onNavigate={navigate} />
-        : page === 'alerts' ? <EventsPage currentUser={currentUser} onOpenTerminal={openAssetTerminal} onOpenIncidents={() => navigate('incidents')} />
+        : page === 'alerts' ? <EventsPage currentUser={currentUser} initialAssetId={serviceAlertContext?.assetId}
+          initialTab={serviceAlertContext?.tab} onOpenTerminal={openAssetTerminal} onOpenIncidents={() => navigate('incidents')} />
         : page === 'incidents' ? <IncidentsPage currentUser={currentUser} />
-        : page === 'observability' ? <ObservabilityPage />
-        : page === 'probes' ? <ProbesPage currentUser={currentUser} />
+        : page === 'observability' ? <ObservabilityPage onOpenProbeHistory={openServiceProbeHistory} onOpenAlerts={openServiceAlerts}
+          onOpenTerminal={openAssetTerminal} onOpenAssistant={openServiceAssistant} />
+        : page === 'probes' ? <ProbesPage currentUser={currentUser} initialServiceId={serviceProbeContext?.serviceId} initialProbe={serviceProbeContext?.probe} />
         : page === 'terminal' ? <TerminalPage initialAssetId={terminalAssetId} />
-        : page === 'ops-assistant' ? <OperationsAssistantPage userId={currentUser.id} />
+        : page === 'ops-assistant' ? <OperationsAssistantPage userId={currentUser.id}
+          initialAssetId={serviceAssistantContext?.assetId} initialContext={serviceAssistantContext?.context} />
             : page === 'assets' ? <AssetsPage onViewFindings={viewAssetFindings} onOpenTerminal={openAssetTerminal}
               key={searchTarget?.page === 'assets' ? `${searchTarget.assetId}:${searchNavigationId}` : 'assets'}
               initialAssetId={searchTarget?.page === 'assets' ? searchTarget.assetId : null}

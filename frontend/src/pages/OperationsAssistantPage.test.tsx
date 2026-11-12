@@ -15,10 +15,26 @@ const send = async (prompt: string) => {
 };
 
 describe('OperationsAssistantPage persisted conversations', () => {
+  it('service_health: starts an asset-bound draft without restoring an unrelated conversation or sending', async () => {
+    installConversationApi([conversation('existing', '旧服务器会话', [turn('u1', '旧服务器问题')])]);
+    const original = vi.mocked(fetch).getMockImplementation()!;
+    vi.mocked(fetch).mockImplementation((url, init) => String(url).includes('/assets')
+      ? Promise.resolve(response([{ id: 'asset-health', name: '订单服务器', host: '192.0.2.40', lifecycle_status: 'enabled' }]))
+      : original(url, init));
+    render(<ConfigProvider><OperationsAssistantPage userId="user-1" initialAssetId="asset-health"
+      initialContext="订单 API：健康检查失败" /></ConfigProvider>);
+    await waitFor(() => expect(screen.getByLabelText('补充只读证据')).toHaveValue('订单 API：健康检查失败'));
+    expect(screen.getByLabelText('补充只读证据')).toBeEnabled();
+    expect(screen.queryByText('旧服务器问题')).not.toBeInTheDocument();
+    expect(screen.getByText('订单服务器 · 192.0.2.40')).toBeInTheDocument();
+    expect(vi.mocked(fetch).mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false);
+  });
   it('restores the latest server conversation and its messages after remount', async () => {
     installConversationApi([conversation('recent', '负载排查', [turn('u1', '历史问题')])]);
     const page = mount();
     expect(await screen.findByText('历史问题')).toBeInTheDocument();
+    expect(screen.queryByText('只读分析')).not.toBeInTheDocument();
+    expect(screen.queryByText('人工确认边界')).not.toBeInTheDocument();
     expect(screen.getByLabelText('补充只读证据')).toBeDisabled();
     page.unmount();
     mount();

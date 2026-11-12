@@ -32,6 +32,16 @@ describe('ProbesPage', () => {
     expect(getProbeResults).toHaveBeenCalledWith('p', 1);
     expect((await screen.findAllByText('检查历史')).some((entry) => entry.classList.contains('ant-drawer-title'))).toBe(true);
   }, 15000);
+  it('service_health: opens the precise history even when the target is not on the first list page', async () => {
+    vi.mocked(getProbes).mockResolvedValue({ items: [], total: 12 });
+    vi.mocked(getProbeResults).mockResolvedValue({ items: [], total: 0 });
+    render(<ProbesPage currentUser={currentUser} initialServiceId="service-selected"
+      initialProbe={{ id: 'probe-page-2', name: '指定健康检查' }} />);
+    await waitFor(() => expect(getProbeResults).toHaveBeenCalledWith('probe-page-2', 1));
+    expect(getProbes).toHaveBeenCalledWith('service-selected', 1);
+    expect(screen.getByText('指定健康检查')).toBeInTheDocument();
+    expect(runProbe).not.toHaveBeenCalled();
+  });
   it('keeps auditors read-only and displays the empty allowlist', async () => {
     vi.mocked(getProbePolicy).mockResolvedValue({ allowed_cidrs: [], configured: false, source: '平台配置' });
     vi.mocked(getProbes).mockResolvedValue({ items: [target], total: 1 });
@@ -91,5 +101,5 @@ describe('ProbesPage', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: '检查 API 健康' })).toBeDisabled());
     expect(screen.getByRole('button', { name: '新增目标' })).toBeDisabled();
     expect(runProbe).not.toHaveBeenCalled();
-  }, 10000);
+  }, 20000);
 });

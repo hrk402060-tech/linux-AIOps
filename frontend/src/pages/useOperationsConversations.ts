@@ -18,7 +18,7 @@ function createRequestId(): string {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
-export function useOperationsConversations() {
+export function useOperationsConversations(options: { restoreLatest?: boolean } = {}) {
   const [items, setItems] = useState<OpsAssistantConversationSummary[]>([]);
   const [active, setActive] = useState<OpsAssistantConversation | null>(null);
   const [archived, setArchived] = useState(false);
@@ -85,7 +85,7 @@ export function useOperationsConversations() {
 
   useEffect(() => {
     alive.current = true;
-    void reload(false, true);
+    void reload(false, options.restoreLatest !== false);
     const expire = () => {
       begin(); retry.current = null; setLocked(true); setItems([]); setActive(null); setQuestion('');
       setAssetId(undefined); setContext(''); setTotal(0); setListError(''); setListLoading(false);
@@ -95,7 +95,7 @@ export function useOperationsConversations() {
       alive.current = false; request.current.controller.abort(); request.current.epoch += 1;
       window.removeEventListener('sentinel:session-expired', expire);
     };
-  }, [begin]); // Each user owns a separate keyed workspace.
+  }, [begin, options.restoreLatest]); // Each user owns a separate keyed workspace.
 
   const newDraft = () => {
     begin(); retry.current = null; setActive(null); setQuestion(''); setAssetId(undefined); setContext('');

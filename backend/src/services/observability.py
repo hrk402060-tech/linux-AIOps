@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
+from math import isfinite
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.models.asset import Asset, AssetLifecycleStatus
@@ -8,10 +9,11 @@ from src.models.cmdb import (
     CmdbApplication, CmdbBusiness, CmdbLifecycle, CmdbService,
     CmdbServiceAsset, ServiceAssetStatus,
 )
-from src.models.monitoring import MonitoringAlertState
 from src.services.dashboard_queries import (
     get_finding_counts, get_latest_active_findings, get_latest_snapshots,
 )
+from src.services.observability_evidence import get_alerts, get_probe_evidence, is_stale
+from src.services.observability_health import apply_health
 
 HEALTH_STATES = {"healthy", "degraded", "unavailable", "unobserved"}
 STATUS_PRIORITY = {"unavailable": 0, "degraded": 1, "unobserved": 2, "healthy": 3}
@@ -36,7 +38,7 @@ def get_services(
     catalog = _catalog_rows(session, query.strip(), business_id, visible_asset_ids)
     asset_ids = list({relation.asset_id for _, _, _, relation, _ in catalog if relation})
     snapshots = get_latest_snapshots(session, asset_ids)
-    alerts = _alert_counts(session, asset_ids)
+    alerts = get_alerts(session, asset_ids)
     findings = get_finding_counts(get_latest_active_findings(session, visible_asset_ids))
     now = datetime.now(timezone.utc)
     grouped: dict[str, dict[str, object]] = {}
@@ -47,7 +49,13 @@ def get_services(
                 row, asset, snapshots.get(asset.id), alerts, findings,
                 now, freshness_threshold,
             )
-    services = [_finalize(row) for row in grouped.values()]
+    evidence = get_probe_evidence(
+        session, grouped, now, freshness_threshold, visible_asset_ids is not None,
+    )
+    services = [
+        apply_health(_finalize(row), evidence[key], visible_asset_ids is not None)
+        for key, row in grouped.items()
+    ]
     if health_status:
         services = [item for item in services if item["status"] == health_status]
     services.sort(key=lambda item: (
@@ -93,7 +101,8 @@ def _catalog_rows(
             CmdbService.name.ilike(pattern) | CmdbService.code.ilike(pattern)
             | CmdbApplication.name.ilike(pattern) | CmdbBusiness.name.ilike(pattern)
         )
-    return list(session.execute(statement.limit(2000)).all())
+    # Never truncate joined rows: a partial asset list can falsely imply health.
+    return list(session.execute(statement).all())
 
 
 def _service_row(
@@ -106,13 +115,13 @@ def _service_row(
         "service_code": service.code, "service_type": service.service_type,
         "assets": [], "active_alerts": 0, "pending_vulnerabilities": 0,
         "critical": 0, "high": 0, "stale_assets": 0, "metric_values": {},
-        "collected_times": [],
+        "collected_times": [], "alerts": [],
     }
 
 
 def _append_asset(
     row: dict[str, object], asset: Asset, snapshot: object,
-    alerts: dict[str, int], findings: dict[str, dict[str, object]],
+    alerts: dict[str, list[dict[str, object]]], findings: dict[str, dict[str, object]],
     now: datetime, freshness_threshold: timedelta,
 ) -> None:
     status = "disabled" if asset.lifecycle_status == AssetLifecycleStatus.DISABLED else (
@@ -122,7 +131,7 @@ def _append_asset(
         "unobserved"
         if asset.lifecycle_status == AssetLifecycleStatus.DISABLED or snapshot is None
         else "stale"
-        if _is_stale(snapshot.collected_at, now, freshness_threshold)
+        if is_stale(snapshot.collected_at, now, freshness_threshold)
         else "fresh"
     )
     assets = row["assets"]
@@ -134,36 +143,41 @@ def _append_asset(
     })
     if freshness == "stale":
         row["stale_assets"] = int(row["stale_assets"]) + 1
-    row["active_alerts"] = int(row["active_alerts"]) + int(alerts.get(asset.id, 0))
+    asset_alerts = alerts.get(asset.id, [])
+    row["alerts"].extend(asset_alerts)  # type: ignore[union-attr]
+    row["active_alerts"] = int(row["active_alerts"]) + len(asset_alerts)
     risk = findings.get(asset.id, {})
     for field in ("total", "critical", "high"):
         target = "pending_vulnerabilities" if field == "total" else field
         row[target] = int(row[target]) + int(risk.get(field, 0))
     if snapshot is not None:
         row["collected_times"].append(snapshot.collected_at)  # type: ignore[union-attr]
+    if snapshot is not None and freshness == "fresh" and status == "online":
         metrics = row["metric_values"]
         for name in ("cpu_percent", "memory_percent", "disk_percent"):
             value = snapshot.metrics.get(name)  # type: ignore[union-attr]
-            if isinstance(value, int | float):
+            if isinstance(value, int | float) and not isinstance(value, bool) and isfinite(value) and 0 <= value <= 100:
                 metrics.setdefault(name, []).append(float(value))  # type: ignore[union-attr]
 
 
 def _finalize(row: dict[str, object]) -> dict[str, object]:
     assets = row.pop("assets")
     assert isinstance(assets, list)
-    statuses = [str(item["status"]) for item in assets]
-    freshnesses = [str(item["freshness"]) for item in assets]
+    enabled = [item for item in assets if item["status"] != "disabled"]
+    statuses = [str(item["status"]) for item in enabled if item["freshness"] == "fresh"]
+    freshnesses = [str(item["freshness"]) for item in enabled]
     online = statuses.count("online")
     offline = statuses.count("offline")
-    disabled = statuses.count("disabled")
-    uncollected = statuses.count("uncollected")
-    observable = online + offline
-    if observable == 0:
-        health = "unobserved"
-    elif online == 0:
+    disabled = len(assets) - len(enabled)
+    uncollected = sum(item["freshness"] == "unobserved" or (
+        item["freshness"] == "fresh" and item["status"] not in {"online", "offline"}
+    ) for item in enabled)
+    if enabled and offline == len(enabled):
         health = "unavailable"
-    elif offline or uncollected or int(row["active_alerts"]) or int(row["stale_assets"]):
+    elif offline:
         health = "degraded"
+    elif not enabled or online < len(enabled):
+        health = "unobserved"
     else:
         health = "healthy"
     if not freshnesses or all(item == "unobserved" for item in freshnesses):
@@ -186,29 +200,6 @@ def _finalize(row: dict[str, object]) -> dict[str, object]:
         },
         "last_collected_at": max(times) if times else None, "assets": assets,
     }
-
-
-def _is_stale(
-    collected_at: datetime, now: datetime, freshness_threshold: timedelta,
-) -> bool:
-    observed_at = (
-        collected_at
-        if collected_at.tzinfo is not None
-        else collected_at.replace(tzinfo=timezone.utc)
-    )
-    return now - observed_at > freshness_threshold
-
-
-def _alert_counts(session: Session, asset_ids: list[str]) -> dict[str, int]:
-    if not asset_ids:
-        return {}
-    return dict(session.execute(
-        select(MonitoringAlertState.asset_id, func.count(MonitoringAlertState.id))
-        .where(
-            MonitoringAlertState.asset_id.in_(asset_ids),
-            MonitoringAlertState.status == "triggered",
-        ).group_by(MonitoringAlertState.asset_id)
-    ).all())
 
 
 def _summary(services: list[dict[str, object]]) -> dict[str, int]:

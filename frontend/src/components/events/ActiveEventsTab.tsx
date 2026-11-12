@@ -21,10 +21,10 @@ const levels: Record<string, string> = { critical: '严重', high: '高危', med
 const options = (values: Record<string, string>) =>
   Object.entries(values).map(([value, label]) => ({ value, label }));
 
-export function ActiveEventsTab({ currentUser }: { currentUser: Pick<AuthUser, 'role'> }) {
+export function ActiveEventsTab({ currentUser, initialAssetId }: { currentUser: Pick<AuthUser, 'role'>; initialAssetId?: string }) {
   const [data, setData] = useState<{ items: SecurityEvent[]; total: number }>({ items: [], total: 0 });
   const [assets, setAssets] = useState<Asset[]>([]);
-  const [filters, setFilters] = useState<Record<string, string>>({});
+  const [filters, setFilters] = useState<Record<string, string>>((): Record<string, string> => initialAssetId ? { asset_id: initialAssetId } : {});
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [target, setTarget] = useState<SecurityEvent | null>(null);
@@ -87,7 +87,7 @@ export function ActiveEventsTab({ currentUser }: { currentUser: Pick<AuthUser, '
   return <div>{holder}
     <div className="tab-toolbar"><Space wrap>{readOnly ? <Tag>审计员只读</Tag> : <Button icon={<Settings size={17} />} onClick={() => setPolicyOpen(true)}>告警策略</Button>}<Button aria-label="刷新事件" icon={<RefreshCw size={17} />} onClick={() => void load()} /></Space></div>
     <Space wrap style={{ marginBottom: 16 }}>
-      <Select allowClear aria-label="事件资产" placeholder="全部资产" style={{ width: 220 }} options={assets.map((item) => ({ value: item.id, label: `${item.name} · ${item.host}` }))} onChange={(value) => filter('asset_id', value)} />
+      <Select allowClear aria-label="事件资产" placeholder="全部资产" style={{ width: 220 }} value={filters.asset_id} options={assets.map((item) => ({ value: item.id, label: `${item.name} · ${item.host}` }))} onChange={(value) => filter('asset_id', value)} />
       <Select allowClear aria-label="事件来源" placeholder="全部来源" style={{ width: 150 }} options={options(sources)} onChange={(value) => filter('source', value)} />
       <Select allowClear aria-label="事件级别" placeholder="全部级别" style={{ width: 120 }} options={options(levels)} onChange={(value) => filter('severity', value)} />
       <Select allowClear aria-label="处置状态" placeholder="全部处置状态" style={{ width: 150 }} options={options(statuses)} onChange={(value) => filter('status', value)} />

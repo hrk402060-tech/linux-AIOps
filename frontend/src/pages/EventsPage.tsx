@@ -6,10 +6,12 @@ import { ExternalAlertsTab } from '../components/events/ExternalAlertsTab';
 import { AlertNotificationsTab } from '../components/events/AlertNotificationsTab';
 import { DiagnosticGrantsTab } from '../components/events/DiagnosticGrantsTab';
 
-export function EventsPage({ currentUser, onOpenTerminal, onOpenIncidents }: {
+export function EventsPage({ currentUser, onOpenTerminal, onOpenIncidents, initialAssetId, initialTab = 'activity' }: {
   currentUser: AuthUser;
   onOpenTerminal?: (assetId: string) => void;
   onOpenIncidents?: () => void;
+  initialAssetId?: string;
+  initialTab?: 'activity' | 'external';
 }) {
   return <section className="events-page">
     <div className="page-heading">
@@ -18,11 +20,11 @@ export function EventsPage({ currentUser, onOpenTerminal, onOpenIncidents }: {
     </div>
     <Tabs
       className="events-tabs"
-      defaultActiveKey="activity"
+      defaultActiveKey={initialTab}
       destroyOnHidden
       items={[
-        { key: 'activity', label: '活动告警', children: <ActiveEventsTab currentUser={currentUser} /> },
-        { key: 'external', label: '外部告警研判', children: <ExternalAlertsTab currentUser={currentUser} onOpenTerminal={onOpenTerminal} onOpenIncidents={onOpenIncidents} /> },
+        { key: 'activity', label: '活动告警', children: <ActiveEventsTab currentUser={currentUser} initialAssetId={initialAssetId} /> },
+        { key: 'external', label: '外部告警研判', children: <ExternalAlertsTab currentUser={currentUser} initialAssetId={initialAssetId} onOpenTerminal={onOpenTerminal} onOpenIncidents={onOpenIncidents} /> },
         { key: 'connectors', label: '接入连接器', children: <AlertConnectorsTab currentUser={currentUser} /> },
         { key: 'notifications', label: '管理员通知', children: <AlertNotificationsTab currentUser={currentUser} /> },
         { key: 'diagnostic-grants', label: '只读诊断授权', children: <DiagnosticGrantsTab currentUser={currentUser} /> },

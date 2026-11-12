@@ -66,7 +66,7 @@ def test_service_observability_aggregates_current_runtime_context(
     assert row["assets"][0]["freshness"] == "fresh"
 
 
-def test_service_observability_marks_old_snapshot_stale_and_degraded(
+def test_service_observability_marks_old_snapshot_stale_and_unobserved(
     client: TestClient, database_session: Session
 ) -> None:
     collected_at = datetime.now(timezone.utc) - timedelta(hours=1)
@@ -100,7 +100,8 @@ def test_service_observability_marks_old_snapshot_stale_and_degraded(
 
     row = body["services"][0]
     assert body["freshness_threshold_seconds"] == 900
-    assert row["status"] == "degraded"
+    assert row["status"] == "unobserved"
+    assert row["resource_peaks"]["cpu_percent"] is None
     assert row["freshness"] == "stale"
     assert row["stale_assets"] == 1
     assert row["assets"][0]["freshness"] == "stale"
