@@ -118,8 +118,8 @@ describe('CmdbPage', () => {
       .mockResolvedValueOnce(response(assets)));
     render(<ConfigProvider theme={{ token: { motion: false } }}><CmdbPage currentUser={admin} /></ConfigProvider>);
 
-    expect(screen.getByRole('heading', { name: '系统/接口监控', level: 1 })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '刷新系统/接口监控' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '业务服务', level: 1 })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '刷新业务服务' })).toBeInTheDocument();
     expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
     expect(screen.queryByText('目录关系')).not.toBeInTheDocument();
     expect(screen.queryByText('服务器资产挂在“服务”下面；点击任意节点可查看详情和关联关系。')).not.toBeInTheDocument();

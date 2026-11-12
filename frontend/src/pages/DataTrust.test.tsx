@@ -17,7 +17,7 @@ const views = [
   { name: '基线', element: <BaselinesPage />, shell: '.baselines-data-shell', error: '基线数据读取失败' },
   { name: '漏洞', element: <VulnerabilitiesPage />, shell: '.vulnerabilities-data-shell', error: '漏洞数据读取失败' },
   { name: '监控', element: <ObservabilityPage />, shell: '.observability-data-shell', error: '接口暂不可用' },
-  { name: '系统/接口监控', element: <CmdbPage currentUser={{
+  { name: '业务服务', element: <CmdbPage currentUser={{
     id: 'admin', username: 'admin', display_name: '管理员', role: 'admin',
     enabled: true, must_change_password: false, created_at: '', last_login_at: null,
   }} />, shell: '.cmdb-data-shell', error: '配置项数据读取失败' },
