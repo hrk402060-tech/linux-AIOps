@@ -149,7 +149,7 @@ export function ExternalAlertsTab({ currentUser, initialAssetId, onOpenTerminal,
       onCancelJob={(job) => { if (detail && !readOnly) setDiagnosticTarget({ kind: 'cancel', alert: detail.alert, job }); }} />
     <DiagnosticJobActionModal target={diagnosticTarget} onClose={() => setDiagnosticTarget(null)} onUpdated={refresh} />
     <Modal title="人工推进告警" open={advanceTarget !== null} onCancel={() => setAdvanceTarget(null)} onOk={() => void advance()} okText="确认推进" confirmLoading={loading} okButtonProps={{ disabled: note.trim().length < 3 }} destroyOnHidden><p>{advanceTarget ? `${statusLabels[advanceTarget.status]} → ${statusLabels[nextStatus[advanceTarget.status] ?? advanceTarget.status]}` : ''}</p><Input.TextArea aria-label="推进说明" value={note} onChange={(event) => setNote(event.target.value)} placeholder="请输入人工判断和处置说明（至少 3 个字符）" rows={3} /></Modal>
-    <Modal title="人工转为故障" open={incidentTarget !== null} onCancel={() => setIncidentTarget(null)} onOk={() => void createIncident()} okText="确认转为故障" confirmLoading={loading} okButtonProps={{ disabled: note.trim().length < 3 }} destroyOnHidden><Alert type="warning" showIcon message="此操作只创建故障记录，不会自动执行修复。" /><Input.TextArea aria-label="转故障说明" value={note} onChange={(event) => setNote(event.target.value)} placeholder="请输入影响判断和转故障原因" rows={3} style={{ marginTop: 12 }} /></Modal>
+    <Modal title="人工转为故障" open={incidentTarget !== null} onCancel={() => setIncidentTarget(null)} onOk={() => void createIncident()} okText="确认转为故障" confirmLoading={loading} okButtonProps={{ disabled: note.trim().length < 3 }} destroyOnHidden><Input.TextArea aria-label="转故障说明" value={note} onChange={(event) => setNote(event.target.value)} placeholder="请输入影响判断和转故障原因" rows={3} style={{ marginTop: 12 }} /></Modal>
   </div>;
 }
 

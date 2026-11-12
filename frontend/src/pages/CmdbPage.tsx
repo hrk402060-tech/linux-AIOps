@@ -117,7 +117,6 @@ export function CmdbPage({ currentUser, initialServiceId }: { currentUser: AuthU
     </div>
     </div><CmdbEntityModal type={modalType} editing={editing} businesses={businesses} applications={applications} services={services} submitting={submitting} onClose={() => { setModalType(null); setEditing(null); }} onSubmit={save} />
     <Modal title="自动发现预览" open={discovery !== null} onCancel={() => setDiscovery(null)} footer={<Button onClick={() => setDiscovery(null)}>关闭</Button>} width={820}>
-      <Alert type="info" showIcon message="只读发现结果" description="结果来自服务器最近一次只读采集。选择发现服务并指定应用后，管理员确认才会写入业务服务。" />
       <Table rowKey="asset_id" size="small" pagination={false} dataSource={discovery?.assets ?? []} columns={[
         { title: '服务器', render: (_, item) => <div><strong>{item.asset_name}</strong><small>{item.host}</small></div> },
         { title: '采集状态', dataIndex: 'status' },

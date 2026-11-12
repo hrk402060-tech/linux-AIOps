@@ -102,7 +102,6 @@ export function DiagnosticGrantsTab({ currentUser }: { currentUser: Pick<AuthUse
     canSubmit: authoritative && writable, kindSelector, onCancel: () => { setFormOpen(false); setEditing(null); },
     onSubmit: (payload: DiagnosticGrantInput) => void mutate(() => saveDiagnosticGrant(payload)) };
   return <section aria-label="只读诊断授权">
-    <Alert type="info" showIcon message="Linux 使用专用身份与限制网关；Kubernetes 限定命名空间；Docker 使用受限 HTTPS 代理，所有诊断仅采集只读证据。" />
     {error ? <Alert type="error" showIcon message={error} closable onClose={() => setError('')} style={{ marginTop: 12 }} /> : null}
     {notice ? <Alert type="success" showIcon message={notice} closable onClose={() => setNotice('')} style={{ marginTop: 12 }} /> : null}
     <Space wrap style={{ margin: '16px 0' }}>
@@ -184,7 +183,6 @@ function RevokeDialog({ grant, busy, onCancel, onRevoke }: {
   return <Modal title="撤销只读诊断授权" open destroyOnHidden okText="确认撤销" onCancel={onCancel}
     confirmLoading={busy} closable={!busy} maskClosable={!busy} cancelButtonProps={{ disabled: busy }}
     okButtonProps={{ disabled: !ready || busy }} onOk={() => { if (ready && !busy) onRevoke(confirmation.trim(), reason.trim()); }}>
-    <Alert type="warning" showIcon message="撤销后停止后续诊断采集，历史证据和人工 SSH 连接凭据保留。" />
     <p>需输入：{grant.asset_name}</p>
     <Input aria-label="资产名称确认" value={confirmation} disabled={busy} maxLength={100} onChange={(event) => setConfirmation(event.target.value)} />
     <p>撤销原因</p><Input.TextArea aria-label="撤销原因" value={reason} disabled={busy} rows={3} maxLength={500} onChange={(event) => setReason(event.target.value)} />
@@ -202,7 +200,6 @@ function TestDialog({ grant, onCancel, onTest }: {
     onCancel={() => { if (!busy) onCancel(); }} closable={!busy} maskClosable={!busy}
     cancelButtonProps={{ disabled: busy }} okButtonProps={{ disabled: !ready || busy }}
     onOk={async () => { if (!ready || busy) return; setBusy(true); await onTest(confirmation.trim(), reason.trim()); }}>
-    <Alert type="info" showIcon message="仅执行已授权的只读检查，不修改、删除、重启或安装任何内容。" />
     <p>需输入：{grant.asset_name}</p>
     <Input aria-label="资产名称确认" value={confirmation} disabled={busy} maxLength={100}
       onChange={(event) => setConfirmation(event.target.value)} />

@@ -23,7 +23,7 @@ describe('RedisGrantForm', () => {
     render(<ConfigProvider><RedisGrantForm assets={[asset]} catalog={catalog}
       initialGrant={null} busy={false} canSubmit onCancel={vi.fn()} onSubmit={vi.fn()} /></ConfigProvider>);
     expect(screen.getByRole('dialog', { name: '配置 Redis 只读授权' })).toBeInTheDocument();
-    expect(screen.getByText(/仅通过 TLS 读取 Redis 状态/)).toBeInTheDocument();
+    expect(screen.queryByText(/仅通过 TLS 读取 Redis 状态/)).not.toBeInTheDocument();
     expect(screen.getByLabelText('Redis 数据库编号')).toBeInTheDocument();
     expect(screen.getByLabelText('已人工确认 Redis 只读权限')).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('资产名称确认'), { target: { value: 'redis-1' } });

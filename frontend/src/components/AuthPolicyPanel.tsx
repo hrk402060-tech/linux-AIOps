@@ -119,16 +119,6 @@ export function AuthPolicyPanel() {
         <Form.Item name="allow_user_mfa_reset" label="允许用户自行关闭 MFA" valuePropName="checked">
           <Switch aria-label="允许用户自行关闭 MFA" />
         </Form.Item>
-        <Alert
-          type="info"
-          showIcon
-          message="用户可在“个人安全”中扫码绑定 MFA；强制策略只影响后续登录。"
-          description={<>
-            <div>新策略仅适用于后续登录；已有会话需在“活动会话”或“撤销全部会话”中撤销后重新认证。</div>
-            <div>未绑定用户下次登录会直接进入二维码绑定流程，绑定完成后才能进入平台。</div>
-            {policy ? <div>当前来源：{policy.source}；锁定 {formatDuration(policy.lock_duration_seconds)}；会话 {formatDuration(policy.session_ttl_seconds)}。</div> : null}
-          </>}
-        />
         <Space wrap style={{ marginTop: 16 }}>
           {policy ? <Tag>{policy.updated_at ? `最后更新：${new Date(policy.updated_at).toLocaleString('zh-CN')}` : '使用环境默认值'}</Tag> : null}
           <Button type="primary" htmlType="submit" icon={<Save size={16} />} loading={saving} disabled={loading || saving || !policy}>保存登录策略</Button>

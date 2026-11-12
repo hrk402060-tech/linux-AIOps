@@ -142,7 +142,6 @@ export function ProbesPage({ currentUser, initialServiceId, initialProbe }: {
       </Form>
     </Modal>
     <Modal title="拨测批准网段" open={isAdmin && policyOpen && policyReady} onCancel={() => setPolicyOpen(false)} onOk={() => void savePolicy()} okText="保存配置" cancelText="取消" confirmLoading={policySaving} okButtonProps={{ disabled: !isAdmin || !policyReady || policyLoading }} destroyOnHidden>
-      <Alert type="info" showIcon message="配置后立即生效" description="每行填写一个 IPv4/IPv6 网段，也可使用逗号分隔。仅允许对已登记服务器资产的 IP 发起只读 HTTP(S) 拨测。" />
       <Input.TextArea aria-label="批准网段" value={policyText} onChange={(event) => setPolicyText(event.target.value.replace(/,/g, '\n'))} rows={5} placeholder="192.0.2.0/24&#10;198.51.100.10/32" />
     </Modal>
     <Drawer title="检查历史" open={Boolean(historyTarget)} width={800} onClose={() => setHistoryTarget(undefined)}>

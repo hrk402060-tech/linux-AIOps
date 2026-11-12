@@ -93,7 +93,6 @@ export function MySQLGrantForm({ assets, catalog, initialGrant, busy, canSubmit,
     okText="保存只读授权" confirmLoading={busy} okButtonProps={{ disabled: !ready }}
     cancelButtonProps={{ disabled: busy }} closable={!busy} maskClosable={!busy} destroyOnHidden width={660}>
     {kindSelector}
-    <Alert type="info" showIcon message="仅通过 TLS 读取 MySQL 状态与复制信息，不读取业务表，不执行写入、修改或管理操作。" />
     {loadError ? <Alert type="error" showIcon message={loadError} /> : null}
     {loading ? <Spin size="small" /> : null}
     <Form form={form} layout="vertical" disabled={busy || loading || !canSubmit} onFinish={submit} style={{ marginTop: 16 }}>

@@ -204,13 +204,6 @@ export function AlertConnectorsTab({ currentUser }: { currentUser: Pick<AuthUser
     return () => { preflightSequence.current += 1; };
   }, [writable]);
   return <div>{holder}
-    <Alert
-      type="info"
-      showIcon
-      message="HMAC Webhook 接入"
-      description={<span>请求地址 <Typography.Text code>/api/v1/alert-ingest/{'{connector_id}'}</Typography.Text>；签名原文 <Typography.Text code>timestamp.nonce.raw_body</Typography.Text>，使用 HMAC-SHA256 计算后发送 <Typography.Text code>X-Alert-Timestamp</Typography.Text>、<Typography.Text code>X-Alert-Nonce</Typography.Text>、<Typography.Text code>X-Alert-Signature: sha256=...</Typography.Text>。密钥仅在创建或轮换后显示一次。</span>}
-      style={{ marginBottom: 14 }}
-    />
     <div className="tab-toolbar"><Space>{writable ? <Button type="primary" icon={<Plus size={16} />} onClick={() => setCreateOpen(true)}>新建连接器</Button> : <Tag>只读</Tag>}<Button aria-label="刷新连接器" icon={<RefreshCw size={16} />} onClick={() => void load()} /></Space></div>
     {runtime.notice}
     <div className="table-frame"><Table<AlertConnector> rowKey="id" loading={loading} dataSource={items} pagination={false} scroll={{ x: writable ? 1440 : 880 }} columns={[
@@ -226,8 +219,8 @@ export function AlertConnectorsTab({ currentUser }: { currentUser: Pick<AuthUser
     ]} /></div>
     {runtime.modal}
     <Modal title="新建告警连接器" open={createOpen} onCancel={() => { setCreateOpen(false); form.resetFields(); }} onOk={() => void create()} okText="创建连接器" confirmLoading={loading} destroyOnHidden><Form form={form} layout="vertical"><Form.Item name="name" label="连接器名称" rules={[{ required: true }, { min: 2 }]}><Input maxLength={120} /></Form.Item><Form.Item name="source_type" label="来源类型" rules={[{ required: true }]}><Select options={Object.entries(sourceLabels).map(([value, label]) => ({ value, label }))} /></Form.Item></Form></Modal>
-    <Modal title="确认轮换接入密钥" open={rotateTarget !== null} onCancel={() => { if (!rotationInFlight.current) setRotateTarget(null); }} onOk={() => void rotate()} okText="确认轮换" cancelText="取消" confirmLoading={rotating} okButtonProps={{ disabled: rotating || !rotateTarget || confirmation.trim() !== rotateTarget.name }} cancelButtonProps={{ disabled: rotating }} closable={!rotating} maskClosable={!rotating} keyboard={!rotating} destroyOnHidden><Alert type="warning" showIcon message="轮换后旧密钥立即失效，请同步更新告警发送端。" /><p>请输入确认文本：<strong>{rotateTarget?.name}</strong></p><Input aria-label="轮换确认文本" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} disabled={rotating} /></Modal>
-    <Modal title="一次性接入密钥" open={oneTimeSecret !== null} onCancel={() => setOneTimeSecret(null)} onOk={() => setOneTimeSecret(null)} okText="我已安全保存" cancelButtonProps={{ style: { display: 'none' } }} destroyOnHidden><Alert type="warning" showIcon message="关闭后无法再次查看明文；需要新密钥时必须执行轮换。" /><div className="one-time-secret"><Typography.Text code copyable>{oneTimeSecret}</Typography.Text></div></Modal>
+    <Modal title="确认轮换接入密钥" open={rotateTarget !== null} onCancel={() => { if (!rotationInFlight.current) setRotateTarget(null); }} onOk={() => void rotate()} okText="确认轮换" cancelText="取消" confirmLoading={rotating} okButtonProps={{ disabled: rotating || !rotateTarget || confirmation.trim() !== rotateTarget.name }} cancelButtonProps={{ disabled: rotating }} closable={!rotating} maskClosable={!rotating} keyboard={!rotating} destroyOnHidden><p>请输入确认文本：<strong>{rotateTarget?.name}</strong></p><Input aria-label="轮换确认文本" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} disabled={rotating} /></Modal>
+    <Modal title="一次性接入密钥" open={oneTimeSecret !== null} onCancel={() => setOneTimeSecret(null)} onOk={() => setOneTimeSecret(null)} okText="我已安全保存" cancelButtonProps={{ style: { display: 'none' } }} destroyOnHidden><div className="one-time-secret"><Typography.Text code copyable>{oneTimeSecret}</Typography.Text></div></Modal>
     <Modal
       title={`告警接入向导：${guideTarget?.name ?? ''}`}
       open={guideTarget !== null}
@@ -236,12 +229,6 @@ export function AlertConnectorsTab({ currentUser }: { currentUser: Pick<AuthUser
       width={720}
       destroyOnHidden
     >
-      <Alert
-        type="info"
-        showIcon
-        message="接入协议"
-        description="告警平台向下方地址发送 POST JSON；平台只保存加密密钥，浏览器不会读取密钥明文。"
-      />
       <div style={{ display: 'grid', gap: 12, marginTop: 16 }}>
         <div><Typography.Text strong>Webhook 地址</Typography.Text><div><Typography.Text code copyable>{`/api/v1/alert-ingest/${guideTarget?.id ?? ''}`}</Typography.Text></div></div>
         <div><Typography.Text strong>签名算法</Typography.Text><div><Typography.Text code>HMAC-SHA256</Typography.Text></div></div>
@@ -269,13 +256,6 @@ export function AlertConnectorsTab({ currentUser }: { currentUser: Pick<AuthUser
       destroyOnHidden
       width={680}
     >
-      <Alert
-        type="info"
-        showIcon
-        message="只读预检"
-        description="无真实告警环境时，本预检仅检查连接器配置和样例；不会验证真实签名、服务器权限/连通性或邮件收件，也不会发送真实告警或邮件。"
-        style={{ marginBottom: 16 }}
-      />
       <Typography.Text strong>告警样例</Typography.Text>
       <Input.TextArea
         aria-label="预检样例 JSON"

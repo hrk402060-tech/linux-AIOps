@@ -103,9 +103,6 @@ export function PatchesPage() {
       okButtonProps={{ disabled: submitting || !valid, danger: executing }}
       cancelButtonProps={{ disabled: submitting }} closable={!submitting} maskClosable={!submitting} keyboard={!submitting} destroyOnHidden>
       {target ? <>
-        {executing ? <Alert type="warning" showIcon message="将更新所选服务器上的软件包"
-          description="仅从该服务器已启用的 YUM / DNF 仓库安装目标版本。依赖包可能随之更新，服务可能受影响。平台不会自动重启服务器，更新后需重新扫描验证。" />
-          : <p>仅记录人工确认，不会安装或执行补丁，操作人使用当前登录账号。</p>}
         <p>确认对象：<strong>{target.asset_name}</strong> · <span>{target.cve_id}</span> · <span>{target.package_name}</span></p>
         <p>版本：{target.current_version} → {target.target_version}</p>
         {!executing && target.target_version_issue ? <Alert type="error" showIcon message="补丁建议已阻断" description={target.target_version_issue} /> : null}

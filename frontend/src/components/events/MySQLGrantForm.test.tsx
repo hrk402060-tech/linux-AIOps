@@ -47,7 +47,7 @@ beforeEach(() => { vi.mocked(getDiagnosticGrants).mockReset(); });
 describe('MySQLGrantForm', () => {
   it('shows read-only TLS scope and masked stored secrets', () => {
     const { dialog } = show();
-    expect(dialog.getByText(/仅通过 TLS 读取 MySQL 状态与复制信息/)).toBeInTheDocument();
+    expect(dialog.queryByText(/仅通过 TLS 读取 MySQL 状态与复制信息/)).not.toBeInTheDocument();
     expect(dialog.getByLabelText('MySQL 密码')).toHaveValue('');
     expect(dialog.getByLabelText('MySQL 密码')).toHaveAttribute('placeholder', '********');
     expect(dialog.getByLabelText('MySQL CA PEM')).toHaveValue('');

@@ -345,8 +345,8 @@ it('shows masked connector secrets and hides every write action from auditors', 
   stubApi();
   render(<ConfigProvider theme={{ token: { motion: false } }}><EventsPage currentUser={auditor} /></ConfigProvider>);
   await user.click(screen.getByRole('tab', { name: '接入连接器' }));
-  expect(await screen.findByText('HMAC Webhook 接入')).toBeInTheDocument();
-  expect(screen.getByText('timestamp.nonce.raw_body')).toBeInTheDocument();
+  await screen.findByText('生产告警');
+  expect(screen.queryByText('HMAC Webhook 接入')).not.toBeInTheDocument();
   expect(await screen.findByText('****7A2F')).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: '新建连接器' })).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /轮换/ })).not.toBeInTheDocument();

@@ -73,7 +73,6 @@ export function ScanTaskRemoveModal({ tasks, open, onClose, onComplete, onBusyCh
       okText="确认删除" cancelText="返回" confirmLoading={running}
       okButtonProps={{ danger: true, disabled: !valid }} cancelButtonProps={{ disabled: running }}
       closable={!running} maskClosable={!running} keyboard={!running} destroyOnHidden>
-      <Alert type="warning" showIcon message="任务将从任务列表移除，无法恢复。漏洞、报告和历史证据保留。" />
       <p>可删除 {eligible.length} 项，跳过 {tasks.length - eligible.length} 项</p>
       {tasks.length > 100 ? <p role="alert">每次最多选择 100 项</p> : null}
       <List size="small" style={{ maxHeight: 200, overflowY: 'auto' }} dataSource={eligible}

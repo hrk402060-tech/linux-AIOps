@@ -64,7 +64,6 @@ export function DiagnosticGrantForm({ assets, catalog, initialGrant, busy, canSu
     okText="保存只读授权" confirmLoading={busy} okButtonProps={{ disabled: !ready }}
     cancelButtonProps={{ disabled: busy }} closable={!busy} maskClosable={!busy} destroyOnHidden width={620}>
     {kindSelector}
-    <Alert type="info" showIcon message="专用诊断身份仅允许固定 Linux 只读采集；不会复用人工 SSH 凭据。" />
     <p>目标服务器需由管理员安装限制网关，并为专用公钥配置 forced-command，禁用终端与转发；本次保存不会自动授权服务器。</p>
     {loadError ? <Alert type="error" showIcon message={loadError} /> : null}
     {loading ? <Spin size="small" /> : null}

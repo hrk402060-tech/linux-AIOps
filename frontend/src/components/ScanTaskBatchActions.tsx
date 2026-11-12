@@ -93,8 +93,6 @@ export function ScanTaskBatchActions({ tasks, disabled, onComplete, onBusyChange
       confirmLoading={running} cancelButtonProps={{ disabled: running }} maskClosable={!running} closable={!running} destroyOnHidden>
       {target ? <>
         <p>可操作 {target.items.length} 项，跳过 {target.skipped} 项</p>
-        {target.action === 'archive' ? <Alert type="info" message="归档后移出当前列表，报告和漏洞证据保留，可在已归档中恢复。" /> : null}
-        {target.action === 'rerun' ? <Alert type="info" message="创建新的排队任务，原记录保持不变；不会自动启动扫描。" /> : null}
         {running ? <p>已处理 {progress} / {target.items.length}</p> : null}
         <List style={{ maxHeight: 260, overflowY: 'auto' }} size="small" dataSource={target.items}
           renderItem={(item) => <List.Item key={item.id}>{item.name}<Tag>{statusLabels[item.status]}</Tag></List.Item>} />

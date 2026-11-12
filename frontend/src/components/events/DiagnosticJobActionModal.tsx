@@ -57,9 +57,6 @@ export function DiagnosticJobActionModal({ target, onClose, onUpdated }: {
   >
     <Typography.Paragraph>{target?.alert.title} · {target?.alert.asset_name}</Typography.Paragraph>
     {target?.kind === 'cancel' ? <Typography.Paragraph>取消任务：<Typography.Text code>{target.job.id}</Typography.Text></Typography.Paragraph> : null}
-    <Alert type="info" showIcon message={target?.kind === 'cancel'
-      ? '运行中的任务需等待只读连接结束，取消请求不会删除历史证据。'
-      : '仅使用已授权的固定只读动作，不执行修复或任意命令。'} />
     <Typography.Paragraph style={{ marginTop: 16 }}>请输入确认内容：<Typography.Text code>{expected}</Typography.Text></Typography.Paragraph>
     <Input aria-label="诊断确认文本" maxLength={80} value={confirmation} onChange={(event) => setConfirmation(event.target.value)} disabled={saving} />
     <Typography.Paragraph style={{ marginTop: 16, marginBottom: 8 }}>操作原因</Typography.Paragraph>

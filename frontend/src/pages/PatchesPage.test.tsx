@@ -72,7 +72,7 @@ async function showExecution() {
 
 it('submits a package update only after a separate explicit confirmation', async () => {
   const { rpmAdvice, dialog, fetchMock } = await showExecution();
-  expect(dialog.getByText(/YUM \/ DNF 仓库/)).toBeInTheDocument();
+  expect(dialog.queryByText(/YUM \/ DNF 仓库/)).not.toBeInTheDocument();
   expect(dialog.getByText(/0:1\.1\.1-2/)).toBeInTheDocument();
   const confirm = dialog.getByRole('button', { name: '确认并更新' });
   fireEvent.change(dialog.getByLabelText('更新原因'), { target: { value: '  安全修复  ' } });

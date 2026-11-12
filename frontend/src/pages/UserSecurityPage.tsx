@@ -77,7 +77,6 @@ export function UserSecurityPage({ onLogout, embedded = false }: { onLogout: () 
     {loadError ? <Alert type="error" showIcon message={loadError} /> : null}
     <Spin spinning={loading}>
       <Card title={<><ShieldCheck size={17} /> MFA 多因素认证</>} extra={<Space size={8}>{statusTag}{embedded ? refresh : null}</Space>}>
-        <p>使用验证器应用扫码绑定。平台不会显示已保存的 MFA 密钥，恢复码只在绑定完成时展示一次。</p>
         {status?.required ? <Alert type="warning" showIcon message="当前策略要求保持 MFA 绑定" description="如需重置，请联系管理员调整策略或执行管理员重置。" /> : null}
         <div style={{ marginTop: 16 }}>
           {status ? !status.enabled ? <Button type="primary" icon={<KeyRound size={16} />} loading={saving} onClick={() => void beginSetup()}>启用 MFA</Button>
@@ -88,7 +87,6 @@ export function UserSecurityPage({ onLogout, embedded = false }: { onLogout: () 
     <Modal title="扫码绑定 MFA" open={setup !== null} footer={null} onCancel={() => { if (!savingRef.current) setSetup(null); }}
       closable={!saving} maskClosable={!saving} keyboard={!saving} destroyOnHidden>
       {setup ? <>
-        <Alert type="info" showIcon message="请使用 Google Authenticator、Microsoft Authenticator 等验证器扫描二维码。" />
         <div style={{ display: 'flex', justifyContent: 'center', padding: '20px 0 12px' }}>
           <QRCode type="svg" value={setup.otpauth_uri} size={220} aria-label="MFA 二维码" />
         </div>

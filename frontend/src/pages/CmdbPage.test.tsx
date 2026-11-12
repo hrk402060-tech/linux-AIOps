@@ -66,7 +66,7 @@ describe('CmdbPage', () => {
 
     await user.click(await screen.findByRole('button', { name: '自动发现预览' }));
 
-    expect(await screen.findByText('只读发现结果')).toBeInTheDocument();
+    expect(screen.queryByText('只读发现结果')).not.toBeInTheDocument();
     expect(screen.getByText('nginx · systemd')).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/v1/cmdb/discovery/preview',

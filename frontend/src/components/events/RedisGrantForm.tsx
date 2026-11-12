@@ -93,7 +93,6 @@ export function RedisGrantForm({ assets, catalog, initialGrant, busy, canSubmit,
     onOk={() => form.submit()} okText="保存只读授权" confirmLoading={busy} okButtonProps={{ disabled: !ready }}
     cancelButtonProps={{ disabled: busy }} closable={!busy} maskClosable={!busy} destroyOnHidden width={660}>
     {kindSelector}
-    <Alert type="info" showIcon message="仅通过 TLS 读取 Redis 状态、内存、连接和慢日志摘要，不读取业务键值，不执行写入、删除或管理操作。" />
     {loadError ? <Alert type="error" showIcon message={loadError} /> : null}
     {loading ? <Spin size="small" /> : null}
     <Form form={form} layout="vertical" disabled={busy || loading || !canSubmit} onFinish={submit} style={{ marginTop: 16 }}>

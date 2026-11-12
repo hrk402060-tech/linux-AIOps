@@ -138,7 +138,6 @@ export function KubernetesGrantForm({ assets, catalog, initialGrant, busy, canSu
     okButtonProps={{ disabled: !ready }} cancelButtonProps={{ disabled: busy }}
     closable={!busy} maskClosable={!busy} destroyOnHidden width={680}>
     {kindSelector}
-    <Alert type="info" showIcon message="仅采集指定命名空间的 Pod、工作负载与事件；不支持 Secrets、日志、exec 或节点采集。" />
     {loadError ? <Alert type="error" showIcon message={loadError} /> : null}
     {loading ? <Spin size="small" /> : null}
     <Form form={form} layout="vertical" disabled={busy || loading} onFinish={submit} style={{ marginTop: 16 }}>

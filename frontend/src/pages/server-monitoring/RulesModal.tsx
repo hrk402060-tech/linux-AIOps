@@ -23,7 +23,6 @@ export function RulesModal({ asset, onClose, onSaved }: { asset: FleetAsset; onC
   };
   return <Modal open title={`${asset.asset_name} · 资源状态规则`} onCancel={onClose} onOk={() => void save()}
     okText="保存规则" cancelText="取消" confirmLoading={action.busy} okButtonProps={{ disabled: !valid }} destroyOnHidden>
-    <p className="fleet-rule-note">用于本页资源状态和阈值线。连续有效采样达到持续时间后确认关注或超限；缺测中断计时。现有告警通知策略独立保留。</p>
     {action.error ? <Alert type="error" showIcon message={action.error} /> : null}
     <Form layout="vertical" className="fleet-rule-form">
       <div className="fleet-rule-row fleet-rule-head"><span>指标</span><span>关注 ≥</span><span>超限 ≥</span></div>

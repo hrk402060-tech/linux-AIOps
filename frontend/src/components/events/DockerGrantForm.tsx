@@ -114,7 +114,6 @@ export function DockerGrantForm({ assets, catalog, initialGrant, busy, canSubmit
     onOk={() => form.submit()} okText="保存只读授权" confirmLoading={busy} okButtonProps={{ disabled: !ready }}
     cancelButtonProps={{ disabled: busy }} closable={!busy} maskClosable={!busy} destroyOnHidden width={660}>
     {kindSelector}
-    <Alert type="info" showIcon message="仅通过受限 Docker 代理读取容器状态和资源快照，不接收容器 ID，不执行命令或修改操作。" />
     {loadError ? <Alert type="error" showIcon message={loadError} /> : null}
     {loading ? <Spin size="small" /> : null}
     <Form form={form} layout="vertical" disabled={busy || loading} onFinish={submit} style={{ marginTop: 16 }}>

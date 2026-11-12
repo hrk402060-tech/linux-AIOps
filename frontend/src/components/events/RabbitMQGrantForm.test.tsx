@@ -40,7 +40,7 @@ beforeEach(() => { vi.mocked(getDiagnosticGrants).mockReset(); });
 describe('RabbitMQGrantForm', () => {
   it('shows the fixed HTTPS scope and masks existing credentials', () => {
     const { dialog } = show();
-    expect(dialog.getByText(/仅通过 HTTPS Management API 的固定 GET/)).toBeInTheDocument();
+    expect(dialog.queryByText(/仅通过 HTTPS Management API 的固定 GET/)).not.toBeInTheDocument();
     expect(dialog.getByLabelText('RabbitMQ 密码')).toHaveValue('');
     expect(dialog.getByLabelText('RabbitMQ 密码')).toHaveAttribute('placeholder', '********');
     expect(dialog.getByLabelText('RabbitMQ CA PEM')).toHaveValue('');

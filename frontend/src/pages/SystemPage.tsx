@@ -252,7 +252,6 @@ export function SystemPage({
       width={720}
     >
       <Spin spinning={accessLoading}>
-        <Alert type="info" showIcon message="查看权限控制资产目录、漏洞和监控数据的可见范围；SSH 权限仅允许操作员使用，AI 仍保持只读。" />
         <Form form={accessForm} layout="vertical" onFinish={(values) => void submitAccess(values)} style={{ marginTop: 16 }}>
           <Form.Item label="资产范围">
             <Select value={accessScope} onChange={(value: 'all' | 'assigned') => { setAccessScope(value); if (value === 'all') setAccessEntries([]); }} options={[{ value: 'assigned', label: '指定资产' }, { value: 'all', label: '全部资产' }]} />
@@ -263,7 +262,7 @@ export function SystemPage({
               { title: '查看', render: (_, item) => <Checkbox aria-label={`${item.name}查看权限`} checked={accessEntries.some((entry) => entry.asset_id === item.id)} onChange={(event) => setAssetView(item.id, event.target.checked)} /> },
               { title: 'SSH', render: (_, item) => { const entry = accessEntries.find((candidate) => candidate.asset_id === item.id); return <Checkbox aria-label={`${item.name}SSH权限`} checked={entry?.can_ssh === true} disabled={!entry || accessTarget?.role === 'auditor'} onChange={(event) => setAssetSsh(item.id, event.target.checked)} />; } },
             ]} />
-          </div> : <Alert type="warning" showIcon message="全部资产范围会包含后续新增资产，请仅对确有需要的账号启用。" />}
+          </div> : null}
           <Form.Item name="confirmation" label={accessTarget ? `输入用户名确认：${accessTarget.username}` : '输入用户名确认'} rules={[{ required: true, validator: (_, value: string) => value === accessTarget?.username ? Promise.resolve() : Promise.reject(new Error('请输入完全一致的用户名')) }]} style={{ marginTop: 16 }}><Input autoComplete="off" /></Form.Item>
           <Form.Item name="reason" label="变更原因" rules={[{ required: true, min: 5, message: '请填写至少 5 个字符的原因' }]}><Input.TextArea maxLength={500} rows={2} /></Form.Item>
           <Button block type="primary" htmlType="submit" loading={accessSaving} disabled={accessLoading || !access}>保存资产授权</Button>
