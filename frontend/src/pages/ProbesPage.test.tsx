@@ -42,14 +42,14 @@ describe('ProbesPage', () => {
     expect(screen.getByText('指定健康检查')).toBeInTheDocument();
     expect(runProbe).not.toHaveBeenCalled();
   });
-  it('keeps auditors read-only and displays the empty allowlist', async () => {
+  it('keeps auditors read-only without a policy explanation banner', async () => {
     vi.mocked(getProbePolicy).mockResolvedValue({ allowed_cidrs: [], configured: false, source: '平台配置' });
     vi.mocked(getProbes).mockResolvedValue({ items: [target], total: 1 });
     render(<ProbesPage currentUser={{ ...currentUser, role: 'auditor' }} />);
     expect(await screen.findByText('API 健康')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '检查 API 健康' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '新增目标' })).toBeDisabled();
-    expect(screen.getByText(/未配置批准网段/)).toBeInTheDocument();
+    expect(screen.queryByText(/未配置批准网段/)).not.toBeInTheDocument();
   });
   it('shows load failures without claiming healthy service', async () => {
     vi.mocked(getProbes).mockRejectedValue(new Error('连接失败'));
@@ -61,41 +61,40 @@ describe('ProbesPage', () => {
     vi.mocked(getProbes).mockResolvedValue({ items: [], total: 0 });
     vi.mocked(updateProbePolicy).mockResolvedValue({ allowed_cidrs: ['192.0.2.0/24'], configured: true, source: '平台配置' });
     render(<ProbesPage currentUser={currentUser} />);
-    await screen.findByText(/未配置批准网段/);
-    await userEvent.click(screen.getByRole('button', { name: '配置批准网段' }));
+    await screen.findByRole('button', { name: '批准网段' });
+    await userEvent.click(screen.getByRole('button', { name: '批准网段' }));
     await userEvent.type(screen.getByRole('textbox', { name: '批准网段' }), '192.0.2.0/24');
     await userEvent.click(screen.getByRole('button', { name: '保存配置' }));
     expect(updateProbePolicy).toHaveBeenCalledWith('192.0.2.0/24');
-    await screen.findByText(/批准网段：192.0.2.0\/24/);
+    expect(screen.queryByText(/批准网段：192\.0\.2\.0\/24/)).not.toBeInTheDocument();
   });
   it('does not mistake an unreadable policy for an empty allowlist', async () => {
     vi.mocked(getProbes).mockResolvedValue({ items: [target], total: 1 });
     vi.mocked(getProbePolicy).mockRejectedValue(new Error('配置读取失败'));
     render(<ProbesPage currentUser={currentUser} />);
-    await screen.findByText('批准网段状态未知');
+    await screen.findByText('批准网段读取失败');
     expect(screen.queryByText(/未配置批准网段/)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '新增目标' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '检查 API 健康' })).toBeDisabled();
-    expect(screen.queryByRole('button', { name: '配置批准网段' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '批准网段' })).not.toBeInTheDocument();
     expect(updateProbePolicy).not.toHaveBeenCalled();
     vi.mocked(getProbePolicy).mockResolvedValue({ allowed_cidrs: ['192.0.2.0/24'], configured: true, source: '平台配置' });
     await userEvent.click(screen.getByRole('button', { name: '重试读取批准网段' }));
-    expect(await screen.findByText(/批准网段：192.0.2.0\/24/)).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: '批准网段' })).toBeEnabled();
     expect(screen.getByRole('button', { name: '检查 API 健康' })).toBeEnabled();
   });
   it('loads the policy independently when catalog loading fails', async () => {
     vi.mocked(getProbes).mockResolvedValue({ items: [], total: 0 });
     vi.mocked(getCmdbTree).mockRejectedValue(new Error('业务服务暂时不可用'));
     render(<ProbesPage currentUser={currentUser} />);
-    expect(await screen.findByText(/批准网段：192.0.2.0\/24/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '修改批准网段' })).toBeEnabled();
+    expect(await screen.findByRole('button', { name: '批准网段' })).toBeEnabled();
   });
   it('revokes create and run controls after clearing the allowlist', async () => {
     vi.mocked(getProbes).mockResolvedValue({ items: [target], total: 1 });
     vi.mocked(updateProbePolicy).mockResolvedValue({ allowed_cidrs: [], configured: false, source: '平台配置' });
     render(<ProbesPage currentUser={currentUser} />);
-    await screen.findByText(/批准网段：192.0.2.0\/24/);
-    await userEvent.click(screen.getByRole('button', { name: '修改批准网段' }));
+    await screen.findByRole('button', { name: '批准网段' });
+    await userEvent.click(screen.getByRole('button', { name: '批准网段' }));
     await userEvent.clear(screen.getByRole('textbox', { name: '批准网段' }));
     await userEvent.click(screen.getByRole('button', { name: '保存配置' }));
     await waitFor(() => expect(screen.getByRole('button', { name: '检查 API 健康' })).toBeDisabled());
