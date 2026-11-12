@@ -17,7 +17,7 @@ export async function apiFetch(input: RequestInfo | URL, init: RequestInit = {})
     headers: init.headers,
     signal: init.signal ?? AbortSignal.timeout(10_000),
   });
-  if (response.status === 401 && String(input) !== '/api/v1/auth/login') {
+  if (response.status === 401 && !init.signal?.aborted && String(input) !== '/api/v1/auth/login') {
     window.dispatchEvent(new Event('sentinel:session-expired'));
   }
   return response;

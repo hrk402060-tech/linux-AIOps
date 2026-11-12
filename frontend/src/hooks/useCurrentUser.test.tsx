@@ -3,8 +3,10 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { AuthUser } from '../api/auth';
 import { getCurrentUser } from '../api/auth';
 import { useCurrentUser } from './useCurrentUser';
+import { clearDashboardCache } from './dashboardSnapshotCache';
 
 vi.mock('../api/auth', () => ({ getCurrentUser: vi.fn() }));
+vi.mock('./dashboardSnapshotCache', () => ({ clearDashboardCache: vi.fn() }));
 const user: AuthUser = {
   id: 'scoped-user', username: 'scoped-user', display_name: null,
   role: 'operator', enabled: true, must_change_password: false,
@@ -78,4 +80,24 @@ it('cleans up polling and focus listeners when unmounted', async () => {
   view.unmount();
   act(() => window.dispatchEvent(new Event('focus')));
   await waitFor(() => expect(getCurrentUser).toHaveBeenCalledTimes(1));
+});
+
+it('clears dashboard snapshots when checking identity, changing scope and signing out', async () => {
+  render(<Harness reset={vi.fn()} />);
+  await screen.findByText('user:1');
+  expect(clearDashboardCache).toHaveBeenCalled();
+  const initial = vi.mocked(clearDashboardCache).mock.calls.length;
+  act(() => window.dispatchEvent(new Event('focus')));
+  await waitFor(() => expect(getCurrentUser).toHaveBeenCalledTimes(2));
+  expect(clearDashboardCache).toHaveBeenCalledTimes(initial);
+  vi.mocked(getCurrentUser).mockResolvedValue({ ...user, access_revision: 3 });
+  act(() => window.dispatchEvent(new Event('focus')));
+  await screen.findByText('user:3');
+  expect(clearDashboardCache).toHaveBeenCalledTimes(initial + 1);
+  act(() => screen.getByText('logout').click());
+  expect(clearDashboardCache).toHaveBeenCalledTimes(initial + 2);
+  act(() => screen.getByText('login').click());
+  expect(clearDashboardCache).toHaveBeenCalledTimes(initial + 3);
+  act(() => window.dispatchEvent(new Event('sentinel:session-expired')));
+  expect(clearDashboardCache).toHaveBeenCalledTimes(initial + 4);
 });

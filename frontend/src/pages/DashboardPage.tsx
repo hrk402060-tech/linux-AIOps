@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Button, Empty, Progress, Spin, Table, Tag, Tooltip, message } from 'antd';
+import { Alert, Button, Empty, Progress, Skeleton, Table, Tag, Tooltip } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { Activity, Database, FileWarning, Gauge, Network, RefreshCw, ScanSearch, Server, SquareTerminal } from 'lucide-react';
-import { getDashboard } from '../api/dashboard';
+import { useDashboardSnapshot } from '../hooks/useDashboardSnapshot';
 import type { PageKey } from '../App';
 import type { DashboardAttentionItem, DashboardMonitoringAsset, DashboardServiceHealthItem, DashboardSnapshot } from '../types/dashboard';
+import './dashboard-loading.css';
 
 const emptySnapshot: DashboardSnapshot = {
   assets: { total: 0, online: 0, offline: 0, unknown: 0, disabled: 0 },
@@ -25,32 +25,8 @@ export function DashboardPage({ onNavigate, onViewFindings, onOpenTerminal }: {
   onViewFindings?: (assetId: string) => void;
   onOpenTerminal?: (assetId: string) => void;
 }) {
-  const [snapshot, setSnapshot] = useState(emptySnapshot); const [loading, setLoading] = useState(true); const [messageApi, holder] = message.useMessage();
-  const [loadError, setLoadError] = useState('');
-  const requestId = useRef(0);
-  const load = useCallback(async () => {
-    const current = ++requestId.current;
-    setLoading(true); setLoadError(''); setSnapshot(emptySnapshot);
-    try {
-      const next = await getDashboard();
-      if (current === requestId.current) setSnapshot(next);
-    } catch (error) {
-      if (current !== requestId.current) return;
-      const text = error instanceof Error ? error.message : '总览数据加载失败';
-      setLoadError(text); messageApi.error(text);
-    } finally {
-      if (current === requestId.current) setLoading(false);
-    }
-  }, [messageApi]);
-  useEffect(() => {
-    void load();
-    const expire = () => {
-      requestId.current += 1;
-      setSnapshot(emptySnapshot); setLoadError('会话已失效，请重新登录'); setLoading(false);
-    };
-    window.addEventListener('sentinel:session-expired', expire);
-    return () => { requestId.current += 1; window.removeEventListener('sentinel:session-expired', expire); };
-  }, [load]);
+  const { entry, loading, error: loadError, load } = useDashboardSnapshot();
+  const snapshot = entry?.snapshot ?? emptySnapshot;
   const columns: ColumnsType<DashboardMonitoringAsset> = [
     { title: '服务器', key: 'asset', fixed: 'left', width: 170, render: (_, item) => <div className="stacked-cell"><strong>{item.asset_name}</strong><small>{item.host}</small></div> },
     { title: '状态', key: 'state', width: 118, render: (_, item) => <span><Tag color={states[item.connection_status]?.color}>{states[item.connection_status]?.label ?? item.connection_status}</Tag>{item.stale ? <Tag color="orange">陈旧</Tag> : null}</span> },
@@ -63,15 +39,20 @@ export function DashboardPage({ onNavigate, onViewFindings, onOpenTerminal }: {
       <Tooltip title={item.lifecycle_status !== 'enabled' ? '停用或归档资产不可连接' : '打开 SSH'}><Button type="text" aria-label={`打开 ${item.asset_name} SSH`} disabled={!onOpenTerminal || item.lifecycle_status !== 'enabled'} icon={<SquareTerminal size={16} />} onClick={() => onOpenTerminal?.(item.asset_id)} /></Tooltip>
     </span> },
   ];
-  return <section className="dashboard-page">{holder}<div className="page-heading dashboard-heading"><div><p className="eyebrow">Linux 智能综合运维平台</p><h1>统一运维工作台</h1></div><div className="dashboard-actions"><Tooltip title="刷新"><Button aria-label="刷新" icon={<RefreshCw size={17} />} loading={loading} onClick={() => void load()} /></Tooltip><Button type="primary" icon={<ScanSearch size={17} />} onClick={() => onNavigate('scans')}>发起扫描</Button></div></div><Spin spinning={loading} tip={loading ? '正在加载真实数据' : undefined}>
-    {loadError ? <Alert type="error" showIcon message="总览数据读取失败" description={loadError} action={<Button onClick={() => void load()}>重试</Button>} /> : null}
-    <div hidden={Boolean(loadError)} className={`dashboard-data-shell${loading ? ' is-loading' : ''}`}>
+  return <section className="dashboard-page"><div className="page-heading dashboard-heading"><div><p className="eyebrow">Linux 智能综合运维平台</p><h1>统一运维工作台</h1></div><div className="dashboard-actions"><Tooltip title="刷新"><Button aria-label="刷新" icon={<RefreshCw size={17} />} loading={loading} onClick={() => void load()}>刷新</Button></Tooltip><Button type="primary" icon={<ScanSearch size={17} />} onClick={() => onNavigate('scans')}>发起扫描</Button></div></div><div aria-busy={loading}>
+    {loadError ? <Alert type={entry ? 'warning' : 'error'} showIcon message={entry ? '总览更新失败，显示上次数据' : '总览数据读取失败'} description={loadError} action={<Button onClick={() => void load()}>重试</Button>} /> : null}
+    {entry ? <div className="dashboard-loading-status" role="status"><span>{loading ? '正在更新' : loadError ? '上次成功读取的数据' : '数据已更新'}</span><time dateTime={new Date(entry.readAt).toISOString()}>读取于 {new Date(entry.readAt).toLocaleString('zh-CN', { hour12: false })}</time></div> : null}
+    {loading && !entry ? <section className="dashboard-initial-loading" role="status" aria-label="正在加载总览">
+      <div className="dashboard-skeleton-metrics">{Array.from({ length: 5 }, (_, index) => <div key={index}><Skeleton active paragraph={{ rows: 1 }} /></div>)}</div>
+      <div className="dashboard-skeleton-panels">{Array.from({ length: 3 }, (_, index) => <div key={index}><Skeleton active paragraph={{ rows: 5 }} /></div>)}</div>
+    </section> : null}
+    <div hidden={!entry} className={`dashboard-data-shell${loading && !entry ? ' is-loading' : ''}`}>
     <div className="operations-metrics"><Metric icon={<Server size={18} />} label="服务器" value={snapshot.assets.total} detail={`${snapshot.assets.online} 在线 · ${snapshot.assets.offline} 离线 · ${snapshot.assets.unknown} 未采集 · ${snapshot.assets.disabled} 停用`} /><Metric icon={<Network size={18} />} label="服务" value={snapshot.catalog.services} detail={`${snapshot.catalog.linked_assets} 台已关联 · ${snapshot.catalog.unlinked_assets} 台未关联`} /><Metric icon={<Activity size={18} />} label="活动告警" value={snapshot.operations.active_alerts} detail={`${snapshot.operations.severe_alerts} 个严重 · ${snapshot.operations.active_incidents} 个活动故障`} alert={snapshot.operations.severe_alerts > 0} /><Metric icon={<Gauge size={18} />} label="扫描任务" value={snapshot.scans.total} detail={`${snapshot.scans.queued} 排队 · ${snapshot.scans.running} 执行中 · ${snapshot.scans.completed} 完成 · ${snapshot.scans.failed} 失败`} alert={snapshot.scans.running > 0 || snapshot.scans.failed > 0} /><Metric icon={<Database size={18} />} label="知识库" value={snapshot.knowledge.freshness} detail={`${snapshot.knowledge.healthy_source_count}/${snapshot.knowledge.source_count} 数据源正常 · ${formatTime(snapshot.knowledge.last_sync_at)}`} alert={snapshot.knowledge.stale} /></div>
     <div className="ops-grid dashboard-platform-grid"><section className="ops-panel"><PanelHeading title="服务运行态势" subtitle={`${snapshot.service_health.summary.total} 个服务 · SSH 无 Agent 准实时采集`} /><div className="health-summary"><span>健康 <b>{snapshot.service_health.summary.healthy}</b></span><span className="warning">降级 <b>{snapshot.service_health.summary.degraded}</b></span><span className="danger">不可用 <b>{snapshot.service_health.summary.unavailable}</b></span><span className="muted">未观测 <b>{snapshot.service_health.summary.unobserved}</b></span></div>{snapshot.service_health.services.length ? <div className="service-health-list">{snapshot.service_health.services.slice(0, 5).map((item) => <ServiceHealthRow key={item.service_id} item={item} />)}</div> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无服务目录数据" />}</section><section className="ops-panel"><PanelHeading title="统一待办" subtitle="来自告警、故障和巡检的当前事项" />{snapshot.attention_items.length ? <div className="attention-list">{snapshot.attention_items.slice(0, 6).map((item) => <AttentionRow key={`${item.kind}-${item.id}`} item={item} onNavigate={onNavigate} />)}</div> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无待办事项" />}</section><section className="ops-panel catalog-panel"><PanelHeading title="配置项编目" subtitle="业务、应用、服务与 API 的当前目录" /><div className="catalog-stats"><CatalogStat label="业务" value={snapshot.catalog.businesses} /><CatalogStat label="应用" value={snapshot.catalog.applications} /><CatalogStat label="服务" value={snapshot.catalog.services} /><CatalogStat label="API" value={snapshot.catalog.apis} /></div><div className="catalog-assets"><span>资产关系</span><strong>{snapshot.catalog.linked_assets}</strong><small>已关联 · {snapshot.catalog.unlinked_assets} 台未关联</small></div><Button type="link" icon={<Network size={15} />} onClick={() => onNavigate('cmdb')}>进入配置项管理</Button></section></div>
     <div className="ops-section-heading"><div><strong>服务器准实时监控</strong><span>SSH 无 Agent 采集，不代表秒级实时；归档资产不计入，停用资产不自动采集</span></div></div><div className="table-frame dashboard-server-table"><Table rowKey="asset_id" columns={columns} dataSource={snapshot.monitoring_assets} pagination={{ pageSize: 8, showSizeChanger: false }} scroll={{ x: 1360 }} locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无服务器监控数据" /> }} /></div>
     <div className="ops-grid"><section className="ops-panel impact-panel"><PanelHeading title="业务影响面" subtitle="按当前资产与配置项服务关系聚合" />{snapshot.monitoring_assets.length ? <div className="impact-list">{snapshot.monitoring_assets.slice(0, 8).map((item) => <div className="impact-row" key={item.asset_id}><div className="impact-asset"><strong>{item.asset_name}</strong><small>{item.host} · {item.cmdb_services.length ? item.cmdb_services.map((service) => service.service_name).join('、') : '未编目'}</small></div><div className="impact-risk"><b>{item.critical + item.high}</b><span>严重/高危</span></div><div className="impact-risk"><b>{item.active_alerts}</b><span>活动告警</span></div><Button type="link" icon={<Network size={15} />} onClick={() => onNavigate('cmdb')} aria-label={`查看 ${item.asset_name} 的配置项`}>配置项</Button></div>)}</div> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无业务影响数据" />}</section><section className="ops-panel trend-panel"><PanelHeading title="资源趋势" subtitle="最近 24 个准实时采样" /><div className="trend-legend"><span className="cpu">CPU</span><span className="memory">内存</span><span className="disk">磁盘</span></div>{snapshot.resource_trends.length ? <div className="trend-bars">{snapshot.resource_trends.map((item) => <Tooltip key={item.collected_at} title={`${formatTime(item.collected_at)} CPU ${item.cpu_percent}% 内存 ${item.memory_percent}% 磁盘 ${item.disk_percent}%`}><span><i className="cpu" style={{ height: `${item.cpu_percent}%` }} /><i className="memory" style={{ height: `${item.memory_percent}%` }} /><i className="disk" style={{ height: `${item.disk_percent}%` }} /></span></Tooltip>)}</div> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无趋势样本" />}</section><section className="ops-panel"><PanelHeading title="漏洞态势" subtitle="按资产 + CVE 最新有效状态去重" /><div className="vuln-posture"><div><strong>{snapshot.vulnerabilities.critical + snapshot.vulnerabilities.high}</strong><span>严重 / 高危</span></div><div><strong>{snapshot.vulnerabilities.manual_confirmation}</strong><span>需人工确认</span></div></div><Progress percent={ratio(snapshot.vulnerabilities.critical + snapshot.vulnerabilities.high, snapshot.vulnerabilities.pending)} strokeColor="#aa2e2e" showInfo={false} /><Button type="link" onClick={() => onNavigate('findings')}>查看待处理漏洞</Button></section><section className="ops-panel"><PanelHeading title="活动告警" subtitle="持续超限后触发" /><Button type="link" onClick={() => onNavigate('alerts')} aria-label="进入告警中心">进入告警中心</Button>{snapshot.active_alerts.length ? <div className="alert-list">{snapshot.active_alerts.slice(0, 6).map((item) => <div key={`${item.asset_id}-${item.metric}`}><span><strong>{item.asset_name}</strong><small>{metricLabels[item.metric] ?? item.metric} · {item.value.toFixed(1)} / {item.threshold.toFixed(1)}</small></span><Tag color="red">告警</Tag></div>)}</div> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无活动告警" />}</section><section className="ops-panel"><PanelHeading title="任务状态" subtitle="最近扫描任务" />{snapshot.recent_scans.length ? <div className="task-list">{snapshot.recent_scans.map((item) => <button key={item.id} type="button" onClick={() => onNavigate('scans')}><span><strong>{item.name}</strong><small>{formatTime(item.created_at)} · {item.finding_count} 个漏洞</small></span><Tag>{scanStates[item.status] ?? item.status}</Tag></button>)}</div> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无扫描任务" />}</section></div>
     </div>
-  </Spin></section>;
+  </div></section>;
 }
 function ServiceHealthRow({ item }: { item: DashboardServiceHealthItem }) {
   const labels = { healthy: '健康', degraded: '降级', unavailable: '不可用', unobserved: '未观测' };

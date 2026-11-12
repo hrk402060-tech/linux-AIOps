@@ -3,6 +3,10 @@ import { ConfigProvider } from 'antd';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { DashboardPage } from './DashboardPage';
+import { clearDashboardCache } from '../hooks/dashboardSnapshotCache';
+
+vi.mock('./dashboard-loading.css', () => ({}));
+vi.setConfig({ testTimeout: 15000 });
 
 const snapshot = {
   assets: { total: 8, online: 5, offline: 1, unknown: 1, disabled: 1 },
@@ -62,11 +66,45 @@ const snapshot = {
 };
 
 beforeEach(() => {
+  clearDashboardCache();
   sessionStorage.setItem('sentinel_admin_token', 'test-token');
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => snapshot }));
 });
 
 describe('DashboardPage', () => {
+  it('uses a skeleton rather than a blank spinner or invented zero metrics on first load', () => {
+    vi.mocked(fetch).mockReturnValue(new Promise(() => undefined));
+    const { container } = render(<ConfigProvider><DashboardPage onNavigate={vi.fn()} /></ConfigProvider>);
+    expect(screen.getByLabelText('正在加载总览')).toBeInTheDocument();
+    expect(screen.queryByText('正在加载真实数据')).not.toBeInTheDocument();
+    expect(container.querySelector('.dashboard-data-shell')).toHaveAttribute('hidden');
+  });
+
+  it('keeps loaded content visible while refreshing and after a recoverable failure', async () => {
+    const { container } = render(<ConfigProvider><DashboardPage onNavigate={vi.fn()} /></ConfigProvider>);
+    await screen.findByText('生产环境巡检');
+    let reject!: (reason: Error) => void;
+    vi.mocked(fetch).mockReturnValue(new Promise((_, fail) => { reject = fail; }));
+    fireEvent.click(screen.getByLabelText('刷新'));
+    expect(container.querySelector('.dashboard-data-shell')).not.toHaveAttribute('hidden');
+    expect(container.querySelector('.dashboard-data-shell')).not.toHaveClass('is-loading');
+    expect(screen.getByText('生产环境巡检')).toBeVisible();
+    await act(async () => reject(new Error('接口暂不可用')));
+    expect(screen.getByText('总览更新失败，显示上次数据')).toBeInTheDocument();
+    expect(screen.getByText('生产环境巡检')).toBeVisible();
+  });
+
+  it('restores recent data immediately when revisiting and continues to refresh', async () => {
+    const first = render(<ConfigProvider><DashboardPage onNavigate={vi.fn()} /></ConfigProvider>);
+    await screen.findByText('生产环境巡检');
+    first.unmount();
+    vi.mocked(fetch).mockReturnValue(new Promise(() => undefined));
+    const second = render(<ConfigProvider><DashboardPage onNavigate={vi.fn()} /></ConfigProvider>);
+    expect(screen.getByText('生产环境巡检')).toBeVisible();
+    expect(screen.queryByLabelText('正在加载总览')).not.toBeInTheDocument();
+    expect(second.container.querySelector('.dashboard-data-shell')).not.toHaveClass('is-loading');
+    expect(screen.getByText('正在更新')).toBeInTheDocument();
+  });
   it('shows the operational snapshot and recent risk activity', async () => {
     render(<ConfigProvider><DashboardPage onNavigate={vi.fn()} /></ConfigProvider>);
 
@@ -158,16 +196,16 @@ describe('DashboardPage', () => {
     expect(onOpenTerminal).not.toHaveBeenCalled();
   });
 
-  it('clears the previous snapshot during refresh and never restores it on failure', async () => {
-    let fail!: (reason: Error) => void;
-    const pending = new Promise<Response>((_, reject) => { fail = reject; });
+  it('clears the previous snapshot when refreshing confirms access is forbidden', async () => {
+    let resolve!: (response: Response) => void;
+    const pending = new Promise<Response>((done) => { resolve = done; });
     vi.mocked(fetch).mockResolvedValueOnce({ ok: true, json: async () => snapshot } as Response)
       .mockReturnValueOnce(pending);
     render(<ConfigProvider><DashboardPage onNavigate={vi.fn()} /></ConfigProvider>);
     await screen.findByText('生产环境巡检');
     fireEvent.click(screen.getByRole('button', { name: '刷新' }));
-    expect(screen.queryByText('生产环境巡检')).not.toBeInTheDocument();
-    await act(async () => fail(new Error('权限校验失败')));
+    expect(screen.getByText('生产环境巡检')).toBeVisible();
+    await act(async () => resolve(new Response(JSON.stringify({ detail: '权限校验失败' }), { status: 403 })));
     expect(await screen.findByText('总览数据读取失败')).toBeInTheDocument();
     expect(screen.queryByText('生产环境巡检')).not.toBeInTheDocument();
   });
