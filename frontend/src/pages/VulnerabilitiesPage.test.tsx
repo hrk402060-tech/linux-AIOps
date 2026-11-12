@@ -68,7 +68,7 @@ describe('VulnerabilitiesPage', () => {
     expect(screen.getByText('数据源')).toBeInTheDocument();
     expect(screen.getByText('已安装版本')).toBeInTheDocument();
     expect(screen.getByText('修复版本')).toBeInTheDocument();
-    expect(screen.getByText('厂商公告优先判定，可直接进入修复评估。')).toBeInTheDocument();
+    expect(screen.queryByText('厂商公告优先判定，可直接进入修复评估。')).not.toBeInTheDocument();
   });
 
   it('keeps medium severity consistent when opening the list evidence', async () => {

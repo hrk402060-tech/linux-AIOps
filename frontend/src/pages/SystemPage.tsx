@@ -4,7 +4,7 @@ import {
   Switch, Table, Tag, message,
 } from 'antd';
 import {
-  CheckCircle2, Eye, KeyRound, RefreshCw, ShieldCheck, UserPlus, XCircle,
+  Eye, KeyRound, RefreshCw, ShieldCheck, UserPlus,
 } from 'lucide-react';
 
 import { getSystemStatus, type SystemStatus } from '../api/system';
@@ -176,17 +176,9 @@ export function SystemPage({
   useEffect(() => { void load(); void loadUsers(); void loadAssets(); }, []);
   useEffect(() => { setSessionTarget(null); setAllSessionsTarget(null); }, [currentUser.id, currentUser.role, currentUser.access_revision]);
   const databaseOk = status.database_status === 'ok';
-  const health = status.health;
-  const healthStatus = health?.status ?? (databaseOk ? 'healthy' : 'unavailable');
-  const healthStale = health?.is_stale ?? false;
-  const healthLabel = healthStatus === 'healthy' && !healthStale ? '核心服务运行正常'
-    : healthStatus === 'degraded' ? '平台健康状态降级'
-      : healthStatus === 'unavailable' ? '平台服务不可用' : '平台健康状态未知';
-  const healthType = healthStatus === 'healthy' && !healthStale ? 'success' : healthStatus === 'unavailable' ? 'error' : 'warning';
   return <section className="system-page">{holder}
     <div className="page-heading"><div><p className="eyebrow">平台运行信息</p><h1>系统管理</h1></div><Button aria-label="刷新系统状态" icon={<RefreshCw size={17} />} loading={loading} onClick={() => void load()} /></div>
     <Spin spinning={loading}>
-      <Alert type={healthType} showIcon icon={healthType === 'success' ? <CheckCircle2 size={18} /> : <XCircle size={18} />} message={healthLabel} description={status.checked_at ? `页面检查：${new Date(status.checked_at).toLocaleString('zh-CN')}；最近调度观测：${health?.last_observed_at ? new Date(health.last_observed_at).toLocaleString('zh-CN') : '未收到'}${healthStale ? '；检查陈旧或未启用，不能据此判定正常' : ''}` : '尚未完成检查'} />
       <div className="metric-band system-metrics"><div><span>数据库</span><strong>{databaseOk ? '正常' : '异常'}</strong><small>{status.database_engine}</small></div><div><span>数据库结构</span><strong className="metric-text">{status.schema_revision ?? '未迁移'}</strong><small>当前 Alembic 版本</small></div><div><span>监控采集周期</span><strong>{duration(status.monitoring_interval_seconds)}</strong><small>SSH 无 Agent</small></div><div><span>知识库同步周期</span><strong>{duration(status.knowledge_sync_interval_seconds)}</strong><small>服务端调度</small></div></div>
       <div className="system-grid">
         <section className="ops-panel"><div className="panel-heading"><div><strong>终端连接策略</strong><span>Web SSH 网关运行边界</span></div></div><Descriptions column={1} size="small" items={[{ key: 'connections', label: '最大并发连接', children: `${status.terminal.max_connections} 个` }, { key: 'idle', label: '空闲超时', children: duration(status.terminal.idle_timeout_seconds) }, { key: 'duration', label: '最长会话', children: duration(status.terminal.max_duration_seconds) }, { key: 'host-key', label: '主机密钥策略', children: <Tag color="green">首次连接自动接受，仅内存使用</Tag> }]} /></section>

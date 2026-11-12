@@ -15,7 +15,7 @@ function stubApi() {
 it('keeps administrator system status separate from security and AI configuration', async () => {
   const fetchMock = stubApi();
   const view = render(<ConfigProvider theme={{ token: { motion: false } }}><SystemPage currentUser={admin} /></ConfigProvider>);
-  await screen.findByText('核心服务运行正常');
+  await screen.findByText('系统管理');
   await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/v1/auth/users', expect.anything()));
   expect(screen.queryByRole('region', { name: 'AI 配置' })).not.toBeInTheDocument();
   expect(screen.queryByRole('region', { name: '登录安全策略' })).not.toBeInTheDocument();
@@ -30,7 +30,7 @@ it('keeps administrator system status separate from security and AI configuratio
 it.each(['operator', 'auditor'] as const)('does not load settings or keys for %s', async (role) => {
   const fetchMock = stubApi();
   render(<ConfigProvider><SystemPage currentUser={{ ...admin, role }} /></ConfigProvider>);
-  await screen.findByText('核心服务运行正常');
+  await screen.findByText('系统管理');
   expect(screen.queryByRole('region', { name: 'AI 配置' })).not.toBeInTheDocument();
   expect(screen.queryByRole('region', { name: '登录安全策略' })).not.toBeInTheDocument();
   expect(fetchMock).toHaveBeenCalledTimes(1);

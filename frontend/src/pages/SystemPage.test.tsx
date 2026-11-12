@@ -22,7 +22,8 @@ it('shows service status and security boundaries from the read-only endpoint', a
     checked_at: '2026-09-15T00:00:00Z',
   }) }));
   render(<ConfigProvider><SystemPage currentUser={auditor} /></ConfigProvider>);
-  expect(await screen.findByText('核心服务运行正常')).toBeInTheDocument();
+  await screen.findByText('系统管理');
+  expect(screen.queryByText('核心服务运行正常')).not.toBeInTheDocument();
   expect(screen.getByText('首次连接自动接受，仅内存使用')).toBeInTheDocument();
   expect(screen.getByText('禁止')).toBeInTheDocument();
   expect(screen.getByText('AES-256-GCM')).toBeInTheDocument();
