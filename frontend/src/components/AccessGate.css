@@ -4,6 +4,7 @@
   --pl-muted: #626d78;
   --pl-line: #dce2e8;
   --pl-blue: #2563eb;
+  --pl-gutter: clamp(24px, 4vw, 128px);
   width: 100%;
   min-height: 100vh;
   min-height: 100dvh;
@@ -21,7 +22,7 @@
 .platform-login button:disabled { cursor: not-allowed; }
 .platform-login button:focus-visible { outline: 2px solid var(--pl-blue); outline-offset: 4px; }
 .platform-login .pl-screen { display: flex; flex-direction: column; width: 100%; max-width: none; min-height: 100vh; min-height: 100dvh; margin: 0 auto; overflow-x: hidden; }
-.platform-login .pl-header { display: flex; flex: 0 0 auto; align-items: center; justify-content: space-between; gap: 24px; width: min(100%, 2400px); margin: 0 auto; padding: clamp(24px, 2.6vw, 42px) clamp(28px, 4vw, 96px) clamp(20px, 1.8vw, 30px); }
+.platform-login .pl-header { display: flex; flex: 0 0 auto; align-items: center; justify-content: space-between; gap: 24px; width: 100%; margin: 0; padding: clamp(24px, 2.6vw, 42px) var(--pl-gutter) clamp(20px, 1.8vw, 30px); }
 .platform-login .pl-brand { display: inline-flex; align-items: center; gap: 12px; color: #35404b; font-size: 15px; font-weight: 600; }
 .platform-login .pl-mark { display: grid; grid-template-columns: repeat(2, 11px); gap: 3px; transform: rotate(-8deg); }
 .platform-login .pl-mark span { display: block; width: 11px; height: 11px; border-radius: 2px; background: var(--pl-blue); }
@@ -32,15 +33,15 @@
 .platform-login .pl-main {
   display: grid;
   flex: 1;
-  grid-template-columns: minmax(0, 1.45fr) minmax(360px, .85fr);
+  grid-template-columns: minmax(0, 1.4fr) minmax(320px, .85fr);
   grid-template-areas: "identity auth" "architecture auth";
   grid-template-rows: auto auto;
   align-content: center;
   column-gap: clamp(48px, 4vw, 96px);
   width: 100%;
-  max-width: 2400px;
+  max-width: none;
   margin: 0 auto;
-  padding: 18px clamp(28px, 4vw, 96px) 22px;
+  padding: 18px var(--pl-gutter) 22px;
 }
 .platform-login .pl-identity { grid-area: identity; min-width: 0; padding: 8px 0 0 clamp(0px, 1vw, 20px); }
 .platform-login .pl-eyebrow { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; color: #677483; font-size: 11px; font-weight: 500; }
@@ -49,8 +50,8 @@
 .platform-login .pl-identity h1 span { display: block; }
 .platform-login .pl-identity h1 span:first-child { color: #465260; font-weight: 400; }
 .platform-login .pl-intro { margin-top: 15px; color: var(--pl-muted); font-size: 14px; line-height: 1.8; }
-.platform-login .pl-architecture { grid-area: architecture; align-self: center; min-width: 0; padding-top: 10px; }
-.platform-login .pl-auth { position: relative; grid-area: auth; align-self: center; justify-self: center; width: 100%; max-width: 420px; min-width: 0; padding: 16px 0; }
+.platform-login .pl-architecture { grid-area: architecture; align-self: center; min-width: 0; padding-top: 10px; container-type: inline-size; }
+.platform-login .pl-auth { position: relative; grid-area: auth; align-self: center; justify-self: center; width: 100%; max-width: 480px; min-width: 0; padding: 16px 0; }
 .platform-login .pl-auth-heading { margin-bottom: 31px; }
 .platform-login .pl-auth-heading h2 { color: var(--pl-ink); font-size: 27px; line-height: 1.4; font-weight: 600; }
 .platform-login .pl-auth-heading p { margin-top: 9px; color: var(--pl-muted); font-size: 14px; }
@@ -79,16 +80,27 @@
 .platform-login .pl-auth-bottom { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 27px; padding-top: 20px; color: #717c89; font-size: 12px; border-top: 1px solid var(--pl-line); }
 .platform-login .pl-auth-bottom > span, .platform-login .pl-contact { display: inline-flex; align-items: center; gap: 6px; }
 .platform-login .pl-contact { min-height: 32px; padding: 5px 0; color: #576b83; font-size: 12px; background: none; border: 0; }
-.platform-login .pl-footer { display: flex; flex: 0 0 auto; align-items: center; justify-content: space-between; gap: 20px; width: min(100%, 2400px); min-height: 66px; margin: 0 auto; padding: 19px clamp(28px, 4vw, 96px); color: #737e8a; font-size: 11px; border-top: 1px solid #e2e7ed; }
+.platform-login .pl-footer { display: flex; flex: 0 0 auto; align-items: center; justify-content: space-between; gap: 20px; width: 100%; min-height: 66px; margin: 0; padding: 19px var(--pl-gutter); color: #737e8a; font-size: 11px; border-top: 1px solid #e2e7ed; }
 .platform-login .pl-footer > span:last-child { display: inline-flex; align-items: center; gap: 7px; }
 .platform-login .pl-help-text { padding: 8px 0; color: #5d6978; font-size: 14px; line-height: 1.8; }
 .platform-login .ant-modal .ant-btn-primary { background: var(--pl-blue); border-color: var(--pl-blue); }
 
+@media (min-width: 1920px) {
+  .platform-login .pl-identity h1 { font-size: 48px; }
+  .platform-login .pl-auth { max-width: 520px; }
+}
 @media (max-width: 1100px) {
   .platform-login .pl-header { padding: 28px 38px 20px; }
-  .platform-login .pl-main { grid-template-columns: minmax(0, 1.15fr) minmax(288px, .85fr); column-gap: 48px; padding: 30px 38px 36px; }
+  .platform-login .pl-main { grid-template-columns: minmax(0, 1.15fr) minmax(288px, .85fr); column-gap: 32px; padding: 24px 38px 30px; }
   .platform-login .pl-identity { padding-left: 4px; }
   .platform-login .pl-footer { padding-inline: 38px; }
+}
+@media (min-width: 821px) and (max-height: 760px) {
+  .platform-login .pl-header { padding-block: 20px 14px; }
+  .platform-login .pl-identity h1 { font-size: 34px; }
+  .platform-login .pl-eyebrow { margin-bottom: 6px; }
+  .platform-login .pl-intro { margin-top: 8px; }
+  .platform-login .pl-footer { min-height: 50px; padding-block: 12px; }
 }
 @media (max-width: 820px) {
   .platform-login .pl-header { padding: 26px 28px 22px; }
