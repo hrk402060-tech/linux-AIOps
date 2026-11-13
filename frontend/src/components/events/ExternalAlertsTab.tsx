@@ -54,9 +54,10 @@ const timelineStatusLabels: Record<string, string> = {
 const options = (values: Record<string, string>) =>
   Object.entries(values).map(([value, label]) => ({ value, label }));
 
-export function ExternalAlertsTab({ currentUser, initialAssetId, onOpenTerminal, onOpenIncidents }: {
+export function ExternalAlertsTab({ currentUser, initialAssetId, initialAlertId, onOpenTerminal, onOpenIncidents }: {
   currentUser: Pick<AuthUser, 'role'>;
   initialAssetId?: string;
+  initialAlertId?: string;
   onOpenTerminal?: (assetId: string) => void;
   onOpenIncidents?: () => void;
 }) {
@@ -78,6 +79,10 @@ export function ExternalAlertsTab({ currentUser, initialAssetId, onOpenTerminal,
   }
     = useExternalAlertData(serverFilters, page, (text) => messages.error(text));
   const loading = refreshing || operationLoading;
+  useEffect(() => {
+    closeDetail();
+    if (initialAlertId) void showDetail({ id: initialAlertId, asset_id: initialAssetId });
+  }, [initialAlertId, initialAssetId, showDetail, closeDetail]);
   useEffect(() => {
     let stopped = false;
     void getAssets('active').then((items) => { if (!stopped) setAssets(items); }).catch(() => { if (!stopped) messages.error('资产列表加载失败'); });

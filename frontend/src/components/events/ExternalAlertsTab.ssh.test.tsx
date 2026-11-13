@@ -91,12 +91,11 @@ it.each([
   expect(drawer.queryByRole('button', { name: '打开 演示节点 SSH' })).not.toBeInTheDocument();
 });
 
-it('uses the authoritative detail asset ID instead of the list row or asset name', async () => {
+it('rejects detail from another asset instead of opening its evidence or SSH', async () => {
   const harness = setup({ detailAssetId: 'unmatched-detail-id' });
-  const drawer = await openDetail();
-  const button = drawer.getByRole('button', { name: '打开 演示节点 SSH' });
-  expect(button).toBeDisabled();
-  fireEvent.click(button);
+  fireEvent.click(await screen.findByRole('button', { name: '查看 演示磁盘告警' }));
+  expect(await screen.findByText('告警与所选目标不匹配，请返回服务监控刷新')).toBeInTheDocument();
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   expect(harness.onOpenTerminal).not.toHaveBeenCalled();
 });
 

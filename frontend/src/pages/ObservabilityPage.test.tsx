@@ -58,7 +58,9 @@ describe('ObservabilityPage', () => {
     fireEvent.click(screen.getByRole('button', { name: '查看 订单健康检查 历史' }));
     expect(onOpenProbeHistory).toHaveBeenCalledWith('service-1', { id: 'probe-1', name: '订单健康检查' });
     fireEvent.click(screen.getByRole('button', { name: '定位 订单服务异常 告警' }));
-    expect(onOpenAlerts).toHaveBeenCalledWith('asset-1', 'external');
+    expect(onOpenAlerts).toHaveBeenCalledWith('asset-1', 'external', 'alert-1');
+    fireEvent.click(screen.getByRole('button', { name: '查看 api-01 告警' }));
+    expect(onOpenAlerts).toHaveBeenLastCalledWith('asset-1');
     fireEvent.click(screen.getByRole('button', { name: '查看 api-01 漏洞' }));
     expect(onOpenFindings).toHaveBeenCalledWith('asset-1');
     fireEvent.click(screen.getByRole('button', { name: '打开 api-01 SSH' }));
@@ -67,6 +69,17 @@ describe('ObservabilityPage', () => {
     expect(onOpenAssistant).toHaveBeenCalledWith('asset-1', expect.stringContaining('订单 API'));
     expect(onOpenAssistant.mock.calls[0][1]).toContain('服务器快照已过期');
   }, 15000);
+
+  it('falls back to the asset activity list when monitoring evidence has no alert ID', async () => {
+    vi.mocked(getServiceObservability).mockResolvedValue({ ...snapshot, services: [{
+      ...snapshot.services[0], alerts: [{ ...snapshot.services[0].alerts[0], alert_id: null, source: 'monitoring' }],
+    }] });
+    const onOpenAlerts = vi.fn();
+    render(<ObservabilityPage onOpenAlerts={onOpenAlerts} />);
+    fireEvent.click(await screen.findByRole('button', { name: '查看 订单 API 证据' }));
+    fireEvent.click(screen.getByRole('button', { name: '定位 订单服务异常 告警' }));
+    expect(onOpenAlerts).toHaveBeenCalledExactlyOnceWith('asset-1', 'activity', undefined);
+  });
 
   it('does not present missing configuration or restricted visibility as complete service health', async () => {
     const service = { ...snapshot.services[0], status: 'unobserved' as const, runtime_status: 'healthy' as const,

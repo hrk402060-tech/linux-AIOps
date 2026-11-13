@@ -46,7 +46,7 @@ export default function App() {
   const [searchTarget, setSearchTarget] = useState<SearchTarget | null>(null);
   const [searchNavigationId, setSearchNavigationId] = useState(0);
   const [serviceProbeContext, setServiceProbeContext] = useState<{ serviceId: string; probe: { id: string; name: string } }>();
-  const [serviceAlertContext, setServiceAlertContext] = useState<{ assetId: string; tab: 'activity' | 'external' }>();
+  const [serviceAlertContext, setServiceAlertContext] = useState<{ assetId: string; tab: 'activity' | 'external'; alertId?: string }>();
   const [serviceAssistantContext, setServiceAssistantContext] = useState<{ assetId: string; context: string }>();
   const [terminalNotice, terminalNoticeHolder] = notification.useNotification();
   const resetScopedState = useCallback(() => {
@@ -111,8 +111,8 @@ export default function App() {
   const openServiceProbeHistory = (serviceId: string, probe: { id: string; name: string }) => {
     setServiceProbeContext({ serviceId, probe }); setPage('probes');
   };
-  const openServiceAlerts = (assetId: string, tab: 'activity' | 'external' = 'activity') => {
-    setServiceAlertContext({ assetId, tab }); setPage('alerts');
+  const openServiceAlerts = (assetId: string, tab: 'activity' | 'external' = 'activity', alertId?: string) => {
+    setServiceAlertContext({ assetId, tab, alertId }); setPage('alerts');
   };
   const openServiceAssistant = (assetId: string, context: string) => {
     setServiceAssistantContext({ assetId, context }); setPage('ops-assistant');
@@ -156,7 +156,8 @@ export default function App() {
         : page === 'audit-log' ? <AuditLogPage />
         : isSecurityCheckPage(page) ? <SecurityChecksPage activeKey={page} onNavigate={navigate} />
         : page === 'alerts' ? <EventsPage currentUser={currentUser} initialAssetId={serviceAlertContext?.assetId}
-          initialTab={serviceAlertContext?.tab} onOpenTerminal={openAssetTerminal} onOpenIncidents={() => navigate('incidents')} />
+          initialTab={serviceAlertContext?.tab} initialAlertId={serviceAlertContext?.alertId}
+          onOpenTerminal={openAssetTerminal} onOpenIncidents={() => navigate('incidents')} />
         : page === 'incidents' ? <IncidentsPage currentUser={currentUser} />
         : page === 'observability' ? <ObservabilityPage onOpenProbeHistory={openServiceProbeHistory} onOpenAlerts={openServiceAlerts}
           onOpenFindings={viewAssetFindings} onOpenTerminal={openAssetTerminal} onOpenAssistant={openServiceAssistant} />

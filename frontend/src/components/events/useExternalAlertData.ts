@@ -76,11 +76,15 @@ export function useExternalAlertData(filters: Record<string, string>, page: numb
     listPending.current = { key, request }; return request;
   }, [filters, page]);
   useEffect(() => { setAuthoritative(false); void load(); }, [load]);
-  const showDetail = useCallback((item: ExternalAlert, requestedPage?: number): Promise<void> => {
+  const showDetail = useCallback((item: { id: string; asset_id?: string }, requestedPage?: number): Promise<void> => {
     const analysisPage = requestedPage ?? (detailRef.current?.alert.id === item.id ? detailRef.current.analysisPage : 1);
-    const key = `${item.id}:${analysisPage}`;
+    const key = JSON.stringify([item.id, item.asset_id, analysisPage]);
     if (detailPending.current?.key === key) return detailPending.current.request;
     const generation = ++detailGeneration.current;
+    if (detailRef.current?.alert.id !== item.id || (item.asset_id && detailRef.current?.alert.asset_id !== item.asset_id)) {
+      detailRef.current = null;
+      setDetail(null);
+    }
     setDetailAuthoritative(false);
     setDetailLoading(true);
     const request = (async () => {
@@ -89,12 +93,21 @@ export function useExternalAlertData(filters: Record<string, string>, page: numb
           getExternalAlert(item.id), getAlertTimeline(item.id), getAlertAnalyses(item.id, (analysisPage - 1) * 20, 20),
         ]);
         if (generation === detailGeneration.current) {
+          if (alert.id !== item.id || (item.asset_id && alert.asset_id !== item.asset_id)) {
+            detailRef.current = null;
+            setDetail(null);
+            throw new Error('告警与所选目标不匹配，请返回服务监控刷新');
+          }
           setDetail({ alert, timeline, analyses, analysisPage });
           setDetailAuthoritative(true);
         }
       } catch (error) {
         if (generation === detailGeneration.current) {
           setDetailAuthoritative(false);
+          if (error instanceof Error && 'status' in error && [403, 404].includes(Number(error.status))) {
+            detailRef.current = null;
+            setDetail(null);
+          }
           errorRef.current(error instanceof Error ? error.message : '告警详情加载失败');
         }
       } finally {

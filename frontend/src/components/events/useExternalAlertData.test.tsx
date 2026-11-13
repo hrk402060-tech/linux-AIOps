@@ -52,6 +52,72 @@ describe('diagnostic queue polling', () => {
 });
 
 describe('external alert authoritative data', () => {
+  it('loads an exact alert outside the list page and clears a different detail while loading', async () => {
+    vi.mocked(getExternalAlerts).mockResolvedValue({ total: 40, items: [] });
+    vi.mocked(getAlertAnalyses).mockResolvedValue([]); vi.mocked(getAlertTimeline).mockResolvedValue([]);
+    const first = { id: 'alert-1', asset_id: 'asset-1' } as ExternalAlert;
+    const second = { id: 'alert-42', asset_id: 'asset-2' } as ExternalAlert;
+    let finish!: (value: ExternalAlert) => void;
+    const pending = new Promise<ExternalAlert>((resolve) => { finish = resolve; });
+    vi.mocked(getExternalAlert).mockResolvedValueOnce(first).mockReturnValueOnce(pending);
+    const filters = { asset_id: 'asset-2' };
+    const { result } = renderHook(() => useExternalAlertData(filters, 1, vi.fn()));
+    await act(async () => { await result.current.showDetail(first); });
+    act(() => { void result.current.showDetail({ id: second.id, asset_id: second.asset_id }); });
+    expect(result.current.detail).toBeNull();
+    expect(result.current.detailAuthoritative).toBe(false);
+    await act(async () => { finish(second); await pending; });
+    expect(result.current.detail?.alert).toBe(second);
+    expect(result.current.detailAuthoritative).toBe(true);
+    expect(getExternalAlerts).toHaveBeenCalledWith({ asset_id: 'asset-2', offset: '0', limit: '20' });
+  });
+
+  it.each(['id', 'asset_id'] as const)('rejects mismatched detail %s rather than opening unrelated evidence', async (field) => {
+    vi.mocked(getExternalAlerts).mockResolvedValue({ total: 0, items: [] });
+    vi.mocked(getAlertAnalyses).mockResolvedValue([]); vi.mocked(getAlertTimeline).mockResolvedValue([]);
+    const expected = { id: 'alert-1', asset_id: 'asset-1' } as ExternalAlert;
+    vi.mocked(getExternalAlert).mockResolvedValueOnce(expected)
+      .mockResolvedValueOnce({ ...expected, [field]: 'other' });
+    const errors = vi.fn(), filters = {};
+    const { result } = renderHook(() => useExternalAlertData(filters, 1, errors));
+    await act(async () => { await result.current.showDetail({ id: 'alert-1', asset_id: 'asset-1' }); });
+    expect(result.current.detail?.alert.id).toBe('alert-1');
+    await act(async () => { await result.current.showDetail({ id: 'alert-1', asset_id: 'asset-1' }); });
+    expect(result.current.detail).toBeNull();
+    expect(result.current.detailAuthoritative).toBe(false);
+    expect(errors).toHaveBeenCalledWith('告警与所选目标不匹配，请返回服务监控刷新');
+  });
+
+  it.each([403, 404])('clears previously loaded detail when access returns %s', async (status) => {
+    vi.mocked(getExternalAlerts).mockResolvedValue({ total: 0, items: [] });
+    vi.mocked(getAlertAnalyses).mockResolvedValue([]); vi.mocked(getAlertTimeline).mockResolvedValue([]);
+    const alert = { id: 'alert-1', asset_id: 'asset-1' } as ExternalAlert;
+    vi.mocked(getExternalAlert).mockResolvedValueOnce(alert)
+      .mockRejectedValueOnce(Object.assign(new Error('告警不可访问'), { status }));
+    const errors = vi.fn(), filters = {};
+    const { result } = renderHook(() => useExternalAlertData(filters, 1, errors));
+    await act(async () => { await result.current.showDetail(alert); });
+    expect(result.current.detail?.alert.id).toBe(alert.id);
+    await act(async () => { await result.current.showDetail(alert); });
+    expect(result.current.detail).toBeNull();
+    expect(result.current.detailAuthoritative).toBe(false);
+    expect(errors).toHaveBeenCalledWith('告警不可访问');
+  });
+
+  it('does not reopen a closed detail when its request completes late', async () => {
+    vi.mocked(getExternalAlerts).mockResolvedValue({ total: 0, items: [] });
+    vi.mocked(getAlertAnalyses).mockResolvedValue([]); vi.mocked(getAlertTimeline).mockResolvedValue([]);
+    let finish!: (value: ExternalAlert) => void;
+    const pending = new Promise<ExternalAlert>((resolve) => { finish = resolve; });
+    vi.mocked(getExternalAlert).mockReturnValue(pending);
+    const filters = {}, alert = { id: 'alert-1' } as ExternalAlert;
+    const { result } = renderHook(() => useExternalAlertData(filters, 1, vi.fn()));
+    act(() => { void result.current.showDetail(alert); result.current.closeDetail(); });
+    await act(async () => { finish(alert); await pending; });
+    expect(result.current.detail).toBeNull();
+    expect(result.current.detailLoading).toBe(false);
+  });
+
   it('deduplicates concurrent refreshes for the same visible page', async () => {
     let finish: (value: { total: number; items: ExternalAlert[] }) => void = () => { throw new Error('Request missing'); };
     const pending = new Promise<{ total: number; items: ExternalAlert[] }>((resolve) => { finish = resolve; });

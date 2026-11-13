@@ -4,7 +4,7 @@ import type { ObservableService, ServiceProbeEvidence } from '../api/observabili
 
 export interface ServiceMonitoringActions {
   onOpenProbeHistory?: (serviceId: string, probe: { id: string; name: string }) => void;
-  onOpenAlerts?: (assetId: string, tab?: 'activity' | 'external') => void;
+  onOpenAlerts?: (assetId: string, tab?: 'activity' | 'external', alertId?: string) => void;
   onOpenFindings?: (assetId: string) => void;
   onOpenTerminal?: (assetId: string) => void;
   onOpenAssistant?: (assetId: string, context: string) => void;
@@ -42,7 +42,7 @@ export function ServiceMonitoringDetail({ service, ...actions }: { service: Obse
       {service.alerts.length ? <div className="service-evidence-list">{service.alerts.map((alert, index) =>
         <div className="service-evidence-row" key={alert.alert_id ?? `${alert.asset_id}:${index}`}>
           <div><Tag color={['critical', 'high'].includes(alert.severity) ? 'red' : 'orange'}>{alert.source === 'monitoring' ? '服务器监控' : '外部告警'}</Tag><strong>{alert.message}</strong><small>{formatEvidenceTime(alert.updated_at)}</small></div>
-          {actions.onOpenAlerts ? <Button size="small" icon={<Bell size={14} />} aria-label={`定位 ${alert.message} 告警`} onClick={() => actions.onOpenAlerts?.(alert.asset_id, alert.alert_id ? 'external' : 'activity')}>查看告警</Button> : null}
+          {actions.onOpenAlerts ? <Button size="small" icon={<Bell size={14} />} aria-label={`定位 ${alert.message} 告警`} onClick={() => actions.onOpenAlerts?.(alert.asset_id, alert.alert_id ? 'external' : 'activity', alert.alert_id ?? undefined)}>查看告警</Button> : null}
         </div>)}</div> : <span className="service-evidence-empty">当前范围无活动告警</span>}
     </section>
     <section><h3>漏洞风险</h3>

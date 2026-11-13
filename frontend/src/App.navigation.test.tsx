@@ -5,6 +5,7 @@ import { ConfigProvider } from 'antd';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
 import type { SearchTarget } from './components/GlobalSearch';
+import type { ServiceMonitoringActions } from './components/ServiceMonitoringDetail';
 
 const auth = vi.hoisted(() => ({
   user: { id: 'nav-user-a', username: 'nav-a', display_name: '用户甲',
@@ -77,8 +78,15 @@ vi.mock('./pages/SecuritySettingsPage', () => ({
     <p>安全设置测试页 {currentUser.role}</p>,
 }));
 vi.mock('./pages/EventsPage', () => ({
-  EventsPage: ({ onOpenTerminal }: { onOpenTerminal?: (assetId: string) => void }) =>
-    <button onClick={() => onOpenTerminal?.('alert-asset-88')}>告警资产 SSH 跳转</button>,
+  EventsPage: ({ onOpenTerminal, initialAssetId, initialTab, initialAlertId }: {
+    onOpenTerminal?: (assetId: string) => void; initialAssetId?: string;
+    initialTab?: string; initialAlertId?: string;
+  }) => <><p>告警定位 {initialAssetId} {initialTab} {initialAlertId}</p>
+    <button onClick={() => onOpenTerminal?.('alert-asset-88')}>告警资产 SSH 跳转</button></>,
+}));
+vi.mock('./pages/ObservabilityPage', () => ({
+  ObservabilityPage: ({ onOpenAlerts }: ServiceMonitoringActions) =>
+    <button onClick={() => onOpenAlerts?.('asset-service', 'external', 'alert-service')}>测试服务告警定位</button>,
 }));
 
 beforeEach(() => {
@@ -159,6 +167,13 @@ describe('使用文档独立页面', () => {
 });
 
 describe('App navigation authentication boundary', () => {
+  it('alert_target: forwards the exact service alert and its asset into the existing alert page', async () => {
+    window.history.replaceState({}, '', '/?page=observability');
+    render(<ConfigProvider theme={{ token: { motion: false } }}><App /></ConfigProvider>);
+    await userEvent.click(await screen.findByRole('button', { name: '测试服务告警定位' }));
+    expect(await screen.findByText('告警定位 asset-service external alert-service')).toBeInTheDocument();
+  });
+
   it.each([
     ['revision', { access_revision: 2 }],
     ['role', { role: 'operator' }],
