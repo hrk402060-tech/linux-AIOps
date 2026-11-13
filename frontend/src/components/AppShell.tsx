@@ -175,7 +175,6 @@ function Navigation({ selectedPage, onNavigate, onSwitchWorkspace, collapsed = f
   );
 }
 
-const roleLabels = { admin: '管理员', operator: '操作员', auditor: '审计员' };
 const pageLabels: Record<PageKey, string> = {
   alerts: '活动告警', dashboard: '综合总览', 'server-monitoring': '服务器监控', cmdb: '业务服务', terminal: 'SSH 远程', observability: '服务监控',
   assets: '服务器资产', scans: '漏洞扫描', schedules: '安全检查', baselines: '安全检查',
@@ -265,7 +264,6 @@ export function AppShell({ children, currentUser, onLogout, selectedPage, onNavi
           >
             <button type="button" className="current-user" aria-label="用户菜单">
               <span className="operator-avatar" aria-hidden="true">{currentUser.username.slice(0, 2).toUpperCase()}</span>
-              <span className="user-meta"><strong>{currentUser.display_name || currentUser.username}</strong><span>{roleLabels[currentUser.role]}</span></span>
             </button>
           </Dropdown>
         </Header>

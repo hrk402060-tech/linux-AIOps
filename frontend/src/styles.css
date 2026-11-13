@@ -209,12 +209,9 @@ button, input, textarea { letter-spacing: 0; }
 .topbar-context { display: flex; align-items: center; gap: 10px; min-width: 0; color: #7a847f; font-size: 13px; line-height: 20px; white-space: nowrap; }
 .topbar-context strong { color: #27312c; font-weight: 600; }
 .topbar-context span::after { content: '/'; margin-left: 10px; color: #bec5c1; }
-.current-user { display: flex; flex: 0 0 auto; align-items: center; gap: 8px; height: 40px; margin-left: auto; padding: 4px 6px; color: inherit; background: transparent; border: 0; border-radius: 6px; cursor: pointer; }
+.current-user { display: flex; flex: 0 0 auto; align-items: center; height: 40px; margin-left: auto; padding: 4px 6px; color: inherit; background: transparent; border: 0; border-radius: 6px; cursor: pointer; }
 .current-user:hover { background: #f2f6f4; }
 .current-user:focus-visible { outline: 2px solid #91caff; outline-offset: 2px; }
-.user-meta { display: grid; gap: 2px; min-width: 92px; }
-.user-meta strong { overflow: hidden; color: #33413a; font-size: 12px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
-.user-meta span { color: #86918b; font-size: 10px; }
 .topbar-search { display: flex; flex: 0 1 min(260px, 26vw); align-items: center; gap: 8px; width: min(260px, 26vw); height: 34px; min-height: 34px; margin-left: 28px; padding: 0 9px; overflow: hidden; color: #8a958f; font: inherit; font-size: 11px; line-height: 18px; text-align: left; white-space: nowrap; background: #f5f7f6; border: 1px solid #e1e7e3; border-radius: 5px; cursor: pointer; }
 .topbar-search:hover { color: #176f55; border-color: #a8cbbb; background: #f0f7f3; }
 .topbar-search span { overflow: hidden; text-overflow: ellipsis; }
@@ -855,7 +852,6 @@ button, input, textarea { letter-spacing: 0; }
   .topbar { padding: 0 14px; }
   .topbar-context span { display: none; }
   .topbar-context span::after { display: none; }
-  .user-meta { display: none; }
   .workspace { padding: 16px 12px; }
   .page-heading { align-items: center; }
   .cmdb-page .page-heading { align-items: flex-start; flex-direction: column; gap: 12px; }

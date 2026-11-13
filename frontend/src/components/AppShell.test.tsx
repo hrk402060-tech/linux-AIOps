@@ -209,6 +209,14 @@ describe('AppShell 四工作台导航', () => {
     expect(screen.getByRole('menuitem', { name: '审计日志' })).toBeInTheDocument();
   });
 
+  it('用户菜单只显示头像，不显示用户文字信息', () => {
+    const { container } = render(<AppShell currentUser={currentUser} onLogout={vi.fn()}
+      selectedPage="dashboard" onNavigate={vi.fn()}>内容</AppShell>);
+    expect(container.querySelector('.operator-avatar')).toBeInTheDocument();
+    expect(container.querySelector('.user-meta')).toBeNull();
+    expect(screen.queryByText('安全管理员')).not.toBeInTheDocument();
+  });
+
   it('系统管理不再展示连接凭据入口，但保留旧 PageKey 兼容', () => {
     render(<AppShell currentUser={currentUser} onLogout={vi.fn()}
       selectedPage="system" onNavigate={vi.fn()}>内容</AppShell>);
@@ -283,7 +291,6 @@ describe('AppShell 四工作台导航', () => {
       selectedPage="dashboard" onNavigate={vi.fn()}>内容</AppShell>);
     expect(screen.getByRole('menu', { name: '主导航' })).toHaveClass('ant-menu-light');
     expect(screen.getByLabelText('Linux 智能综合运维平台')).toBeInTheDocument();
-    expect(screen.getByText('安全管理员')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '用户菜单' }));
     fireEvent.click(screen.getByRole('menuitem', { name: '退出登录' }));
     expect(onLogout).toHaveBeenCalledOnce();
