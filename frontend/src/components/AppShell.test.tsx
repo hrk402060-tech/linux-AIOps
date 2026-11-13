@@ -31,8 +31,9 @@ const groupEntries: Record<string, string[]> = {
   工作台: ['综合总览', '服务器监控', '服务器资产', '业务服务', '自动化任务', 'SSH 远程', 'AI 运维助手', '补丁管理'],
   监控告警: ['服务监控', 'API 拨测', '活动告警', '故障管理'],
   安全中心: ['漏洞扫描', '安全检查', '漏洞治理', '漏洞知识库', '漏洞 AI 助手', '安全报告'],
-  系统管理: ['安全设置', '系统状态', '审计日志'],
+  系统管理: [],
 };
+const switchableWorkspaces = ['工作台', '监控告警', '安全中心'];
 
 function Harness({ initialPage = 'dashboard', user = currentUser }: {
   initialPage?: PageKey; user?: typeof currentUser;
@@ -67,7 +68,7 @@ describe('AppShell 四工作台导航', () => {
       selectedPage={page} onNavigate={onNavigate}>内容</AppShell>);
     const [group, label] = expectedPages[page];
     const entry = container.querySelector<HTMLElement>('.desktop-sider .ant-menu-item-selected');
-    if (page === 'credentials') {
+    if (['system', 'credentials', 'audit-log', 'user-security', 'security-settings'].includes(page)) {
       expect(entry).toBeNull();
     } else {
       expect(entry).toHaveTextContent(label);
@@ -76,7 +77,7 @@ describe('AppShell 四工作台导航', () => {
     expect(container.querySelector('.workspace-nav-heading strong')).toHaveTextContent(group);
     expect(container.querySelector('.topbar-context span')).toHaveTextContent(group);
     expect(container.querySelector('.topbar-context strong')).toHaveTextContent(label);
-    expect(menu().getAllByRole('menuitem').map((item) => item.textContent)).toEqual(groupEntries[group]);
+    expect(menu().queryAllByRole('menuitem').map((item) => item.textContent)).toEqual(groupEntries[group]);
     if (entry) {
       await userEvent.click(entry);
       expect(onNavigate).toHaveBeenCalledWith(getNavigationPageKey(page));
@@ -85,7 +86,7 @@ describe('AppShell 四工作台导航', () => {
 
   it('nav_interaction: switches workspaces, visible menus and header together', async () => {
     const { container } = render(<Harness />);
-    for (const [group, page] of [['监控告警', 'observability'], ['安全中心', 'scans'], ['系统管理', 'system'], ['工作台', 'dashboard']]) {
+    for (const [group, page] of [['监控告警', 'observability'], ['安全中心', 'scans'], ['工作台', 'dashboard']]) {
       await switchTo(group);
       expect(screen.getByRole('status')).toHaveTextContent(page);
       expect(menu().getAllByRole('menuitem').map((item) => item.textContent)).toEqual(groupEntries[group]);
@@ -95,16 +96,20 @@ describe('AppShell 四工作台导航', () => {
     expect(screen.queryByText('AI 运维')).not.toBeInTheDocument();
   }, 30_000);
 
-  it('nav_popup: sidebar trigger opens only four workspaces and marks the current one', async () => {
+  it('nav_popup: sidebar trigger opens the three operational workspaces and marks the current one', async () => {
     const { container } = render(<Harness />);
     expect(container.querySelector('.topbar .workspace-switcher')).not.toBeInTheDocument();
     expect(screen.queryByRole('menuitem', { name: /^监控告警$/ })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '切换工作台' }));
-    const item = await screen.findByRole('menuitem', { name: /^工作台$/ });
-    const popup = item.closest('.workspace-switcher-dropdown');
+    const popup = await waitFor(() => {
+      const node = document.querySelector<HTMLElement>('.workspace-switcher-dropdown:not(.ant-dropdown-hidden)');
+      expect(node).not.toBeNull();
+      return node as HTMLElement;
+    });
     expect(popup).not.toBeNull();
     expect(within(popup as HTMLElement).getAllByRole('menuitem').map((entry) => entry.textContent))
-      .toEqual(Object.keys(groupEntries));
+      .toEqual(switchableWorkspaces);
+    const item = within(popup as HTMLElement).getByRole('menuitem', { name: /^工作台$/ });
     expect(item).toHaveClass('ant-dropdown-menu-item-selected');
     fireEvent.click(item);
     await waitFor(() => expect(item).not.toBeVisible());
@@ -196,18 +201,21 @@ describe('AppShell 四工作台导航', () => {
   it.each(['admin', 'operator', 'auditor'] as const)('角色 %s 保留现有入口和系统页权限边界', async (role) => {
     const { container } = render(<AppShell currentUser={{ ...currentUser, role }} onLogout={vi.fn()}
       selectedPage="system" onNavigate={vi.fn()}>内容</AppShell>);
-    expect(menu().getAllByRole('menuitem').map((item) => item.textContent)).toEqual(groupEntries.系统管理);
-    expect(container.querySelector('.ant-menu-item-selected')).toHaveTextContent('系统状态');
-    expect(menu().queryByText('用户权限')).not.toBeInTheDocument();
-    expect(menu().queryByText('AI 配置')).not.toBeInTheDocument();
+    expect(menu().queryAllByRole('menuitem')).toHaveLength(0);
+    expect(container.querySelector('.ant-menu-item-selected')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '用户菜单' }));
+    expect(screen.getByRole('menuitem', { name: '安全设置' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: '系统状态' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: '审计日志' })).toBeInTheDocument();
   });
 
   it('系统管理不再展示连接凭据入口，但保留旧 PageKey 兼容', () => {
     render(<AppShell currentUser={currentUser} onLogout={vi.fn()}
       selectedPage="system" onNavigate={vi.fn()}>内容</AppShell>);
-    expect(menu().getAllByRole('menuitem').map((item) => item.textContent)).toEqual(['安全设置', '系统状态', '审计日志']);
-    expect(menu().queryByText('个人安全')).not.toBeInTheDocument();
-    expect(menu().queryByText('连接凭据')).not.toBeInTheDocument();
+    expect(menu().queryAllByRole('menuitem')).toHaveLength(0);
+    fireEvent.click(screen.getByRole('button', { name: '用户菜单' }));
+    expect(screen.queryByRole('menuitem', { name: '连接凭据' })).not.toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: '安全设置' })).toBeInTheDocument();
   });
 
   it('nav_cache: 旧个人安全导航记忆统一恢复到安全设置', () => {
@@ -216,8 +224,8 @@ describe('AppShell 四工作台导航', () => {
     }));
     render(<Harness />);
     expect(screen.getByRole('status')).toHaveTextContent('security-settings');
-    expect(menu().getByText('安全设置')).toHaveClass('ant-menu-title-content');
-    expect(menu().queryByText('个人安全')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '用户菜单' }));
+    expect(screen.getByRole('menuitem', { name: '安全设置' })).toBeInTheDocument();
     expect(JSON.parse(localStorage.getItem('sentinel_navigation:user-1')!))
       .toMatchObject({ activePage: 'security-settings', system: 'security-settings' });
   });
@@ -276,7 +284,8 @@ describe('AppShell 四工作台导航', () => {
     expect(screen.getByRole('menu', { name: '主导航' })).toHaveClass('ant-menu-light');
     expect(screen.getByLabelText('Linux 智能综合运维平台')).toBeInTheDocument();
     expect(screen.getByText('安全管理员')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: '退出登录' }));
+    fireEvent.click(screen.getByRole('button', { name: '用户菜单' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '退出登录' }));
     expect(onLogout).toHaveBeenCalledOnce();
   });
 });

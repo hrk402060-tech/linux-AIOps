@@ -124,7 +124,7 @@ function Navigation({ selectedPage, onNavigate, onSwitchWorkspace, collapsed = f
   collapsed?: boolean;
 }) {
   const activeWorkspace = workspaces.find((workspace) => workspace.key === pageWorkspaces[selectedPage]) ?? workspaces[0];
-  const items = activeWorkspace.children
+  const items = (activeWorkspace.key === 'system' ? [] : activeWorkspace.children)
     .map((entry) => ({ key: entry.key, icon: entry.icon, label: entry.label }));
   return (
     <div className="nav-content">
@@ -141,7 +141,7 @@ function Navigation({ selectedPage, onNavigate, onSwitchWorkspace, collapsed = f
           menu={{
             selectable: true,
             selectedKeys: [activeWorkspace.key],
-            items: workspaces.map((workspace) => ({
+            items: workspaces.filter((workspace) => workspace.key !== 'system').map((workspace) => ({
               key: workspace.key, icon: workspace.icon, label: workspace.label,
               onClick: () => onSwitchWorkspace(workspace),
             })),
@@ -246,13 +246,28 @@ export function AppShell({ children, currentUser, onLogout, selectedPage, onNavi
           </Tooltip>
           <div className="topbar-context"><span>{activeWorkspace.label}</span><strong>{pageLabels[selectedPage]}</strong></div>
           <GlobalSearch key={currentUser.id} onNavigate={onNavigate} onSearchNavigate={onSearchNavigate} />
-          <div className="current-user">
-            <span className="operator-avatar" aria-hidden="true">{currentUser.username.slice(0, 2).toUpperCase()}</span>
-            <div className="user-meta"><strong>{currentUser.display_name || currentUser.username}</strong><span>{roleLabels[currentUser.role]}</span></div>
-            <Tooltip title="退出登录">
-              <Button type="text" aria-label="退出登录" icon={<LogOut size={17} />} onClick={onLogout} />
-            </Tooltip>
-          </div>
+          <Dropdown
+            trigger={['click']}
+            placement="bottomRight"
+            menu={{
+              items: [
+                { key: 'security-settings', icon: <KeyRound size={16} />, label: '安全设置',
+                  onClick: () => onNavigate('security-settings') },
+                { key: 'system', icon: <Settings size={16} />, label: '系统状态',
+                  onClick: () => onNavigate('system') },
+                { key: 'audit-log', icon: <FileText size={16} />, label: '审计日志',
+                  onClick: () => onNavigate('audit-log') },
+                { type: 'divider' },
+                { key: 'logout', danger: true, icon: <LogOut size={16} />, label: '退出登录',
+                  onClick: onLogout },
+              ],
+            }}
+          >
+            <button type="button" className="current-user" aria-label="用户菜单">
+              <span className="operator-avatar" aria-hidden="true">{currentUser.username.slice(0, 2).toUpperCase()}</span>
+              <span className="user-meta"><strong>{currentUser.display_name || currentUser.username}</strong><span>{roleLabels[currentUser.role]}</span></span>
+            </button>
+          </Dropdown>
         </Header>
         <Content className="workspace">{children}</Content>
       </Layout>
