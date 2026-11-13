@@ -78,7 +78,8 @@ def claim_next(session: Session) -> tuple[AlertNotification, str] | None:
         channel = config.get_record(session)
         if channel is None or not channel.enabled or not channel.recipients:
             session.execute(update(AlertNotification).where(AlertNotification.status.in_(('pending', 'retry')))
-                            .values(status='blocked', error_code='notification_not_configured', next_attempt_at=None))
+                            .values(status='blocked', error_code='notification_disabled' if channel and not channel.enabled
+                                    else 'notification_not_configured', next_attempt_at=None))
             _commit(session)
             return None
         now = utc_now()

@@ -31,6 +31,7 @@ function EditableConfigForm({ config, onSaved }: {
 }) {
   const [form] = Form.useForm<ConfigValues>();
   const enabled = Form.useWatch('enabled', form) ?? config.enabled;
+  const username = Form.useWatch('username', form) ?? config.username;
   const [saving, setSaving] = useState(false);
   const inFlight = useRef(false);
   const [messages, holder] = message.useMessage();
@@ -63,7 +64,10 @@ function EditableConfigForm({ config, onSaved }: {
         <Form.Item name="security" label="加密方式" rules={[{ required: true }]}><Select aria-label="SMTP 加密方式" options={[{ value: 'starttls', label: 'STARTTLS' }, { value: 'ssl', label: 'SSL/TLS' }]} /></Form.Item>
         <Form.Item name="sender" label="发件人" rules={[{ required: enabled, message: '请输入发件人邮箱' }, { validator: (_, value: string) => !value || (headerSafe(value) && validAddress(value.trim())) ? Promise.resolve() : Promise.reject(new Error('发件人邮箱格式不正确')) }]}><Input aria-label="发件人" maxLength={254} /></Form.Item>
         <Form.Item name="username" label="SMTP 用户名" rules={[{ validator: (_, value: string) => !value || headerSafe(value) ? Promise.resolve() : Promise.reject(new Error('用户名不可包含控制字符')) }]}><Input aria-label="SMTP 用户名" autoComplete="off" maxLength={200} /></Form.Item>
-        <Form.Item name="password" label="SMTP 密码"><Input.Password aria-label="SMTP 密码" autoComplete="new-password" placeholder={config.password_configured ? '********' : '未配置'} maxLength={4096} /></Form.Item>
+        <Form.Item name="password" label="SMTP 密码" rules={[{
+          required: enabled && Boolean(username?.trim()) && !config.password_configured,
+          message: '填写 SMTP 用户名时必须配置密码',
+        }]}><Input.Password aria-label="SMTP 密码" autoComplete="new-password" placeholder={config.password_configured ? '********' : '未配置'} maxLength={4096} /></Form.Item>
       </div>
       <Form.Item name="recipients" label="收件人" rules={[{ required: enabled, whitespace: true, message: '请输入收件人邮箱' }, { validator: (_, value: string) => {
         const items = addresses(value ?? '');

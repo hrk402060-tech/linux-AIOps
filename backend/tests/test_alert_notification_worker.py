@@ -58,6 +58,25 @@ def test_missing_or_disabled_config_consumes_no_send_attempts(client: TestClient
     send.assert_not_called()
 
 
+@pytest.mark.parametrize('configured', [False, True])
+def test_retry_and_worker_preserve_configuration_block_reason(
+    client: TestClient, database_session: Session, configured: bool,
+) -> None:
+    if configured:
+        assert client.patch('/api/v1/alert-notification-config', json={'enabled': False}).status_code == 200
+    item = notifications.enqueue(database_session, 'blocked-config', 'asset_mapping_failed', None, None, 'Alert', 'Body')
+    item.status = 'pending'
+    database_session.commit()
+    assert delivery.claim_next(database_session) is None
+    database_session.refresh(item)
+    expected = 'notification_disabled' if configured else 'notification_not_configured'
+    assert item.error_code == expected and item.attempts == 0
+    response = client.post(f'/api/v1/alert-notifications/{item.id}/retry')
+    assert response.status_code == 200
+    assert response.json()['error_code'] == expected
+    assert response.json()['attempts'] == 0
+
+
 def test_ssl_verifies_dns_hostname_with_bounded_socket(client: TestClient, database_session: Session) -> None:
     item_id = _setup(client, database_session)
     claim = delivery.claim_next(database_session)

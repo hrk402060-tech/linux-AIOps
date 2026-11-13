@@ -25,6 +25,28 @@ function setup(item = notice, role: Role = 'admin') {
 }
 afterEach(() => vi.unstubAllGlobals());
 
+it.each(['retry', 'acknowledge'] as const)('unlocks %s controls when configuration refresh overtakes the write', async (action) => {
+  let finish!: (value: ReturnType<typeof response>) => void;
+  const item = action === 'retry' ? { ...notice, status: 'blocked', sent_at: null } : notice;
+  const fetchMock = vi.fn((_url: string, init?: RequestInit) => init?.method === 'POST'
+    ? new Promise<ReturnType<typeof response>>((resolve) => { finish = resolve; })
+    : Promise.resolve(response({ items: [item] })));
+  vi.stubGlobal('fetch', fetchMock);
+  const page = (version: number) => <ConfigProvider theme={{ token: { motion: false } }}>
+    <AlertNotificationHistory alertId="alert-1" currentUser={{ role: 'admin' }} refreshVersion={version} />
+  </ConfigProvider>;
+  const { rerender } = render(page(0));
+  const label = action === 'retry' ? '重试通知 notice-1' : '确认已查看通知 notice-1';
+  fireEvent.click(await screen.findByRole('button', { name: label }));
+  if (action === 'acknowledge') fireEvent.click(await screen.findByRole('button', { name: '确认已查看' }));
+  await waitFor(() => expect(fetchMock.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(true));
+  rerender(page(1));
+  await waitFor(() => expect(fetchMock.mock.calls.filter(([, init]) => !init?.method)).toHaveLength(2));
+  await act(async () => { finish(response({ ...item, status: 'sent' })); });
+  await waitFor(() => expect(screen.getByRole('button', { name: '刷新通知记录' })).toBeEnabled());
+  expect(screen.queryByText('已记录人工查看确认')).not.toBeInTheDocument();
+});
+
 it('does not acknowledge SMTP acceptance until a human confirms', async () => {
   const { fetchMock, onUpdated } = setup(notice, 'operator');
   await screen.findByText('未确认查看');

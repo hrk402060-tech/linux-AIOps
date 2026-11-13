@@ -21,13 +21,13 @@ const kinds: Record<NotificationKind, string> = {
 const formatTime = (value: string | null) => value ? new Date(value).toLocaleString() : '-';
 
 type HistoryProps = {
-  currentUser: Pick<AuthUser, 'role'>; alertId?: string; onUpdated?: () => void;
+  currentUser: Pick<AuthUser, 'role'>; alertId?: string; onUpdated?: () => void; refreshVersion?: number;
 };
 export function AlertNotificationHistory(props: HistoryProps) {
   return <NotificationHistoryContext key={`${props.alertId ?? 'all'}:${props.currentUser.role}`} {...props} />;
 }
 
-function NotificationHistoryContext({ currentUser, alertId, onUpdated }: HistoryProps) {
+function NotificationHistoryContext({ currentUser, alertId, onUpdated, refreshVersion }: HistoryProps) {
   const [items, setItems] = useState<AlertNotification[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -58,7 +58,7 @@ function NotificationHistoryContext({ currentUser, alertId, onUpdated }: History
       if (mounted.current && requestId === generation.current) setLoadError(error instanceof Error ? error.message : '通知记录加载失败');
     } finally { if (mounted.current && requestId === generation.current) setLoading(false); }
   };
-  useEffect(() => { void load(); return () => { generation.current += 1; }; }, [alertId, page]);
+  useEffect(() => { void load(); return () => { generation.current += 1; }; }, [alertId, page, refreshVersion]);
   const update = async (item: AlertNotification, action: 'retry' | 'acknowledge') => {
     const current = items.find((entry) => entry.id === item.id);
     if (!mounted.current || inFlight.current || !authoritative || loading || !current
@@ -81,7 +81,7 @@ function NotificationHistoryContext({ currentUser, alertId, onUpdated }: History
         if (error instanceof TypeError) setAcknowledging(null);
         messages.error(error instanceof Error ? error.message : '通知操作结果待核实，请刷新后确认，不会自动重试');
       }
-    } finally { inFlight.current = false; if (mounted.current && requestId === generation.current) setBusyId(null); }
+    } finally { inFlight.current = false; if (mounted.current) setBusyId(null); }
   };
   return <section className="notification-history">{holder}
     <div className="notification-history-heading"><h3>通知发送记录</h3><Tooltip title="刷新通知记录"><Button aria-label="刷新通知记录" disabled={loading || busyId !== null} icon={<RefreshCw size={16} />} onClick={() => void load()} /></Tooltip></div>
@@ -95,7 +95,7 @@ function NotificationHistoryContext({ currentUser, alertId, onUpdated }: History
         { title: '发送状态', width: 100, render: (_, item) => <Tag color={statuses[item.status].color}>{statuses[item.status].label}</Tag> },
         { title: '尝试次数', width: 85, render: (_, item) => `${item.attempts} / ${item.max_attempts}` },
         { title: '收件人', width: 180, render: (_, item) => <span className="notification-recipients">{item.recipients.join('、') || '待配置'}</span> },
-        { title: '失败原因', width: 145, render: (_, item) => <span className="notification-error">{item.error_code || '-'}{item.status === 'failed' ? <small>需人工升级处理</small> : null}</span> },
+        { title: '失败原因', width: 145, render: (_, item) => <span className="notification-error">{item.error_code === 'notification_not_configured' ? '尚未配置通知通道' : item.error_code === 'notification_disabled' ? '通知通道已停用' : item.error_code || '-'}{item.status === 'failed' ? <small>需人工升级处理</small> : null}</span> },
         { title: '时间', width: 180, render: (_, item) => <div className="notification-times"><span>创建 {formatTime(item.created_at)}</span><span>发送 {formatTime(item.sent_at)}</span>{item.next_attempt_at ? <span>重试 {formatTime(item.next_attempt_at)}</span> : null}</div> },
         { title: '人工查看', width: 165, render: (_, item) => item.acknowledged_at ? <div className="notification-times"><span>{item.acknowledged_by}</span><span>{formatTime(item.acknowledged_at)}</span></div> : <span>{item.status === 'sent' ? '未确认查看' : '-'}</span> },
         { title: '操作', width: 105, fixed: 'right', render: (_, item) => <Space size={4}>

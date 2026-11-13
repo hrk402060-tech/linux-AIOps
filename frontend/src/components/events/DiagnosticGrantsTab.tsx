@@ -24,11 +24,13 @@ const labels: Record<DiagnosticGrantStatus, string> = {
 const emptyList: DiagnosticGrantList = { total: 0, items: [], catalog: [] };
 const failureText = (error: unknown) => error instanceof Error ? error.message : '只读诊断授权请求失败';
 
-export function DiagnosticGrantsTab({ currentUser }: { currentUser: Pick<AuthUser, 'role'> }) {
+export function DiagnosticGrantsTab({ currentUser, initialAssetId }: {
+  currentUser: Pick<AuthUser, 'role'>; initialAssetId?: string;
+}) {
   const [data, setData] = useState(emptyList);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [page, setPage] = useState(1);
-  const [assetFilter, setAssetFilter] = useState<string>();
+  const [assetFilter, setAssetFilter] = useState<string | undefined>(initialAssetId);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');

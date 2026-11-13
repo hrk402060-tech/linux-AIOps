@@ -3,7 +3,7 @@ import {
   Alert, Button, Descriptions, Drawer, Empty, Input, List, Modal, Select,
   Space, Table, Tag, Timeline, Typography, message,
 } from 'antd';
-import { Brain, Eye, RefreshCw, StepForward, TerminalSquare, TicketCheck } from 'lucide-react';
+import { Bell, Brain, Eye, KeyRound, RefreshCw, StepForward, TerminalSquare, TicketCheck } from 'lucide-react';
 import type { AuthUser } from '../../api/auth';
 import { getAssets } from '../../api/assets';
 import {
@@ -54,12 +54,13 @@ const timelineStatusLabels: Record<string, string> = {
 const options = (values: Record<string, string>) =>
   Object.entries(values).map(([value, label]) => ({ value, label }));
 
-export function ExternalAlertsTab({ currentUser, initialAssetId, initialAlertId, onOpenTerminal, onOpenIncidents }: {
+export function ExternalAlertsTab({ currentUser, initialAssetId, initialAlertId, onOpenTerminal, onOpenIncidents, onOpenConfiguration }: {
   currentUser: Pick<AuthUser, 'role'>;
   initialAssetId?: string;
   initialAlertId?: string;
   onOpenTerminal?: (assetId: string) => void;
   onOpenIncidents?: () => void;
+  onOpenConfiguration?: (tab: 'notifications' | 'diagnostic-grants', alert: ExternalAlert) => void;
 }) {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [serverFilters, setServerFilters] = useState<Record<string, string>>((): Record<string, string> => initialAssetId ? { asset_id: initialAssetId } : {});
@@ -143,6 +144,7 @@ export function ExternalAlertsTab({ currentUser, initialAssetId, initialAlertId,
       { title: '操作', fixed: 'right', width: readOnly ? 70 : 210, render: (_, item) => <Space size={4}><Button aria-label={`查看 ${item.title}`} icon={<Eye size={16} />} onClick={() => void showDetail(item)} />{!readOnly ? <><Button aria-label={`研判 ${item.title}`} disabled={loading || !authoritative || isActiveDiagnosticJob(item.latest_job)} icon={<Brain size={16} />} onClick={() => setDiagnosticTarget({ kind: 'enqueue', alert: item })} /><Button aria-label={`推进 ${item.title}`} disabled={!nextStatus[item.status]} icon={<StepForward size={16} />} onClick={() => { setAdvanceTarget(item); setNote(''); }} /><Button aria-label={`转为故障 ${item.title}`} disabled={Boolean(item.incident_id)} icon={<TicketCheck size={16} />} onClick={() => { setIncidentTarget(item); setNote(''); }} /></> : null}</Space> },
     ]} /></div>
     <AlertDetailDrawer detail={detail} currentUser={currentUser} onClose={closeDetail}
+      onOpenConfiguration={onOpenConfiguration}
       onOpenIncidents={onOpenIncidents}
       actionsDisabled={loading || !authoritative || detailLoading || !detailAuthoritative}
       onOpenTerminal={onOpenTerminal}
@@ -168,11 +170,12 @@ function formatEvidence(value: unknown) {
   return typeof value === 'string' ? value : JSON.stringify(value);
 }
 
-function AlertDetailDrawer({ detail, currentUser, onClose, onUpdated, onCancelJob, onAnalysisPage, onAdvance, onIncident, actionsDisabled, onOpenTerminal, onOpenIncidents, terminalAssetEnabled }: {
+function AlertDetailDrawer({ detail, currentUser, onClose, onUpdated, onCancelJob, onAnalysisPage, onAdvance, onIncident, actionsDisabled, onOpenTerminal, onOpenIncidents, onOpenConfiguration, terminalAssetEnabled }: {
   detail: AlertDetail | null; currentUser: Pick<AuthUser, 'role'>; onClose: () => void; onUpdated: () => void;
   onAdvance: (alert: ExternalAlert) => void; onIncident: (alert: ExternalAlert) => void;
   actionsDisabled: boolean;
   onOpenTerminal?: (assetId: string) => void; onOpenIncidents?: () => void; terminalAssetEnabled: boolean;
+  onOpenConfiguration?: (tab: 'notifications' | 'diagnostic-grants', alert: ExternalAlert) => void;
   onCancelJob: (job: DiagnosticJob) => void;
   onAnalysisPage: (page: number) => void;
 }) {
@@ -190,6 +193,12 @@ function AlertDetailDrawer({ detail, currentUser, onClose, onUpdated, onCancelJo
     {alert ? <div className="alert-detail">
       <AlertWorkflow alert={alert} recordCount={detail.timeline.length} />
       <Space wrap style={{ margin: '12px 0' }}>
+        {currentUser.role === 'admin' && onOpenConfiguration ? <>
+          <Button icon={<KeyRound size={15} />} disabled={actionsDisabled || !terminalAssetEnabled}
+            onClick={() => onOpenConfiguration('diagnostic-grants', alert)}>配置此资产只读授权</Button>
+          <Button icon={<Bell size={15} />} disabled={actionsDisabled}
+            onClick={() => onOpenConfiguration('notifications', alert)}>配置管理员通知</Button>
+        </> : null}
         {alert.incident_id && onOpenIncidents ? <Button aria-label={`查看关联故障 ${alert.title}`} icon={<TicketCheck size={15} />} onClick={onOpenIncidents}>查看关联故障</Button> : null}
       {currentUser.role !== 'auditor' ? <>
         {onOpenTerminal ? <Button aria-label={`打开 ${alert.asset_name || alert.asset_id} SSH`} title={terminalAssetEnabled ? '打开资产 SSH' : '资产未启用或未关联'} disabled={actionsDisabled || !terminalAssetEnabled} icon={<TerminalSquare size={15} />} onClick={() => onOpenTerminal(alert.asset_id)}>打开资产 SSH</Button> : null}

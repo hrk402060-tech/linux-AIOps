@@ -11,6 +11,7 @@ export function AlertNotificationsTab({ currentUser }: { currentUser: Pick<AuthU
   const [config, setConfig] = useState<AlertNotificationConfig | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [historyRevision, setHistoryRevision] = useState(0);
   const generation = useRef(0);
   const load = async () => {
     const requestId = ++generation.current;
@@ -26,7 +27,8 @@ export function AlertNotificationsTab({ currentUser }: { currentUser: Pick<AuthU
   return <div className="alert-notifications-tab">
     {loading ? <div className="notification-config-loading"><Spin size="small" /></div> : error
       ? <Alert type="error" showIcon message={error} action={<Button icon={<RefreshCw size={15} />} onClick={() => void load()}>重新加载</Button>} />
-      : config ? <AlertNotificationConfigForm config={config} writable={currentUser.role === 'admin'} onSaved={setConfig} /> : null}
-    <AlertNotificationHistory currentUser={currentUser} />
+      : config ? <AlertNotificationConfigForm config={config} writable={currentUser.role === 'admin'}
+        onSaved={(next) => { setConfig(next); setHistoryRevision((value) => value + 1); }} /> : null}
+    <AlertNotificationHistory currentUser={currentUser} refreshVersion={historyRevision} />
   </div>;
 }

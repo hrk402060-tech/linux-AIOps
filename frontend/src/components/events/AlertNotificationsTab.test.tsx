@@ -38,6 +38,26 @@ function show(role: 'admin' | 'operator' | 'auditor') {
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 describe('AlertNotificationsTab', () => {
+  it('refreshes blocked records after a successful channel save', async () => {
+    const fetchMock = stubApi();
+    show('admin');
+    await waitFor(() => expect(screen.getByLabelText('SMTP 服务器')).toHaveValue('smtp.example.com'));
+    await screen.findByText('已发送');
+    const before = fetchMock.mock.calls.filter(([input]) => String(input).startsWith('/api/v1/alert-notifications?')).length;
+    fireEvent.click(screen.getByRole('button', { name: '保存通知配置' }));
+    await waitFor(() => expect(fetchMock.mock.calls.filter(([input]) => String(input).startsWith('/api/v1/alert-notifications?')).length).toBe(before + 1));
+    expect(fetchMock.mock.calls.some(([input]) => /\/retry|\/acknowledge/.test(String(input)))).toBe(false);
+  });
+
+  it('requires an authentication password when enabling a channel with a username', async () => {
+    const fetchMock = stubApi({ 'GET /api/v1/alert-notification-config': { ...config, password_configured: false } });
+    show('admin');
+    await waitFor(() => expect(screen.getByLabelText('SMTP 服务器')).toHaveValue('smtp.example.com'));
+    fireEvent.click(screen.getByRole('button', { name: '保存通知配置' }));
+    expect(await screen.findByText('填写 SMTP 用户名时必须配置密码', {}, { timeout: 5000 })).toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === 'PATCH')).toBe(false);
+  });
+
   it('shows configuration without retrieving a password and omits blank password on save', async () => {
     const fetchMock = stubApi();
     show('admin');

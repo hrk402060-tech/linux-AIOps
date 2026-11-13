@@ -35,6 +35,16 @@ def _enqueue(session: Session) -> AlertNotification:
     return item
 
 
+def test_enabled_authenticated_channel_requires_a_password(client: TestClient, database_session: Session) -> None:
+    response = client.patch('/api/v1/alert-notification-config', json={
+        'enabled': True, 'host': 'smtp.example.test', 'username': 'mailer',
+        'sender': 'ops@example.test', 'recipients': ['admin@example.test'],
+    })
+    assert response.status_code == 422
+    assert response.json()['detail'] == '填写 SMTP 用户名时必须配置密码'
+    assert config.get_record(database_session) is None
+
+
 def test_config_masks_encrypts_and_retains_password(client: TestClient, database_session: Session) -> None:
     assert client.get('/api/v1/alert-notification-config').json()['configured'] is False
     body = _configured(client)

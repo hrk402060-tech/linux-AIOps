@@ -163,7 +163,8 @@ def retry_notification(session: Session, notification_id: str, operator: str) ->
     channel = get_record(session)
     enabled = bool(channel and channel.enabled and channel.recipients)
     changes = {'status': 'pending' if enabled else 'blocked', 'next_attempt_at': utc_now() if enabled else None,
-               'error_code': None if enabled else 'notification_disabled', 'claim_token': None, 'lease_expires_at': None}
+               'error_code': None if enabled else 'notification_not_configured' if channel is None else 'notification_disabled',
+               'claim_token': None, 'lease_expires_at': None}
     changed = session.execute(update(AlertNotification).where(
         AlertNotification.id == item.id, AlertNotification.status.in_({'pending', 'blocked', 'retry', 'failed'}),
         AlertNotification.acknowledged_at.is_(None), AlertNotification.attempts < AlertNotification.max_attempts,

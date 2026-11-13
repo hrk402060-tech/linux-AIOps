@@ -54,6 +54,8 @@ def save_config(
         if payload.password is not None:
             item.encrypted_password, item.password_nonce = vault.encrypt(payload.password, item.id, SECRET_TYPE)
             item.key_version = vault.key_version
+        if item.enabled and item.username and not item.encrypted_password:
+            raise NotificationConfigError('填写 SMTP 用户名时必须配置密码')
         item.updated_at = utc_now()
         _update_waiting(session, item)
         session.add(AlertNotificationAudit(id=str(uuid4()), action='configuration_updated',

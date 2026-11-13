@@ -24,6 +24,11 @@ function setup(detailStatus = 200) {
     if (path === '/api/v1/alerts') return response({ total: 40, items: [] });
     if (path === '/api/v1/events') return response({ total: 0, items: [] });
     if (path === '/api/v1/monitoring/overview') return response({ assets: [] });
+    if (path === '/api/v1/diagnostic-grants') return response({ total: 0, items: [], catalog: [] });
+    if (path === '/api/v1/alert-notification-config') return response({
+      configured: false, enabled: false, host: '', port: 587, security: 'starttls',
+      username: '', sender: '', recipients: [], password_configured: false, updated_at: null,
+    });
     if (path === `/api/v1/alerts/${alert.id}`) return response(detailStatus === 200 ? alert : { detail: '目标告警不存在或无权访问' }, detailStatus);
     if (path.endsWith('/timeline') || path.endsWith('/analyses')) return response([]);
     throw new Error(`Unexpected request: ${path}`);
@@ -61,4 +66,44 @@ it('accepts a new navigation target after the tabs were already mounted', async 
   rerender(<EventsPage currentUser={user} initialAssetId={alert.asset_id} initialAlertId={alert.id} initialTab="external" />);
   await screen.findByRole('dialog', { name: /指定服务告警/ });
   expect(screen.getByRole('tab', { name: '外部告警研判' })).toHaveAttribute('aria-selected', 'true');
+});
+
+it('opens authorization for the selected asset and returns to the exact alert without executing it', async () => {
+  const fetchMock = setup();
+  render(<ConfigProvider theme={{ token: { motion: false } }}><EventsPage currentUser={user}
+    initialAssetId={alert.asset_id} initialAlertId={alert.id} initialTab="external" /></ConfigProvider>);
+  const configure = await screen.findByRole('button', { name: '配置此资产只读授权' });
+  await waitFor(() => expect(configure).toBeEnabled());
+  fireEvent.click(configure);
+  expect(screen.getByRole('tab', { name: '只读诊断授权' })).toHaveAttribute('aria-selected', 'true');
+  await waitFor(() => expect(fetchMock.mock.calls.some(([input]) => {
+    const url = new URL(String(input), 'http://localhost');
+    return url.pathname === '/api/v1/diagnostic-grants' && url.searchParams.get('asset_id') === alert.asset_id;
+  })).toBe(true));
+  fireEvent.click(screen.getByRole('button', { name: '返回告警' }));
+  await screen.findByRole('dialog', { name: /指定服务告警/ });
+  expect(fetchMock.mock.calls.every(([, init]) => !init?.method || init.method === 'GET')).toBe(true);
+});
+
+it('opens notification configuration and returns to the same alert without sending messages', async () => {
+  const fetchMock = setup();
+  render(<ConfigProvider theme={{ token: { motion: false } }}><EventsPage currentUser={user}
+    initialAssetId={alert.asset_id} initialAlertId={alert.id} initialTab="external" /></ConfigProvider>);
+  const configure = await screen.findByRole('button', { name: '配置管理员通知' });
+  await waitFor(() => expect(configure).toBeEnabled());
+  fireEvent.click(configure);
+  await screen.findByLabelText('SMTP 服务器');
+  expect(screen.getByRole('tab', { name: '管理员通知' })).toHaveAttribute('aria-selected', 'true');
+  fireEvent.click(screen.getByRole('button', { name: '返回告警' }));
+  await screen.findByRole('dialog', { name: /指定服务告警/ });
+  expect(fetchMock.mock.calls.every(([, init]) => !init?.method || init.method === 'GET')).toBe(true);
+});
+
+it('does not offer configuration mutations to an auditor', async () => {
+  setup();
+  render(<EventsPage currentUser={{ ...user, role: 'auditor' }}
+    initialAssetId={alert.asset_id} initialAlertId={alert.id} initialTab="external" />);
+  await screen.findByRole('dialog', { name: /指定服务告警/ });
+  expect(screen.queryByRole('button', { name: '配置此资产只读授权' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: '配置管理员通知' })).not.toBeInTheDocument();
 });
