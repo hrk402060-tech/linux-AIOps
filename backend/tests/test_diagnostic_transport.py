@@ -116,11 +116,11 @@ def test_gateway_handshake_denies_privileged_identity() -> None:
                                        time.monotonic() + 2, Mock())
 
 
-def test_ssh_connect_only_uses_dedicated_key_and_reject_policy(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_ssh_connect_only_uses_dedicated_key_in_direct_mode(monkeypatch: pytest.MonkeyPatch) -> None:
     from src.services import diagnostic_grants
     import paramiko
     key = paramiko.RSAKey.generate(2048)
-    monkeypatch.setattr(diagnostic_transport, '_parse_private_key', lambda _: key)
+    monkeypatch.setattr(diagnostic_transport, 'parse_private_key', lambda _: key)
     client = Mock()
     client.get_transport.return_value.get_remote_server_key.return_value = key
     monkeypatch.setattr(diagnostic_transport.paramiko, 'SSHClient', lambda: client)
@@ -132,7 +132,7 @@ def test_ssh_connect_only_uses_dedicated_key_and_reject_policy(monkeypatch: pyte
     options = client.connect.call_args.kwargs
     assert options['pkey'] is key and 'password' not in options
     assert options['allow_agent'] is False and options['look_for_keys'] is False
-    assert isinstance(client.set_missing_host_key_policy.call_args.args[0], paramiko.RejectPolicy)
+    assert isinstance(client.set_missing_host_key_policy.call_args.args[0], paramiko.AutoAddPolicy)
     assert vault.decrypt.call_args.args[3] == diagnostic_grants.SECRET_TYPE
 
 

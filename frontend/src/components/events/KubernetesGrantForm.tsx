@@ -79,8 +79,7 @@ export function KubernetesGrantForm({ assets, catalog, initialGrant, busy, canSu
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState('');
   const generation = useRef(0);
-  const enabledAssets = assets.filter((item) => item.lifecycle_status === 'enabled'
-    && item.credential_id == null && item.credential == null);
+  const enabledAssets = assets.filter((item) => item.lifecycle_status === 'enabled');
   const asset = enabledAssets.find((item) => item.id === values?.asset_id);
   const available = catalog.filter((item) => actionIds.includes(item.id) && item.available && item.read_only);
   const writeValues = (grant: DiagnosticGrant | null, assetId?: string) => {
@@ -141,7 +140,7 @@ export function KubernetesGrantForm({ assets, catalog, initialGrant, busy, canSu
     {loadError ? <Alert type="error" showIcon message={loadError} /> : null}
     {loading ? <Spin size="small" /> : null}
     <Form form={form} layout="vertical" disabled={busy || loading} onFinish={submit} style={{ marginTop: 16 }}>
-      <Form.Item name="asset_id" label="集群映射资产" extra="选择未绑定 SSH 凭据的现有资产作为集群 API 映射。">
+      <Form.Item name="asset_id" label="集群映射资产" extra="选择启用资产作为集群 API 映射，使用独立 ServiceAccount 只读授权。">
         <Select aria-label="授权服务器" showSearch optionFilterProp="label"
         onChange={(id: string) => void selectAsset(id)} options={enabledAssets.map((item) => ({
           value: item.id, label: `${item.name} · ${item.host}`,

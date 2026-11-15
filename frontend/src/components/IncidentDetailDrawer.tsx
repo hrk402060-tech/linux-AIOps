@@ -24,6 +24,7 @@ const analysisLabels = {
 };
 const alertTimelineLabels: Record<string, string> = {
   ingested: '告警接入', duplicate: '重复接收', reopened: '告警复发',
+  source_resolved: '监控源报告恢复',
   status: '状态变更', diagnostic_queued: '诊断入队', diagnostic_finished: '诊断完成',
   incident_created: '转为故障', recovery_started: '开始恢复验证',
   recovery_observing: '恢复验证观察中', recovery_verified: '恢复检查通过',

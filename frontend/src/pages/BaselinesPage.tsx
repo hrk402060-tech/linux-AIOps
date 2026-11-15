@@ -46,7 +46,6 @@ export function BaselinesPage({ embedded = false }: { embedded?: boolean }) {
   };
   return <section className="scan-tasks-page" aria-label="基线合规">{holder}
     <div className="page-heading">{!embedded ? <div><p className="eyebrow">SSH 无 Agent 只读检查</p><h1>Linux 基线与合规</h1></div> : null}<Space><Button aria-label="刷新基线任务" icon={<RefreshCw size={17} />} onClick={() => void load()} /><Button type="primary" icon={<Plus size={17} />} onClick={() => setOpen(true)}>新建检查</Button></Space></div>
-    <Alert type="info" showIcon message="任务完成不等于全部合规" description="完成 100% 仅表示检查流程结束；合规率按实际检查项计算，反映通过比例。" />
     {loadError ? <Alert type="error" showIcon message="基线数据读取失败" description={loadError} action={<Button onClick={() => void load()}>重试</Button>} /> : null}
     <Spin spinning={loading} tip={loading ? '正在加载真实数据' : undefined}><div hidden={Boolean(loadError)} className={`baselines-data-shell${loading ? ' is-loading' : ''}`}><div className="metric-band"><div><span>任务总数</span><strong>{summary.total}</strong></div><div><span>检查中</span><strong>{summary.running}</strong></div><div><span>最近一次已完成检查合规率</span><strong>{summary.rate}%</strong></div><div><span>失败任务</span><strong>{summary.failed}</strong></div></div>
     <div className="table-frame"><Table rowKey="id" loading={loading} dataSource={tasks} scroll={{ x: 1050 }} columns={[

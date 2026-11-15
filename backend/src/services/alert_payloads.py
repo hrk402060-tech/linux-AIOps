@@ -40,6 +40,7 @@ def _prometheus(value: dict[str, Any]) -> dict[str, Any]:
         annotations = _mapping(item.get("annotations"))
         merged_labels = {**labels, **_mapping(annotations)}
         instance = _text(labels.get("instance") or labels.get("host"))
+        source_status = _source_status(item.get("status", value.get("status", "firing")))
         return {
             "external_id": _text(item.get("fingerprint") or labels.get("alertname")
                                  or value.get("groupKey")),
@@ -48,10 +49,17 @@ def _prometheus(value: dict[str, Any]) -> dict[str, Any]:
             "description": _text(annotations.get("description") or item.get("generatorURL")
                                  or value.get("status") or ""),
             "severity": _severity(labels.get("severity") or labels.get("priority")),
+            "source_status": source_status,
             "instance": instance,
             "labels": merged_labels,
         }
     return value
+
+
+def _source_status(value: object) -> str:
+    if value in {"firing", "resolved"}:
+        return str(value)
+    raise AlertPayloadError("告警状态必须是 firing 或 resolved")
 
 
 def _zabbix(value: dict[str, Any]) -> dict[str, Any]:

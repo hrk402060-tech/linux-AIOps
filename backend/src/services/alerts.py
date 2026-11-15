@@ -41,6 +41,11 @@ def ingest(
         Alert.connector_id == connector.id,
         Alert.external_id == payload.external_id,
     ).with_for_update().execution_options(populate_existing=True))
+    if payload.source_status == "resolved":
+        if existing is None:
+            raise AlertNotFoundError("Resolved alert does not exist")
+        _record_source_resolved(session, connector, existing, payload, nonce_hash)
+        return existing, False
     if existing is not None:
         if existing.status in {"resolved", "closed"}:
             _reopen_terminal_alert(session, connector, existing, payload, nonce_hash)
@@ -80,6 +85,30 @@ def ingest(
     if concurrent is not None:
         return concurrent, False
     return alert, True
+
+
+def _record_source_resolved(
+    session: Session, connector: AlertConnector, alert: Alert,
+    payload: AlertIngest, nonce_hash: str,
+) -> None:
+    asset = _resolve_asset(session, payload)
+    if asset.id != alert.asset_id:
+        raise AlertConflictError("Source resolution does not match alert asset")
+    _received_source_receipt(session, alert, connector.id, nonce_hash)
+    _timeline(
+        session, alert, "source_resolved", alert.status,
+        "监控源已报告恢复信号，仍需人工验证后关闭告警", f"connector:{connector.name}",
+        connector.id, nonce_hash,
+        details={"source_status": "resolved", "recovery_verified": False},
+    )
+    _commit_duplicate(session, connector.id, nonce_hash)
+
+
+def _received_source_receipt(
+    session: Session, alert: Alert, connector_id: str, nonce_hash: str,
+) -> None:
+    from src.services import alert_ingest_runtime
+    alert_ingest_runtime.record_success(session, alert, recurrence=False)
 
 
 def list_alerts(

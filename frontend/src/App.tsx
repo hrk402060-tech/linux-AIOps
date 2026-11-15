@@ -14,6 +14,7 @@ import { KnowledgePage } from './pages/KnowledgePage';
 import { ScanTasksPage } from './pages/ScanTasksPage';
 import { VulnerabilitiesPage } from './pages/VulnerabilitiesPage';
 import { DashboardPage } from './pages/DashboardPage';
+import { DashboardPreviewPage } from './pages/DashboardPreviewPage';
 import { ServerMonitoringPreviewPage } from './pages/ServerMonitoringPreviewPage';
 import { AIAgentPage } from './pages/AIAgentPage';
 import { ReportsPage } from './pages/ReportsPage';
@@ -134,6 +135,13 @@ export default function App() {
       onNavigate={navigate} onSearchNavigate={navigateToSearchResult}>
       {terminalNoticeHolder}
       <ServerMonitoringPreviewPage key={scopeKey} canManage={currentUser.role !== 'auditor'} />
+    </AppShell>;
+  }
+  if (new URLSearchParams(window.location.search).get('view') === 'dashboard-preview') {
+    return <AppShell key={scopeKey} currentUser={currentUser} onLogout={() => void signOut()} selectedPage="dashboard"
+      onNavigate={navigate} onSearchNavigate={navigateToSearchResult}>
+      {terminalNoticeHolder}
+      <DashboardPreviewPage onNavigate={navigate} onViewFindings={viewAssetFindings} onOpenTerminal={openAssetTerminal} />
     </AppShell>;
   }
   if (standaloneTerminalAssetId) {

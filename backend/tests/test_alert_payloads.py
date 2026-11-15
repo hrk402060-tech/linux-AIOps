@@ -44,3 +44,48 @@ def test_generic_payload_remains_backward_compatible() -> None:
         "asset_id": "asset-1",
     })
     assert payload.external_id == "generic-1"
+    assert payload.source_status == "firing"
+
+
+@pytest.mark.parametrize(("envelope", "item", "expected"), [
+    ({}, {}, "firing"),
+    ({"status": "resolved"}, {}, "resolved"),
+    ({"status": "firing"}, {"status": "resolved"}, "resolved"),
+    ({"status": "resolved"}, {"status": "firing"}, "firing"),
+])
+@pytest.mark.parametrize("source", ["prometheus", "alertmanager"])
+def test_prometheus_status_uses_item_before_envelope(
+    source: str, envelope: dict[str, str], item: dict[str, str], expected: str,
+) -> None:
+    payload = normalize_payload(source, {
+        **envelope, "alerts": [{
+            "fingerprint": "status-fp", **item,
+            "labels": {"alertname": "NodeState", "instance": "192.0.2.10:9100"},
+        }],
+    })
+    assert payload.source_status == expected
+
+
+@pytest.mark.parametrize("status", ["unknown", "", None, 1, True])
+@pytest.mark.parametrize("at_item", [False, True])
+def test_prometheus_rejects_invalid_source_status(
+    status: object, at_item: bool,
+) -> None:
+    envelope = {"status": "firing" if at_item else status}
+    item = {"status": status} if at_item else {}
+    with pytest.raises(AlertPayloadError):
+        normalize_payload("alertmanager", {
+            **envelope, "alerts": [{
+                "fingerprint": "bad-status", **item,
+                "labels": {"instance": "192.0.2.10:9100"},
+            }],
+        })
+
+
+@pytest.mark.parametrize("status", ["unknown", "", None, 1])
+def test_generic_rejects_invalid_source_status(status: object) -> None:
+    with pytest.raises(AlertPayloadError):
+        normalize_payload("generic_webhook", {
+            "external_id": "bad-status", "title": "Alert", "severity": "low",
+            "asset_id": "asset-1", "source_status": status,
+        })

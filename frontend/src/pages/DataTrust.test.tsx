@@ -12,7 +12,7 @@ import { VulnerabilitiesPage } from './VulnerabilitiesPage';
 afterEach(() => vi.unstubAllGlobals());
 
 const views = [
-  { name: '总览', element: <DashboardPage onNavigate={() => undefined} />, shell: '.dashboard-data-shell', error: '总览数据读取失败' },
+  { name: '总览', element: <DashboardPage onNavigate={() => undefined} />, shell: '.dashboard-preview-data', error: '总览数据读取失败' },
   { name: '报告', element: <ReportsPage />, shell: '.reports-data-shell', error: '报告数据读取失败' },
   { name: '基线', element: <BaselinesPage />, shell: '.baselines-data-shell', error: '基线数据读取失败' },
   { name: '漏洞', element: <VulnerabilitiesPage />, shell: '.vulnerabilities-data-shell', error: '漏洞数据读取失败' },

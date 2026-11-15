@@ -94,7 +94,6 @@ export function VulnerabilitiesPage({ initialAssetId = null, initialQuery = '', 
       <div><span>已确认</span><strong>{summary.confirmed}</strong></div>
       <div><span>需人工确认</span><strong className="metric-text">{summary.manual_confirmation}</strong></div>
     </div>
-    <Alert type="info" showIcon message="判定与处置状态说明" description="已确认：厂商公告与采集证据一致；需人工确认：无法可靠判断厂商 backport。待处理：尚未人工处置；待复扫验证：已人工确认变更，等待只读复扫；已修复：复扫已验证；已忽略或风险接受会保留原因、操作人和时间。" />
     <div className="finding-toolbar">
       <Input allowClear prefix={<Search size={16} />} placeholder="搜索 CVE、公告、资产或软件包" value={query} onChange={(event) => setQuery(event.target.value)} onPressEnter={() => { setPage(1); void load(); }} />
       <Select aria-label="严重度筛选" value={severity} onChange={(value) => { setPage(1); setSeverity(value); }} options={[{ value: 'all', label: '全部严重度' }, ...Object.entries(vulnerabilitySeverityLabels).map(([value, label]) => ({ value, label }))]} />

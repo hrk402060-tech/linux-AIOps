@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { ConfigProvider } from 'antd';
 import { describe, expect, it, vi } from 'vitest';
 import { PlatformUserDocs } from './PlatformUserDocs';
@@ -111,7 +112,7 @@ describe('使用文档', () => {
     }
   });
 
-  it('搜索跨工作台匹配前置条件和命令，清空后恢复分类', () => {
+  it('搜索跨工作台匹配前置条件和命令，清空后恢复分类', async () => {
     renderDocs();
     const search = screen.getByRole('textbox', { name: '搜索使用文档' });
     for (const command of ['--askpass', 'SHOW GLOBAL STATUS', 'SLOWLOG GET 16', '/api/overview']) {
@@ -120,8 +121,9 @@ describe('使用文档', () => {
     }
     fireEvent.change(search, { target: { value: '  StrictHostKeyChecking  ' } });
     fireEvent.click(screen.getByRole('button', { name: '只读诊断授权与执行' }));
-    fireEvent.click(screen.getByText('SSH（Linux）只读查询', { exact: true }));
-    expect(screen.getByText(/StrictHostKeyChecking=yes/)).toBeVisible();
+    await userEvent.click(await screen.findByRole('tab', { name: /SSH（Linux）只读查询/ }));
+    expect(await screen.findByRole('tab', { name: /expanded SSH（Linux）只读查询/ })).toBeInTheDocument();
+    expect(screen.getAllByText(/StrictHostKeyChecking=accept-new/).length).toBeGreaterThan(0);
     fireEvent.change(search, { target: { value: '配置批准网段' } });
     fireEvent.click(screen.getByRole('button', { name: 'API 拨测' }));
     expect(screen.getByText(/无需为批准网段修改 .env/)).toBeVisible();
@@ -143,20 +145,20 @@ describe('使用文档', () => {
     expect(screen.queryByRole('button', { name: /执行命令|自动授权/ })).not.toBeInTheDocument();
   });
 
-  it('使用文档保留六类只读诊断命令与权限限制', () => {
+  it('使用文档保留六类只读诊断命令与权限限制', async () => {
     renderDocs();
     fireEvent.click(screen.getByRole('button', { name: '运维流程' }));
     fireEvent.click(screen.getByRole('button', { name: '只读诊断授权与执行' }));
     for (const [title, content] of [
-      ['SSH（Linux）只读查询', /StrictHostKeyChecking=yes/],
+      ['SSH（Linux）只读查询', /StrictHostKeyChecking=accept-new/],
       ['Docker 只读查询', /当前项目未提供 Docker 代理安装器/],
       ['K8s 只读查询', /当前不采集节点、日志/],
       ['MySQL 只读查询', /SHOW GLOBAL STATUS/],
       ['Redis 只读查询', /SLOWLOG GET 16/],
       ['RabbitMQ 只读查询', /api\/overview/],
     ] as const) {
-      fireEvent.click(screen.getByText(title, { exact: true }));
-      expect(screen.getByText(content)).toBeVisible();
+      await userEvent.click(screen.getByRole('tab', { name: new RegExp(title) }));
+      expect((await screen.findAllByText(content)).length).toBeGreaterThan(0);
     }
   });
 });

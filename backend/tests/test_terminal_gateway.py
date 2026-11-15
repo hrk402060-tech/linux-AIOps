@@ -24,26 +24,19 @@ def _credential() -> Credential:
     )
 
 
-def test_open_shell_registers_only_confirmed_host_key() -> None:
-    expected = paramiko.RSAKey.generate(1024)
+def test_open_shell_accepts_host_key_in_memory_without_registration() -> None:
     client = Mock()
     channel = Mock()
-    transport = Mock()
-    transport.get_remote_server_key.return_value = expected
     client.invoke_shell.return_value = channel
-    client.get_transport.return_value = transport
 
     with patch("src.services.terminal_gateway.paramiko.SSHClient", return_value=client):
         shell = terminal_gateway.open_shell(
-            _asset(port=2222), _credential(), "secret", 100, 30, expected,
+            _asset(port=2222), _credential(), "secret", 100, 30,
         )
 
-    registered = client.get_host_keys.return_value.add
-    registered.assert_called_once_with(
-        "[10.0.0.50]:2222", expected.get_name(), expected
-    )
+    client.get_host_keys.return_value.add.assert_not_called()
     policy = client.set_missing_host_key_policy.call_args.args[0]
-    assert isinstance(policy, paramiko.RejectPolicy)
+    assert isinstance(policy, paramiko.AutoAddPolicy)
     client.connect.assert_called_once_with(
         hostname="10.0.0.50", port=2222, username="ops", password="secret", pkey=None,
         timeout=10, banner_timeout=10, auth_timeout=10,
@@ -52,20 +45,18 @@ def test_open_shell_registers_only_confirmed_host_key() -> None:
     assert isinstance(shell, terminal_gateway.ParamikoShell)
 
 
-def test_open_shell_rejects_remote_key_mismatch() -> None:
+def test_open_shell_does_not_block_on_stale_expected_host_key() -> None:
     expected = paramiko.RSAKey.generate(1024)
-    actual = paramiko.RSAKey.generate(1024)
     client = Mock()
     client.invoke_shell.return_value = Mock()
-    client.get_transport.return_value.get_remote_server_key.return_value = actual
 
     with patch("src.services.terminal_gateway.paramiko.SSHClient", return_value=client):
-        with pytest.raises(paramiko.SSHException, match="主机密钥不匹配"):
-            terminal_gateway.open_shell(
-                _asset(), _credential(), "secret", 80, 24, expected,
-            )
+        shell = terminal_gateway.open_shell(
+            _asset(), _credential(), "secret", 80, 24, expected,
+        )
 
-    client.close.assert_called_once()
+    assert isinstance(shell, terminal_gateway.ParamikoShell)
+    client.close.assert_not_called()
 
 
 def test_channel_close_failure_still_closes_ssh_client() -> None:

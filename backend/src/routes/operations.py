@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from src.auth import AuthPrincipal, authenticated_operator, require_admin, require_system_admin
 from src.database import get_session
-from src.models.operations import AutomationApproval, ChangeRecord
+from src.models.operations import AutomationApproval
 from src.models.alert import AlertConnector
 from src.models.scan_task import ScanTask
 from src.schemas.operations import (

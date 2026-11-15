@@ -5,6 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 AlertSeverity = Literal["critical", "high", "medium", "low"]
 AlertStatus = Literal["open", "acknowledged", "in_progress", "resolved", "closed"]
+AlertSourceStatus = Literal["firing", "resolved"]
 
 
 class ConnectorCreate(BaseModel):
@@ -39,6 +40,7 @@ class AlertIngest(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     description: str = Field(default="", max_length=5000)
     severity: AlertSeverity
+    source_status: AlertSourceStatus = "firing"
     asset_id: str | None = Field(default=None, min_length=1, max_length=36)
     asset_host: str | None = Field(default=None, min_length=1, max_length=253)
     instance: str | None = Field(default=None, min_length=1, max_length=300)

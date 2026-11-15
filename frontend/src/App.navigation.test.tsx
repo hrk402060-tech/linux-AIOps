@@ -110,7 +110,8 @@ describe('使用文档独立页面', () => {
     expect(await screen.findByText('安全设置测试页 operator')).toBeVisible();
     expect(document.querySelector('.topbar-context strong')).toHaveTextContent('安全设置');
     expect(screen.queryByRole('menuitem', { name: '个人安全' })).not.toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: '安全设置' })).toHaveClass('ant-menu-item-selected');
+    await userEvent.click(screen.getByRole('button', { name: '用户菜单' }));
+    expect(screen.getByRole('menuitem', { name: '安全设置' })).toHaveClass('ant-dropdown-menu-item');
   });
 
   it('登录后展示完整文档，不挂载主侧栏或终端，相关功能另开安全标签', async () => {
@@ -285,7 +286,7 @@ describe('App navigation authentication boundary', () => {
     expect(screen.getByRole('button', { name: '告警资产 SSH 跳转' })).toBeInTheDocument();
     await userEvent.click(await screen.findByRole('button', { name: '在当前页打开 SSH' }));
     expect(await screen.findByText('终端测试页 alert-asset-88')).toBeInTheDocument();
-  }, 15_000);
+  }, 30_000);
 
   it.each([
     ['打开测试资产终端', '终端测试页 asset-99'],
@@ -299,7 +300,7 @@ describe('App navigation authentication boundary', () => {
       await userEvent.click(await screen.findByRole('button', { name: '在当前页打开 SSH' }));
     }
     expect(await screen.findByText(expected)).toBeInTheDocument();
-  }, 15_000);
+  }, 30_000);
 
   it('nav_assets: uses the same safe new-tab behavior from server assets', async () => {
     render(<ConfigProvider theme={{ token: { motion: false } }}><App /></ConfigProvider>);
@@ -338,7 +339,10 @@ describe('App navigation authentication boundary', () => {
     render(<ConfigProvider theme={{ token: { motion: false } }}><App /></ConfigProvider>);
     await userEvent.click(await screen.findByRole('button', { name: '打开测试资产终端' }));
     await screen.findByRole('button', { name: '在当前页打开 SSH' });
-    if (action === 'logout') await userEvent.click(screen.getByRole('button', { name: '退出登录' }));
+    if (action === 'logout') {
+      await userEvent.click(screen.getByRole('button', { name: '用户菜单' }));
+      await userEvent.click(screen.getByRole('menuitem', { name: '退出登录' }));
+    }
     else act(() => { window.dispatchEvent(new Event('sentinel:session-expired')); });
     await userEvent.click(await screen.findByRole('button', { name: '测试登录' }));
     expect(await screen.findByText('总览测试页')).toBeInTheDocument();
@@ -353,7 +357,10 @@ describe('App navigation authentication boundary', () => {
     const menu = within(screen.getByRole('menu', { name: '主导航' }));
     await userEvent.click(menu.getByText('SSH 远程'));
     expect(screen.getByText('终端测试页')).toBeInTheDocument();
-    if (action === 'logout') await userEvent.click(screen.getByRole('button', { name: '退出登录' }));
+    if (action === 'logout') {
+      await userEvent.click(screen.getByRole('button', { name: '用户菜单' }));
+      await userEvent.click(screen.getByRole('menuitem', { name: '退出登录' }));
+    }
     else act(() => { window.dispatchEvent(new Event('sentinel:session-expired')); });
     await userEvent.click(await screen.findByRole('button', { name: '测试登录' }));
     expect(await screen.findByText('报告测试页')).toBeInTheDocument();

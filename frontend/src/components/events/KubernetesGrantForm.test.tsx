@@ -11,6 +11,9 @@ vi.mock('../../api/diagnostics', async (importOriginal) => ({
 }));
 const asset = { id: 'asset-1', name: 'cluster-1', host: '192.0.2.10', lifecycle_status: 'enabled',
   credential_id: null, credential: null } as Asset;
+const sshCredential: NonNullable<Asset['credential']> = {
+  id: 'credential-1', name: 'SSH login', username: 'root', credential_type: 'password',
+};
 const catalog = ['pods', 'workloads', 'events'].map((id) => ({
   id: `kubernetes.${id}`, label: `Kubernetes ${id}`, domain: 'kubernetes', available: true,
   read_only: true, required_permission: 'kubernetes:observe', status: 'available',
@@ -46,21 +49,21 @@ function confirm(dialog: ReturnType<typeof within>) {
 afterEach(() => { vi.clearAllMocks(); });
 
 describe('KubernetesGrantForm', () => {
-  it('excludes assets with SSH credential IDs or credential records from cluster mapping choices', async () => {
+  it('includes enabled SSH assets in cluster mapping choices while excluding disabled and archived assets', async () => {
     const { dialog } = show(null, asset, [
       { ...asset, id: 'ssh-id', name: 'SSH ID asset', credential_id: 'credential-1' },
-      { ...asset, id: 'ssh-record', name: 'SSH record asset', credential: {
-        id: 'credential-2', name: 'SSH login', username: 'root', credential_type: 'password',
-      } },
+      { ...asset, id: 'ssh-record', name: 'SSH record asset', credential: sshCredential },
       { ...asset, id: 'disabled', name: 'disabled asset', lifecycle_status: 'disabled' },
+      { ...asset, id: 'archived', name: 'archived asset', lifecycle_status: 'archived' },
     ]);
     expect(dialog.getByText('集群映射资产')).toBeInTheDocument();
     fireEvent.mouseDown(dialog.getByRole('combobox', { name: '授权服务器' }));
     expect(screen.getByText('cluster-1 · 192.0.2.10', { selector: '.ant-select-item-option-content' })).toBeInTheDocument();
     expect(screen.getByText('cluster-2 · 192.0.2.20', { selector: '.ant-select-item-option-content' })).toBeInTheDocument();
-    expect(screen.queryByText('SSH ID asset · 192.0.2.10')).not.toBeInTheDocument();
-    expect(screen.queryByText('SSH record asset · 192.0.2.10')).not.toBeInTheDocument();
+    expect(screen.getByText('SSH ID asset · 192.0.2.10', { selector: '.ant-select-item-option-content' })).toBeInTheDocument();
+    expect(screen.getByText('SSH record asset · 192.0.2.10', { selector: '.ant-select-item-option-content' })).toBeInTheDocument();
     expect(screen.queryByText('disabled asset · 192.0.2.10')).not.toBeInTheDocument();
+    expect(screen.queryByText('archived asset · 192.0.2.10')).not.toBeInTheDocument();
   });
 
   it('retains masked credentials only with unchanged identity and requires exact human confirmation', async () => {
@@ -184,9 +187,14 @@ describe('KubernetesGrantForm', () => {
     expect(submit).toBeDisabled();
   });
 
-  it('requires token and CA on first grant and sends only the Kubernetes contract', async () => {
+  it.each([
+    { name: 'without SSH credentials', targetAsset: asset },
+    { name: 'with an SSH credential ID', targetAsset: { ...asset, credential_id: sshCredential.id } },
+    { name: 'with an SSH credential record', targetAsset: { ...asset, credential: sshCredential } },
+    { name: 'with both SSH credential fields', targetAsset: { ...asset, credential_id: sshCredential.id, credential: sshCredential } },
+  ])('requires dedicated token and CA on first grant $name and sends only the Kubernetes contract', async ({ targetAsset }) => {
     vi.mocked(getDiagnosticGrants).mockResolvedValue({ total: 0, items: [], catalog });
-    const { dialog, onSubmit } = show(null);
+    const { dialog, onSubmit } = show(null, targetAsset);
     fireEvent.mouseDown(dialog.getByRole('combobox', { name: '授权服务器' }));
     fireEvent.click(screen.getByText('cluster-1 · 192.0.2.10', { selector: '.ant-select-item-option-content' }));
     await waitFor(() => expect(dialog.getByLabelText('API Server HTTPS 地址')).toHaveValue('https://192.0.2.10:6443'));
@@ -209,7 +217,10 @@ describe('KubernetesGrantForm', () => {
     expect(onSubmit.mock.calls[0][0]).toMatchObject({ kind: 'kubernetes', expected_revision: 0, token: firstToken, ca_pem: ca });
     expect(onSubmit.mock.calls[0][0]).not.toHaveProperty('private_key');
     expect(onSubmit.mock.calls[0][0]).not.toHaveProperty('gateway_confirmed');
-  });
+    expect(onSubmit.mock.calls[0][0]).not.toHaveProperty('credential_id');
+    expect(onSubmit.mock.calls[0][0]).not.toHaveProperty('credential');
+    expect(onSubmit.mock.calls[0][0]).not.toHaveProperty('username');
+  }, 20_000);
 
   it('clears secrets on asset changes before loading the newly selected grant', async () => {
     let resolveOld: ((value: Awaited<ReturnType<typeof getDiagnosticGrants>>) => void) | undefined;
@@ -234,7 +245,7 @@ describe('KubernetesGrantForm', () => {
 
   it('refuses changing an existing Linux grant into Kubernetes', async () => {
     vi.mocked(getDiagnosticGrants).mockResolvedValue({ total: 1, items: [{ ...grant, kind: 'linux' }], catalog });
-    const { dialog } = show(null);
+    const { dialog } = show(null, { ...asset, credential_id: sshCredential.id, credential: sshCredential });
     fireEvent.mouseDown(dialog.getByRole('combobox', { name: '授权服务器' }));
     fireEvent.click(screen.getByText('cluster-1 · 192.0.2.10', { selector: '.ant-select-item-option-content' }));
     expect(await screen.findByText('该资产已有 Linux 授权，不允许转换授权类型')).toBeInTheDocument();

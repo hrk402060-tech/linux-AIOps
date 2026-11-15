@@ -29,7 +29,7 @@ def effective_status(grant: DiagnosticGrant, asset: Asset) -> str:
         host, port = endpoint_target(str(config['endpoint']))
         if (host, port) != (grant.host, grant.port) or ipaddress.ip_address(asset.host) != ipaddress.ip_address(host):
             return 'target_changed'
-        if asset.credential_id is not None or not config.get('namespaces'):
+        if not config.get('namespaces'):
             return 'disabled'
         if _utc(grant.expires_at) <= datetime.now(timezone.utc):
             return 'expired'
@@ -139,15 +139,15 @@ def upsert(session: Session, payload: KubernetesGrantInput, vault: CredentialVau
     from src.services import diagnostic_grants as grants
     asset = session.get(Asset, payload.asset_id)
     if asset is None or asset.lifecycle_status != AssetLifecycleStatus.ENABLED:
-        raise grants.DiagnosticGrantInvalid('请选择启用的集群映射资产')
+        raise grants.DiagnosticGrantInvalid('请选择启用的服务器资产')
     grants._confirmation(asset, payload)
     host, port = endpoint_target(payload.endpoint)
     try:
         matched = ipaddress.ip_address(asset.host) == ipaddress.ip_address(host)
     except ValueError:
         matched = False
-    if not matched or asset.credential_id is not None:
-        raise grants.DiagnosticGrantInvalid('API 地址必须等于资产 IP，且集群映射资产不能绑定人工 SSH 凭据')
+    if not matched:
+        raise grants.DiagnosticGrantInvalid('API 地址必须等于资产 IP')
     previous = session.scalar(select(DiagnosticGrant).where(DiagnosticGrant.asset_id == asset.id))
     if previous is not None and previous.kind != 'kubernetes':
         raise grants.DiagnosticGrantConflict('已有授权类型不可转换，请选择独立集群映射资产')

@@ -50,18 +50,12 @@ function OperationsAssistantWorkspace({ initialAssetId, initialContext }: Pick<P
     if (await assistant.update({ title })) { setEditingId(null); setEditingTitle(''); }
   };
   const activeMessages = assistant.active?.messages ?? [];
-  const engine = [...activeMessages].reverse().find((item) => item.analysis)?.analysis?.engine;
   const canSend = !assistant.locked && !assistant.sending && !assistant.detailLoading && !assistant.listLoading && !assistant.archived && !assistant.active?.archived && Boolean(assistant.question.trim());
 
   return <section className="operations-assistant-page">{holder}
     <div className="page-heading">
       <div><p className="eyebrow">只读诊断与排障建议</p><h1>AI 运维助手</h1></div>
       {assistant.active ? <Button aria-label={assistant.active.archived ? '恢复会话' : '归档会话'} icon={assistant.active.archived ? <ArchiveRestore size={16} /> : <Archive size={16} />} disabled={assistant.sending || assistant.detailLoading || assistant.locked} onClick={() => void assistant.update({ archived: !assistant.active?.archived })}>{assistant.active.archived ? '恢复会话' : '归档会话'}</Button> : null}
-    </div>
-    <div className="operations-assistant-safety">
-      <span><ShieldCheck size={19} /><strong>只读分析</strong><small>AI 不会删除、修改、安装、部署或执行命令</small></span>
-      <span><CircleAlert size={19} /><strong>人工确认边界</strong><small>检查命令仅供管理员人工确认后使用</small></span>
-      <span><Bot size={19} /><strong>{engine || '本地运维推理'}</strong><small>上下文先脱敏，再交给模型分析</small></span>
     </div>
     <div className="operations-assistant-layout">
       <OperationsConversationSidebar

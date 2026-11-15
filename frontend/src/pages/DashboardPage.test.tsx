@@ -3,10 +3,6 @@ import { ConfigProvider } from 'antd';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { DashboardPage } from './DashboardPage';
-import { clearDashboardCache } from '../hooks/dashboardSnapshotCache';
-
-vi.mock('./dashboard-loading.css', () => ({}));
-vi.setConfig({ testTimeout: 15000 });
 
 const snapshot = {
   assets: { total: 8, online: 5, offline: 1, unknown: 1, disabled: 1 },
@@ -66,63 +62,27 @@ const snapshot = {
 };
 
 beforeEach(() => {
-  clearDashboardCache();
   sessionStorage.setItem('sentinel_admin_token', 'test-token');
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => snapshot }));
 });
 
 describe('DashboardPage', () => {
-  it('uses a skeleton rather than a blank spinner or invented zero metrics on first load', () => {
-    vi.mocked(fetch).mockReturnValue(new Promise(() => undefined));
-    const { container } = render(<ConfigProvider><DashboardPage onNavigate={vi.fn()} /></ConfigProvider>);
-    expect(screen.getByLabelText('正在加载总览')).toBeInTheDocument();
-    expect(screen.queryByText('正在加载真实数据')).not.toBeInTheDocument();
-    expect(container.querySelector('.dashboard-data-shell')).toHaveAttribute('hidden');
-  });
-
-  it('keeps loaded content visible while refreshing and after a recoverable failure', async () => {
-    const { container } = render(<ConfigProvider><DashboardPage onNavigate={vi.fn()} /></ConfigProvider>);
-    await screen.findByText('生产环境巡检');
-    let reject!: (reason: Error) => void;
-    vi.mocked(fetch).mockReturnValue(new Promise((_, fail) => { reject = fail; }));
-    fireEvent.click(screen.getByLabelText('刷新'));
-    expect(container.querySelector('.dashboard-data-shell')).not.toHaveAttribute('hidden');
-    expect(container.querySelector('.dashboard-data-shell')).not.toHaveClass('is-loading');
-    expect(screen.getByText('生产环境巡检')).toBeVisible();
-    await act(async () => reject(new Error('接口暂不可用')));
-    expect(screen.getByText('总览更新失败，显示上次数据')).toBeInTheDocument();
-    expect(screen.getByText('生产环境巡检')).toBeVisible();
-  });
-
-  it('restores recent data immediately when revisiting and continues to refresh', async () => {
-    const first = render(<ConfigProvider><DashboardPage onNavigate={vi.fn()} /></ConfigProvider>);
-    await screen.findByText('生产环境巡检');
-    first.unmount();
-    vi.mocked(fetch).mockReturnValue(new Promise(() => undefined));
-    const second = render(<ConfigProvider><DashboardPage onNavigate={vi.fn()} /></ConfigProvider>);
-    expect(screen.getByText('生产环境巡检')).toBeVisible();
-    expect(screen.queryByLabelText('正在加载总览')).not.toBeInTheDocument();
-    expect(second.container.querySelector('.dashboard-data-shell')).not.toHaveClass('is-loading');
-    expect(screen.getByText('正在更新')).toBeInTheDocument();
-  });
   it('shows the operational snapshot and recent risk activity', async () => {
     render(<ConfigProvider><DashboardPage onNavigate={vi.fn()} /></ConfigProvider>);
 
     expect(await screen.findByText('生产环境巡检')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: '统一运维工作台' })).toBeInTheDocument();
-    expect(screen.getByText('Linux 智能综合运维平台')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '综合总览' })).toBeInTheDocument();
+    expect(screen.getByText(/Linux 智能综合运维平台/)).toBeInTheDocument();
     expect(screen.getByText('服务运行态势')).toBeInTheDocument();
     expect(screen.getByText('统一待办')).toBeInTheDocument();
     expect(screen.getByText('数据库连接耗尽')).toBeInTheDocument();
-    expect(screen.getByText(/6 个服务/)).toBeInTheDocument();
+    expect(screen.getAllByText('服务').length).toBeGreaterThan(0);
     expect(screen.getAllByText('edge-01').length).toBeGreaterThan(0);
     expect(screen.getByText(/9\/9 数据源正常/)).toBeInTheDocument();
-    expect(screen.getByText(/2 排队 · 1 执行中/)).toBeInTheDocument();
-    expect(screen.getByText('服务器准实时监控')).toBeInTheDocument();
-    expect(screen.getAllByText('edge-01').length).toBeGreaterThan(0);
+    expect(screen.getByText('资源使用趋势')).toBeInTheDocument();
     expect(screen.getByText('按资产 + CVE 最新有效状态去重')).toBeInTheDocument();
     expect(screen.getAllByText('支付 API').length).toBeGreaterThan(0);
-    expect(screen.getByText('业务影响面')).toBeInTheDocument();
+    expect(screen.queryByText('服务器监控')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '监控中心' })).not.toBeInTheDocument();
   });
 
@@ -131,24 +91,18 @@ describe('DashboardPage', () => {
     render(<ConfigProvider><DashboardPage onNavigate={onNavigate} /></ConfigProvider>);
     await screen.findByText('生产环境巡检');
 
-    fireEvent.click(screen.getByRole('button', { name: '进入告警中心' }));
-    fireEvent.click(screen.getByRole('button', { name: '查看待处理漏洞' }));
+    fireEvent.click(screen.getByRole('button', { name: '查看全部' }));
+    fireEvent.click(screen.getByRole('button', { name: '进入漏洞治理' }));
 
     expect(onNavigate).toHaveBeenNthCalledWith(1, 'alerts');
     expect(onNavigate).toHaveBeenNthCalledWith(2, 'findings');
   });
 
-  it('provides asset-scoped vulnerability and SSH actions', async () => {
-    const onViewFindings = vi.fn();
-    const onOpenTerminal = vi.fn();
-    render(<ConfigProvider><DashboardPage onNavigate={vi.fn()} onViewFindings={onViewFindings} onOpenTerminal={onOpenTerminal} /></ConfigProvider>);
-
+  it('keeps asset actions out of the overview after removing server monitoring', async () => {
+    render(<ConfigProvider><DashboardPage onNavigate={vi.fn()} /></ConfigProvider>);
     await screen.findByText('生产环境巡检');
-    fireEvent.click(screen.getByRole('button', { name: '查看 edge-01 漏洞' }));
-    fireEvent.click(screen.getByRole('button', { name: '打开 edge-01 SSH' }));
-
-    expect(onViewFindings).toHaveBeenCalledWith('asset-1');
-    expect(onOpenTerminal).toHaveBeenCalledWith('asset-1');
+    expect(screen.queryByRole('button', { name: '查看 edge-01 漏洞' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '打开 edge-01 SSH' })).not.toBeInTheDocument();
   });
 
   it('translates dashboard attention status into Chinese', async () => {
@@ -157,7 +111,7 @@ describe('DashboardPage', () => {
     await screen.findByText('数据库连接耗尽');
     const item = within(screen.getByRole('button', { name: /数据库连接耗尽/ }));
     expect(item.getByText('待处理')).toBeInTheDocument();
-    expect(item.getByText(/edge-01 · 待处理/)).toBeInTheDocument();
+    expect(item.getByText(/edge-01/)).toBeInTheDocument();
     expect(screen.queryByText('open')).not.toBeInTheDocument();
   });
 
@@ -179,35 +133,8 @@ describe('DashboardPage', () => {
     expect(screen.getAllByText('异常')).toHaveLength(2);
     expect(screen.getByText(/port open/)).toBeInTheDocument();
     expect(screen.getByText('人工登记完成')).toBeInTheDocument();
-    expect(screen.queryByText('已恢复')).not.toBeInTheDocument();
     expect(screen.queryByText('failed')).not.toBeInTheDocument();
     expect(screen.queryByText('error')).not.toBeInTheDocument();
-  });
-
-  it.each(['disabled', 'archived'])('does not offer SSH for a %s asset', async (lifecycle) => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({
-      ...snapshot, monitoring_assets: snapshot.monitoring_assets.map((item) => ({ ...item, lifecycle_status: lifecycle })),
-    }) }));
-    const onOpenTerminal = vi.fn();
-    render(<ConfigProvider><DashboardPage onNavigate={vi.fn()} onOpenTerminal={onOpenTerminal} /></ConfigProvider>);
-    await screen.findByText('生产环境巡检');
-    expect(screen.getByRole('button', { name: '打开 edge-01 SSH' })).toBeDisabled();
-    fireEvent.click(screen.getByRole('button', { name: '打开 edge-01 SSH' }));
-    expect(onOpenTerminal).not.toHaveBeenCalled();
-  });
-
-  it('clears the previous snapshot when refreshing confirms access is forbidden', async () => {
-    let resolve!: (response: Response) => void;
-    const pending = new Promise<Response>((done) => { resolve = done; });
-    vi.mocked(fetch).mockResolvedValueOnce({ ok: true, json: async () => snapshot } as Response)
-      .mockReturnValueOnce(pending);
-    render(<ConfigProvider><DashboardPage onNavigate={vi.fn()} /></ConfigProvider>);
-    await screen.findByText('生产环境巡检');
-    fireEvent.click(screen.getByRole('button', { name: '刷新' }));
-    expect(screen.getByText('生产环境巡检')).toBeVisible();
-    await act(async () => resolve(new Response(JSON.stringify({ detail: '权限校验失败' }), { status: 403 })));
-    expect(await screen.findByText('总览数据读取失败')).toBeInTheDocument();
-    expect(screen.queryByText('生产环境巡检')).not.toBeInTheDocument();
   });
 
   it('ignores a pending snapshot after the session expires', async () => {

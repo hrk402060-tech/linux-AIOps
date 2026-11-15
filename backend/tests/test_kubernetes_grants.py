@@ -167,15 +167,44 @@ def test_invalid_or_short_lived_ca_rejected(client: TestClient, database_session
     assert client.post('/api/v1/diagnostic-grants', json=data).status_code == 400
 
 
-def test_kubernetes_mapping_rejects_manual_ssh_credential(client: TestClient, database_session: Session) -> None:
+def test_existing_ssh_asset_uses_only_dedicated_kubernetes_secret(
+    client: TestClient, database_session: Session, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from unittest.mock import Mock
+    from src.services import kubernetes_diagnostics, ssh_connection
+
     data = payload(client)
     credential = client.post('/api/v1/credentials', json={
-        'name': 'manual-only', 'username': 'manual', 'credential_type': 'password', 'secret': 'manual-only',
+        'name': 'manual-only', 'username': 'root', 'credential_type': 'password', 'secret': 'manual-only',
     }).json()
     assert client.patch(f"/api/v1/assets/{data['asset_id']}",
                         json={'credential_id': credential['id']}).status_code == 200
     login_role(client, database_session, 'admin')
-    assert client.post('/api/v1/diagnostic-grants', json=data).status_code == 400
+    saved = client.post('/api/v1/diagnostic-grants', json=data)
+    assert saved.status_code == 201, saved.text
+    assert saved.json()['effective_status'] == 'active'
+    vault = client.app.state.credential_vault
+    decrypt = Mock(wraps=vault.decrypt)
+    monkeypatch.setattr(vault, 'decrypt', decrypt)
+    ssh = Mock(side_effect=AssertionError('Kubernetes must never use SSH credentials'))
+    monkeypatch.setattr(ssh_connection, 'open_client', ssh)
+    transport = Mock()
+    transport.request.side_effect = [
+        {'kind': 'PodList', 'metadata': {}, 'items': []},
+        {'kind': 'EventList', 'metadata': {}, 'items': []},
+    ]
+    monkeypatch.setattr(kubernetes_diagnostics, 'KubernetesTransport', Mock(return_value=transport))
+    checked = client.post(f"/api/v1/diagnostic-grants/{data['asset_id']}/test", json={
+        'expected_revision': 1, 'confirmation': 'cluster-demo', 'reason': 'verify isolated identity',
+    })
+    assert checked.status_code == 200, checked.text
+    assert checked.json()['status'] == 'completed'
+    assert [call.args[3] for call in decrypt.call_args_list] == ['diagnostic_kubernetes']
+    assert transport.request.call_count == 2
+    ssh.assert_not_called()
+    database_session.expire_all()
+    assert database_session.get(Asset, data['asset_id']).credential_id == credential['id']
+    assert 'manual-only' not in checked.text and str(data['token']) not in checked.text
 
 
 def test_explicit_linux_kind_compatible_and_conversion_rejected(

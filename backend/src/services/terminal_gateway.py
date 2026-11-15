@@ -5,7 +5,7 @@ from typing import Protocol
 import paramiko
 
 from src.models.asset import Asset
-from src.models.credential import Credential, CredentialType
+from src.models.credential import Credential
 from src.services.ssh_connection import open_client
 
 

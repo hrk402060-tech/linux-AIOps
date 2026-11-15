@@ -6,7 +6,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from src.models.auth import User
-from src.models.incident import Incident, IncidentTicket, IncidentTimeline
+from src.models.incident import IncidentTicket, IncidentTimeline
 from src.schemas.incident import IncidentTicketCreate, IncidentTicketStatusUpdate
 from src.services import incidents
 

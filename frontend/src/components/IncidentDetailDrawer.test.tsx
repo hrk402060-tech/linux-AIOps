@@ -17,6 +17,7 @@ const alert = {
 const alertTimeline = [
   { id: 1, alert_id: 'alert-1', event_type: 'ingested', status: 'open', note: '外部告警已验签接收', operator: 'connector:Prometheus', created_at: '2026-10-20T00:00:00Z' },
   { id: 2, alert_id: 'alert-1', event_type: 'diagnostic_finished', status: 'completed', note: '只读采集完成', operator: 'system', created_at: '2026-10-20T00:01:00Z' },
+  { id: 3, alert_id: 'alert-1', event_type: 'source_resolved', status: 'open', note: '监控源已报告恢复信号', operator: 'connector:prometheus', created_at: '2026-10-20T00:02:00Z' },
   { id: 3, alert_id: 'alert-1', event_type: 'incident_created', status: 'in_progress', note: '人工确认转为故障', operator: 'operator', created_at: '2026-10-20T00:02:00Z' },
 ];
 const recovery = { total: 0, items: [], options: {
@@ -88,6 +89,7 @@ it('shows the immutable timeline for the linked alert in the incident detail', a
   setup();
   const timeline = await screen.findByRole('region', { name: '关联告警时间线' });
   expect(timeline).toHaveTextContent('告警接入');
+  expect(timeline).toHaveTextContent('监控源报告恢复');
   expect(timeline).toHaveTextContent('外部告警已验签接收');
   expect(timeline).toHaveTextContent('诊断完成');
   expect(timeline).toHaveTextContent('转为故障');
