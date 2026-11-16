@@ -1,5 +1,191 @@
 # Project Context
 
+## Kubernetes 管理一期设计（2026-11-16，待 PM 确认）
+
+本节为设计提案，未开始应用编码、迁移或发布。只制作交互原型与方案；
+不修改生产配置或目标集群，PM 确认后再实施。
+
+### 页面原型
+
+现有工作台切换器新增 `Kubernetes 管理`，只含 `集群接入`、`集群总览`。
+拟新增工作台键 `kubernetes`，页面键 `kubernetes-clusters`、
+`kubernetes-overview`。沿用 AppShell、React/TypeScript/Ant Design 和认证，
+其他工作台、PageKey、路由及权限保持。原型位于当前对话持久化可视化目录，
+文件名 `kubernetes-phase-one.html`，全部示例、无网络访问，不保存真实配置。
+
+| 页面 | 设计 |
+| --- | --- |
+| 集群接入 | 搜索/筛选列表：名称、API Server、版本、连接/授权状态、证书到期、最近检测；接入、编辑、测试、停用。表单：名称、API Server、kubeconfig、context、关联业务服务；配置变化使旧测试失效，保存后清空浏览器配置输入 |
+| 集群总览 | 集群/namespace 选择；Node 就绪/异常、Namespace、Pod/异常 Pod、三类 Workload、Service、Warning 数量；CPU/内存用量及覆盖数；手动/自动刷新；活动告警、查看审计和关联业务服务入口沿用现有页面并传递集群上下文 |
+| 总览资源标签 | Node、Namespace、Pod、Workload、Service、Event；搜索、筛选、分页；Node/Pod 页内详情可展开收起，显示状态、IP、重启、条件、事件和有权查看的关联服务器 |
+
+默认 60 秒后台采集，页面每 30 秒查询缓存状态，可选 30/60 秒或关闭；
+标注“周期采集”，不称实时。后台页面暂停轮询，手动刷新合并同集群进行中
+任务。切换集群/namespace/账号取消旧请求，隔离迟到数据。未采集、采集中、
+失败、过期、权限不足、部分清单、真实空列表分别展示；未知为“—”，完整
+空清单才为 0；旧数据带最后成功时间和过期标记。
+
+### 架构与安全评审
+
+协调者承担项目管理、UI 和前后端方案，独立架构/QA 只读复核后条件通过；
+前后端实现、QA 环境验收和运维待确认后逐页面推进。
+
+现有 DiagnosticGrant 绑定单资产、最多三个 namespace，只提供 Pod/Event/
+三类 Workload 有限摘要。新建独立集群连接、清单和访问授权领域，不能扩宽
+旧 grant/transport，不能把摘要 150 条/12,000 字符限额当完整清单，不能将新
+kubeconfig 自动提供给 AI。复用会话、AES-GCM、业务服务、资产、审计和通知。
+现有 `require_admin` 实际接受三角色，管理操作须另校验真实管理员会话，
+不允许应急 Token 或 AI 身份配置集群。
+
+- kubeconfig 后端受限 YAML 解析：大小/深度/别名/重复键限制，显式选择
+  context，只保留其内嵌 CA、静态 Token 或专用只读客户端证书/私钥。
+  表单 API Server 必须与所选 context.server 规范化一致。
+- 拒绝 exec、auth-provider、tokenFile、本地 CA/证书/私钥路径、代理、冒充、
+  跳过 TLS 及未知插件；不运行 kubectl，不读取平台文件。
+- 强制 HTTPS、CA 链/主机名/有效期验证。管理员批准 IP/DNS API 目标，
+  每次解析检查全部地址并固定实际连接目标；阻断回环、链路本地、元数据及
+  平台内部管理目标，拒绝重定向，不提供通用 URL 代理。
+- 规范化所选配置使用现有 AES-GCM、随机 nonce、key_version、绑定
+  cluster_id/credential_revision 的 AAD 加密，元信息 revision 独立，不因改名
+  或周期调整破坏解密。主密钥由服务器管理；无 kubeconfig/
+  密文/Token/私钥读取或下载接口，不回显、不进入错误正文和日志。
+- 连接测试分 TLS、版本、身份、读取权限、Metrics API。使用专用最小只读
+  身份，发现已知管理员、写/Secrets/exec/proxy 权限拒绝激活；身份/自权限
+  检查不可用或不完整时待授权，不把一次 GET 成功当成最小权限证明。
+  检查是当时证据，不是永久安全证明，后台仍强制固定读取路径并持续重检。
+- 只允许 get/list Nodes、Namespaces、Pods、Services、core Events、
+  apps/v1 三类 Workload、metrics.k8s.io nodes/pods 及版本发现；
+  官方自身份/自权限 Review POST 仅接入校验使用，不是业务写操作。
+  禁止 Secrets/ConfigMap 内容、日志、exec/attach/port-forward/proxy、
+  watch、通用 API 转发及全部业务资源写操作。
+- 失败区分网络/端口、超时、证书链/主机名/到期、认证 401、权限 403、
+  版本不支持、限流和指标缺失；连接、授权、完整性、指标能力分别显示。
+- 分别记录服务端、CA、客户端证书期限；Token 到期无法可信确定则“未知”。
+  建议 30/7/1 天提醒；到期停止新采集，不自动续签、不降级 TLS。
+
+### 数据模型
+
+拟新增九张表，均采用 FK、稳定 UID、修订号和明确唯一约束：
+
+| 表 | 关键字段 |
+| --- | --- |
+| `kubernetes_clusters` | id、唯一 name、endpoint/context、service_id、lifecycle、connection/authorization_status、version/capabilities、各类到期、采集周期/新鲜度、revision、检测/成功时间、脱敏 error_code |
+| `kubernetes_cluster_credentials` | 唯一 cluster_id、auth_type、encrypted_config、nonce、key_version、credential_revision、identity_hint、rotated_at；读取 DTO 不含密文 |
+| `kubernetes_cluster_access` | 唯一 user_id/cluster_id、namespace_scope（all/selected）、namespaces、can_view_cluster_resources、granted_by、revision；空范围默认无权限 |
+| `kubernetes_collection_runs` | cluster_id、凭据 revision、状态、起止时间、各 kind 完整性/错误、指标覆盖、租约、trace_id；单集群合并刷新 |
+| `kubernetes_resource_snapshots` | run_id、cluster_id、kind、namespace、UID、name、resource_version、observed_at、白名单状态投影；run/kind/UID 唯一，不存 raw spec |
+| `kubernetes_metric_samples` | cluster/run、kind/UID/namespace、sample_time/window、CPU cores、memory bytes、allocatable、source；缺值 NULL，目标/时间去重 |
+| `kubernetes_node_asset_links` | 唯一 cluster_id/node_uid、asset_id、status、confirmed_by/at；名称/IP 仅绑定候选 |
+| `kubernetes_alert_states` | cluster/rule、非空规范化 target_key、namespace/UID、episode、first/last_seen、state、active_alert_id、revision；cluster/rule/target_key 唯一维护当前状态，episode 递增，活动告警以该键+episode 唯一；不用含 NULL 的联合唯一约束去重 |
+| `kubernetes_audits` | actor/session、cluster/namespace/kind/UID、action/outcome、trace_id、时间、poll_group/count；无凭据和原始正文 |
+
+复用 users/AuthSession、CmdbService、assets、Alert/Timeline 和通知表。集群选择
+已有业务服务，或在原业务/应用下按原权限创建 service_type=kubernetes_cluster
+服务；不建平行 CMDB、不伪造 Linux 资产。Node 绑定不自动新建资产/SSH 凭据
+或授予权限；跨域链接需要两侧可见，并携带业务/应用/服务/资产关联 ID。
+连接停用/归档保留历史 FK，密钥清除和记录保留遵循平台保留策略。
+
+### 集群告警的兼容改造
+
+Alert、DiagnosticJob、RootCauseAnalysis、Incident 当前均要求非空 asset_id。
+不能把集群异常挂在虚构服务器上：拟扩展 Alert.target_type/cluster_id/
+namespace/resource_uid，只有 Kubernetes 目标允许 asset_id 可空；
+CHECK 必须按 target_type 验证合法目标组合，不只是任一 ID 非空。
+
+所有告警列表、计数、详情、搜索、通知、审计、恢复统一目标鉴权：
+有权资产目标 OR 有权 cluster 且有权 namespace 目标；namespace 为空的
+集群级告警须单独集群资源权限。NULL asset 不等于全局可见，资产全权限
+不等于所有集群权限，可选 Node 资产关系不能替代 cluster/namespace ACL。
+
+旧资产型诊断/故障在不兼容目标上显式阻断并保留管理员结果通知，不入队假
+资产，不自动把清单 kubeconfig 提供给 AI。本期不宣称新增集群级自动根因
+分析、故障转换或工单目标泛化。此项改造必须回归原资产告警完整链路。
+
+### 数据、指标、告警规则
+
+- 各类资源独立分页、UID 去重，resourceVersion/continue 保持一致；410 重采
+  该类，不拼接不同批次冒充完整清单。跨 kind 不是原子快照，显示时间窗。
+  超时/页数/字节/对象限额为 partial；仅有权范围完整才能报告精确总数，
+  否则“已观测 N 条”。403、缺失和失败不能为零。
+- 用量来自 Metrics API，缺少 metrics-server/API 显示未接入，不以 requests/
+  limits 或平台本机指标代替。CPU=sum(有效节点 cores)/sum(相同节点
+  allocatable CPU)；内存=sum(working set)/sum(相同节点 allocatable memory)。
+  标注单位、sample_time/window/source 和覆盖 X/Y，不直接平均百分比。
+- namespace 用户仅得到有权 Pod 用量，不泄漏 Node、全局 IP/数量/指标。
+  Pod 异常区分持续 Pending、Failed/Unknown、Waiting reason 和重启增长，
+  正常 Succeeded 不算故障，历史累计重启不等于当前异常。
+- 告警包含 NodeNotReady、异常/重启 Pod、Workload 副本不足、Warning、
+  连接失败和证书临期；阈值/持续时间可配置，按 cluster/rule/namespace/UID
+  去重并记录复发 episode。Event 次数变化只更新同一异常，不反复通知。
+  仅新鲜完整的相应状态证据能判恢复，Event 消失/TTL 到期、采集失败、撤权
+  或指标缺失不能恢复；人工关闭保持原门禁，通知复用 outbox。
+- 建议新鲜度 max(3×周期,180 秒)；投影/运行保留 7 天，指标原始 7 天后小时
+  汇总保留 30 天，审计 180 天，均是可配置的待确认默认值。
+
+### 接口设计
+
+统一前缀 `/api/v1/kubernetes`，仅平台接口，不是 Kubernetes 通用代理：
+
+| 方法/路径 | 作用 |
+| --- | --- |
+| GET `/clusters`、`/clusters/{id}` | 有权列表/脱敏配置，搜索/状态/生命周期/分页 |
+| POST `/cluster-tests` | 管理员检测未保存配置，短时 test_id/分步结果，不存明文 |
+| POST `/clusters` | 配置/context/service_id/test_id；重验指纹/身份后加密保存 |
+| POST `/clusters/{id}/tests` | 检测已存配置，版本、身份摘要、权限矩阵、证书和指标能力 |
+| PATCH `/clusters/{id}` | 元信息、周期、停用/归档，If-Match revision，不绕测试换目标 |
+| PUT `/clusters/{id}/credential` | 先测后轮换、CAS revision、废止旧采集，无明文 GET |
+| GET `/clusters/{id}/overview` | namespace/run_id；scope/complete/时间/新鲜度/指标覆盖/错误 |
+| GET `/clusters/{id}/resources/{kind}` | kind 白名单、namespace/cursor/limit/search/status/run_id |
+| GET `/clusters/{id}/resources/{kind}/{uid}` | 只读投影及有权关系，UID 选择，不接收 API 路径 |
+| GET `/clusters/{id}/metrics`、`/clusters/{id}/events` | 有界时间窗、namespace/UID、样本单位/时间/完整性 |
+| POST `/clusters/{id}/refresh`、GET `/clusters/{id}/collections/{run_id}` | 202 后台刷新/状态，合并任务/限频，无远程写操作 |
+| GET/PUT `/clusters/{id}/access` | 管理员授权范围，revision 和审计 |
+| GET/PUT `/clusters/{id}/service-link`、`/clusters/{id}/nodes/{uid}/asset-link` | 管理员维护服务/资产关系，验证两侧权限 |
+| GET `/clusters/{id}/audits` | 有权访问历史，管理变更进入现有统一审计 |
+
+响应含 trace_id；错误为 code、中文 message、安全 required_action。
+平台 401/403/404/409/422/429 分别为登录/操作权限/隐藏目标/冲突/输入/限频；
+上游认证失败写入测试 steps，不让上游 401 被误当平台登录失效。
+游标绑定集群、namespace、run 和授权 revision。
+
+### 权限方案
+
+| 操作 | admin | operator | auditor |
+| --- | --- | --- | --- |
+| 接入/轮换/停用/关联/访问授权 | 真实管理员会话 | 禁止 | 禁止 |
+| 读取 | 所有登记集群 | 显式授权范围 | 显式授权范围 |
+| 手动后台采集 | 允许、限频 | 有权范围、限频 | 禁止；只读已有快照 |
+| 自动查询快照 | 允许 | 有权范围 | 有权范围 |
+| 凭据下载/业务资源写操作 | 禁止 | 禁止 | 禁止 |
+
+内部能力拟为 kubernetes.connection.manage/read/refresh/access.manage，
+映射原角色加对象授权，不顺带重构平台 RBAC。operator/auditor 默认无集群
+权限，资产/SSH/业务服务权限不自动继承。Node/Namespace/全局统计额外检查
+can_view_cluster_resources；资产链接还检查原资产权限。
+页面/详情/刷新审计；自动轮询按会话/集群/namespace/动作聚合首末时间/次数，
+人工和拒绝逐条记录。停用/撤权/轮换废止缓存/后台租约，返回前再次鉴权。
+
+### 开发计划
+
+1. 接入页：先测后实现模型/迁移、加密解析、测试连接和授权；覆盖恶意配置、
+   TLS/SSRF、多 context、过期/轮换/并发、401/403/脱敏；开发候选交 PM 验收。
+2. 总览页：分页、详情、Metrics、筛选/刷新；验证目标隔离、UID、迟到数据、
+   过期/partial/403、410、缺失指标；真实受控集群验收，不只跑 mock。
+3. 关联闭环：业务服务、Node 资产、集群告警、通知/审计；验证无服务器绑定、
+   namespace 越权、并发去重、复发/恢复、诊断分流及原资产告警回归。
+4. 安装/测试/构建仅在 192.168.10.17 隔离 Docker，不使用 WSL/本地容器，
+   不改其他业务、不备份；前端测试/构建和后端权限/迁移/集成通过后提交
+   GitHub，依据本次 PM 确认后的页面发布安排部署。
+
+一期排除：Master/Node 增删、扩缩容、升级、备份恢复、清理、Helm、
+工作负载修改/删除、终端 exec、AI 执行。技术依据为 Kubernetes 官方
+kubeconfig、RBAC、Resource Metrics Pipeline 和 API 分页规范：
+
+- https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/
+- https://kubernetes.io/docs/reference/access-authn-authz/rbac/
+- https://kubernetes.io/docs/tasks/debug/debug-cluster/resource-metrics-pipeline/
+- https://kubernetes.io/docs/reference/using-api/api-concepts/
+
 ## Fair Kubernetes Read-only Collection (2026-11-16)
 
 The Kubernetes collector divides its existing 150-item and 12,000-character
