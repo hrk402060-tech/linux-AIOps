@@ -39,6 +39,8 @@ class Settings(BaseSettings):
     terminal_ai_api_key: SecretStr = SecretStr("")
     terminal_ai_timeout_seconds: int = Field(default=30, ge=5, le=120)
     probe_allowed_cidrs: str = Field(default="", validation_alias="SENTINEL_PROBE_ALLOWED_CIDRS")
+    kubernetes_api_allowed_cidrs: str = ""
+    kubernetes_api_denied_cidrs: str = ""
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

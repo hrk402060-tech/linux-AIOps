@@ -20,10 +20,12 @@ from src.models.diagnostic_grant import DiagnosticGrantAudit
 from src.models.alert import AlertTimeline
 from src.models.ssh_host_key_audit import SshHostKeyAudit
 from src.models.asset_access import UserAccessAudit
+from src.models.kubernetes_cluster import KubernetesClusterAudit
 
 
 def list_entries(
     session: Session, visible_asset_ids: set[str] | None = None,
+    *, include_kubernetes: bool = False,
 ) -> list[dict[str, object]]:
     items = [*_event_entries(session), *_cleanup_entries(session), *_asset_entries(session),
              *_vulnerability_entries(session), *_report_entries(session), *_command_entries(session),
@@ -32,6 +34,8 @@ def list_entries(
              *_scan_removal_entries(session), *_recovery_entries(session),
              *_user_access_entries(session),
              *_ssh_host_key_entries(session)]
+    if include_kubernetes:
+        items.extend(_kubernetes_entries(session))
     if visible_asset_ids is not None:
         items = [
             item for item in items
@@ -39,6 +43,14 @@ def list_entries(
             or str(item["target"]) in visible_asset_ids
         ]
     return sorted(items, key=lambda item: _time(item["occurred_at"]), reverse=True)
+
+
+def _kubernetes_entries(session: Session) -> list[dict[str, object]]:
+    return [_entry(
+        f"kubernetes:{item.id}", "kubernetes_cluster", item.action, item.actor,
+        f"{item.outcome}; trace_id={item.trace_id or ''}", item.cluster_id, item.created_at,
+    ) for item in session.scalars(select(KubernetesClusterAudit).order_by(
+        KubernetesClusterAudit.created_at.desc(), KubernetesClusterAudit.id.desc()).limit(500))]
 
 
 def _event_entries(session: Session) -> list[dict[str, object]]:

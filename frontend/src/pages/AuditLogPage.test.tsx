@@ -4,6 +4,17 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { AuditLogPage } from './AuditLogPage';
 
 afterEach(() => vi.unstubAllGlobals());
+it('filters cluster audits using the Kubernetes source', async () => {
+  const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ total: 0, items: [] }) });
+  vi.stubGlobal('fetch', fetchMock);
+  render(<ConfigProvider><AuditLogPage /></ConfigProvider>);
+  await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+  fireEvent.mouseDown(screen.getByRole('combobox', { name: '审计来源' }));
+  fireEvent.click(await screen.findByText('Kubernetes 集群', { selector: '.ant-select-item-option-content' }));
+  await waitFor(() => expect(fetchMock).toHaveBeenLastCalledWith(
+    '/api/v1/audit-log?source=kubernetes_cluster&page=1&page_size=20', expect.anything(),
+  ));
+});
 it('shows and filters administrator notification audits using their backend source', async () => {
   const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ total: 1, items: [{ id: 'notification:1', source: 'alert_notification', action: 'notification_acknowledged', operator: 'ops-admin', detail: 'human acknowledgment', target: 'notice-1', occurred_at: '2026-10-03T01:00:00Z' }] }) });
   vi.stubGlobal('fetch', fetchMock);

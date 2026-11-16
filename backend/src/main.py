@@ -38,7 +38,11 @@ from src.routes.diagnostic_grants import router as diagnostic_grants_router
 from src.routes.diagnostic_jobs import router as diagnostic_jobs_router
 from src.routes.recovery import router as recovery_router
 from src.routes.operations import router as operations_router
+from src.routes.kubernetes import router as kubernetes_router
 from src.models.ops_assistant import OpsConversation, OpsMessage  # noqa: F401
+from src.models.kubernetes_cluster import (  # noqa: F401
+    KubernetesCluster, KubernetesClusterAudit, KubernetesClusterCredential, KubernetesConnectionTest,
+)
 from src.services import diagnostic_job_state
 from src.services.diagnostic_job_worker import (
     DiagnosticSchedulerHealth, run_scheduler as run_diagnostic_scheduler,
@@ -226,6 +230,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     application.include_router(
         ssh_host_keys_router,
+        prefix="/api/v1",
+        dependencies=[Depends(require_admin)],
+    )
+    application.include_router(
+        kubernetes_router,
         prefix="/api/v1",
         dependencies=[Depends(require_admin)],
     )

@@ -22,7 +22,10 @@ def read_audit_log(
     principal: AuthPrincipal = Depends(require_admin),
     session: Session = Depends(get_session),
 ) -> dict[str, object]:
-    items = list_entries(session, asset_access.visible_asset_ids(session, principal))
+    items = list_entries(
+        session, asset_access.visible_asset_ids(session, principal),
+        include_kubernetes=principal.role == "admin" and principal.auth_type == "session",
+    )
     if any(value is not None for value in (client_ip, failure_reason, login_success)):
         items = [item for item in items if item["source"] == "authentication"]
     if source:

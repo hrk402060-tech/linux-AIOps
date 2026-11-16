@@ -54,6 +54,9 @@ from src.models.platform_setting import PlatformSetting  # noqa: F401
 from src.models.asset_access import UserAssetAccess, UserAccessAudit  # noqa: F401
 from src.models.auth import User  # noqa: F401
 from src.models.operations import AutomationApproval, ChangeRecord  # noqa: F401
+from src.models.kubernetes_cluster import (  # noqa: F401
+    KubernetesCluster, KubernetesClusterAudit, KubernetesClusterCredential, KubernetesConnectionTest,
+)
 
 config = context.config
 if config.config_file_name is not None:

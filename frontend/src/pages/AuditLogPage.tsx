@@ -4,7 +4,7 @@ import { RefreshCw, Search } from 'lucide-react';
 
 import { getAuditLog, type AuditLogEntry } from '../api/audit-log';
 
-const sources: Record<string, string> = { event_disposition: '事件处置', asset_cleanup: '资产清理', asset_lifecycle: '资产生命周期', vulnerability_disposition: '漏洞处置', report: '报告操作', ai_command_approval: 'AI 命令审批', ai_provider_config: 'AI 模型配置', alert_notification: '告警通知' };
+const sources: Record<string, string> = { event_disposition: '事件处置', asset_cleanup: '资产清理', asset_lifecycle: '资产生命周期', vulnerability_disposition: '漏洞处置', report: '报告操作', ai_command_approval: 'AI 命令审批', ai_provider_config: 'AI 模型配置', alert_notification: '告警通知', kubernetes_cluster: 'Kubernetes 集群' };
 const sourceOptions = Object.entries(sources).map(([value, label]) => ({ value, label }));
 
 export function AuditLogPage() {

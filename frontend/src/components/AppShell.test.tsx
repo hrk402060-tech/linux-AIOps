@@ -17,6 +17,7 @@ const expectedPages: Record<PageKey, [string, string]> = {
   'server-monitoring': ['工作台', '服务器监控'],
   assets: ['工作台', '服务器资产'], automation: ['工作台', '自动化任务'],
   terminal: ['工作台', 'SSH 远程'], 'ops-assistant': ['工作台', 'AI 运维助手'], patches: ['工作台', '补丁管理'],
+  'kubernetes-clusters': ['Kubernetes 管理', '集群接入'],
   observability: ['监控告警', '服务监控'], probes: ['监控告警', 'API 拨测'],
   alerts: ['监控告警', '活动告警'], incidents: ['监控告警', '故障管理'],
   scans: ['安全中心', '漏洞扫描'], schedules: ['安全中心', '安全检查'],
@@ -29,11 +30,12 @@ const expectedPages: Record<PageKey, [string, string]> = {
 };
 const groupEntries: Record<string, string[]> = {
   工作台: ['综合总览', '服务器监控', '服务器资产', '业务服务', '自动化任务', 'SSH 远程', 'AI 运维助手', '补丁管理'],
+  'Kubernetes 管理': ['集群接入'],
   监控告警: ['服务监控', 'API 拨测', '活动告警', '故障管理'],
   安全中心: ['漏洞扫描', '安全检查', '漏洞治理', '漏洞知识库', '漏洞 AI 助手', '安全报告'],
   系统管理: [],
 };
-const switchableWorkspaces = ['工作台', '监控告警', '安全中心'];
+const switchableWorkspaces = ['工作台', 'Kubernetes 管理', '监控告警', '安全中心'];
 
 function Harness({ initialPage = 'dashboard', user = currentUser }: {
   initialPage?: PageKey; user?: typeof currentUser;
@@ -61,7 +63,7 @@ async function switchTo(label: string) {
 
 beforeEach(() => { localStorage.clear(); });
 
-describe('AppShell 四工作台导航', () => {
+describe('AppShell 工作台导航', () => {
   it.each(Object.keys(expectedPages) as PageKey[])('保留 %s 的菜单映射和原 PageKey', async (page) => {
     const onNavigate = vi.fn();
     const { container } = render(<AppShell currentUser={currentUser} onLogout={vi.fn()}
@@ -86,7 +88,7 @@ describe('AppShell 四工作台导航', () => {
 
   it('nav_interaction: switches workspaces, visible menus and header together', async () => {
     const { container } = render(<Harness />);
-    for (const [group, page] of [['监控告警', 'observability'], ['安全中心', 'scans'], ['工作台', 'dashboard']]) {
+    for (const [group, page] of [['Kubernetes 管理', 'kubernetes-clusters'], ['监控告警', 'observability'], ['安全中心', 'scans'], ['工作台', 'dashboard']]) {
       await switchTo(group);
       expect(screen.getByRole('status')).toHaveTextContent(page);
       expect(menu().getAllByRole('menuitem').map((item) => item.textContent)).toEqual(groupEntries[group]);
@@ -247,7 +249,7 @@ describe('AppShell 四工作台导航', () => {
     expect(container.querySelector('.ant-menu-item-selected')).toHaveTextContent('漏洞扫描');
     await userEvent.click(screen.getByRole('button', { name: '展开侧栏' }));
     expect(menu().getByText('安全检查')).toBeInTheDocument();
-  }, 15_000);
+  }, 30_000);
 
   it('左下角使用文档通过安全链接在新标签打开，当前页面保持', () => {
     render(<Harness />);

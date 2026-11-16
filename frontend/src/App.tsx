@@ -32,11 +32,12 @@ import { ObservabilityPage } from './pages/ObservabilityPage';
 import { ProbesPage } from './pages/ProbesPage';
 import { IncidentsPage } from './pages/IncidentsPage';
 import { OperationsAssistantPage } from './pages/OperationsAssistantPage';
+import { KubernetesClustersPage } from './pages/KubernetesClustersPage';
 import { UserDocsPage } from './pages/UserDocsPage';
 import { openTerminalTab } from './utils/terminalNavigation';
 import { requestedPlatformPage } from './utils/userDocsNavigation';
 
-export type PageKey = 'dashboard' | 'server-monitoring' | 'cmdb' | 'terminal' | 'observability' | 'probes' | 'assets' | 'scans' | 'schedules' | 'baselines' | 'exposures' | 'credential-risks' | 'findings' | 'incidents' | 'reports' | 'audit-log' | 'patches' | 'credentials' | 'knowledge' | 'agent' | 'alerts' | 'system' | 'automation' | 'ops-assistant' | 'user-security' | 'security-settings';
+export type PageKey = 'dashboard' | 'server-monitoring' | 'cmdb' | 'terminal' | 'observability' | 'probes' | 'assets' | 'scans' | 'schedules' | 'baselines' | 'exposures' | 'credential-risks' | 'findings' | 'incidents' | 'reports' | 'audit-log' | 'patches' | 'credentials' | 'knowledge' | 'agent' | 'alerts' | 'system' | 'automation' | 'ops-assistant' | 'user-security' | 'security-settings' | 'kubernetes-clusters';
 
 export default function App() {
   const [monitorPreview, setMonitorPreview] = useState(() => import.meta.env.VITE_SERVER_MONITOR_PREVIEW === 'true'
@@ -173,6 +174,7 @@ export default function App() {
         : page === 'terminal' ? <TerminalPage initialAssetId={terminalAssetId} />
         : page === 'ops-assistant' ? <OperationsAssistantPage userId={currentUser.id}
           initialAssetId={serviceAssistantContext?.assetId} initialContext={serviceAssistantContext?.context} />
+        : page === 'kubernetes-clusters' ? <KubernetesClustersPage currentUser={currentUser} />
             : page === 'assets' ? <AssetsPage onViewFindings={viewAssetFindings} onOpenTerminal={openAssetTerminal}
               key={searchTarget?.page === 'assets' ? `${searchTarget.assetId}:${searchNavigationId}` : 'assets'}
               initialAssetId={searchTarget?.page === 'assets' ? searchTarget.assetId : null}
