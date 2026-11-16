@@ -1,5 +1,30 @@
 # Project Context
 
+## Fair Kubernetes Read-only Collection (2026-11-16)
+
+The Kubernetes collector divides its existing 150-item and 12,000-character
+operation limits among the authorized namespace/action groups. Workloads
+reserve a share for each of Deployments, StatefulSets and DaemonSets. A busy
+event stream or truncated Deployment list cannot consume another group's
+item or evidence allowance. Page sizes remain bounded to 1..50, and errors
+are retained per resource; cancellation, revocation, TLS verification,
+40-second deadlines and total response-byte limits remain enforced.
+
+Truncated evidence is still `partial`, never a successful complete inventory.
+Nine evidence keys prove that all three actions produced evidence in all three
+namespaces, not that every resource was returned. Empty successful responses
+remain distinct from failed requests. The existing grant API, encrypted
+ServiceAccount credentials, asset permissions and immutable audit records
+remain unchanged; no schema or frontend change is needed.
+
+Operational setup uses a dedicated ServiceAccount and namespaced Roles with
+`get`/`list` for Pods, Events, Deployments, StatefulSets and DaemonSets only.
+Validate the actual ServiceAccount identity and TLS, including negative
+permission checks, before storing its bounded Token and CA through a real
+administrator session. Credentials and real environment configuration do not
+belong in this repository. Token expiry does not imply automatic renewal;
+renewal requires an authorized administrator and a new TokenRequest.
+
 ## Diagnostic Authorization Asset Boundary (Released 2026-10-24)
 
 Diagnostic authorization listings and audit history use the caller's visible

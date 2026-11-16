@@ -20,6 +20,7 @@ POLICY_VERSION = 'readonly-kubernetes-2026.10.15'
 MAX_EVIDENCE_CHARS = 12000
 MAX_ITEMS = 150
 MAX_PAGES = 3
+METADATA_RESERVE = 3072
 ACTIONS = {'kubernetes.pods': ('pods',), 'kubernetes.events': ('events',),
            'kubernetes.workloads': ('deployments', 'statefulsets', 'daemonsets')}
 
@@ -30,6 +31,9 @@ class _Observation:
     evidence: dict[str, str] = field(default_factory=dict)
     errors: dict[str, str] = field(default_factory=dict)
     items_read: int = 0
+    group_items: dict[str, int] = field(default_factory=dict)
+    item_quota: int = MAX_ITEMS
+    evidence_quota: int = MAX_EVIDENCE_CHARS - METADATA_RESERVE
 
     def metadata(self) -> dict[str, str]:
         return {'collection_mode': 'restricted_read_only_kubernetes', 'read_only': 'true',
@@ -40,12 +44,13 @@ class _Observation:
     def combined(self) -> dict[str, str]:
         return {**self.metadata(), **self.evidence}
 
-    def store(self, key: str, namespace: str, rows: list[dict[str, object]]) -> None:
+    def store(self, key: str, namespace: str, rows: list[dict[str, object]],
+              quota: int) -> None:
         encoded = json.dumps({'namespace': namespace, 'items': rows}, ensure_ascii=True,
                              separators=(',', ':'))
         other = sum(len(value) for name, value in self.evidence.items() if name != key)
         # Reserve space for every scoped action's fixed error code and mandatory metadata.
-        if len(encoded) + other > MAX_EVIDENCE_CHARS - 2048:
+        if len(encoded) > quota or len(encoded) + other > MAX_EVIDENCE_CHARS - METADATA_RESERVE:
             raise KubernetesTransportError('evidence_limit')
         self.evidence[key] = encoded
 
@@ -110,6 +115,9 @@ def collect(
     try:
         authorize()
         actions, namespaces, endpoint = _scope(asset, grant)
+        groups = len(actions) * len(namespaces)
+        observation.item_quota = MAX_ITEMS // groups
+        observation.evidence_quota = (MAX_EVIDENCE_CHARS - METADATA_RESERVE) // groups
         token, ca_pem = _credentials(grant, vault)
         authorize()
         transport = KubernetesTransport(endpoint, ca_pem, token, deadline, authorize)
@@ -142,12 +150,23 @@ def _observe(transport: KubernetesTransport, actions: list[str], namespaces: lis
         for action in actions:
             key = action + ':' + namespace
             rows: list[dict[str, object]] = []
-            try:
-                for resource in ACTIONS[action]:
+            for resource in ACTIONS[action]:
+                try:
                     _resource(transport, resource, namespace, key, rows, observation, authorize)
-            except KubernetesTransportError as exc:
-                observation.errors[key] = exc.code
-            authorize()
+                except KubernetesTransportError as exc:
+                    observation.errors[f'{key}:{resource}'] = exc.code
+                authorize()
+
+
+def _resource_quotas(key: str, namespace: str, observation: _Observation) -> tuple[int, int]:
+    types = len(ACTIONS[key.split(':', 1)[0]])
+    empty_size = len(json.dumps({'namespace': namespace, 'items': []},
+                               ensure_ascii=True, separators=(',', ':')))
+    current_size = len(observation.evidence.get(key, '')) or empty_size
+    # Each resource retains its own share even if a previous resource was truncated.
+    evidence_quota = min(observation.evidence_quota, current_size
+                         + (observation.evidence_quota - empty_size) // types)
+    return observation.item_quota // types, evidence_quota
 
 
 def _resource(transport: KubernetesTransport, resource: str, namespace: str, key: str,
@@ -155,20 +174,28 @@ def _resource(transport: KubernetesTransport, resource: str, namespace: str, key
               authorize: Callable[[], None]) -> None:
     continuation = ''
     seen: set[str] = set()
+    resource_quota, evidence_quota = _resource_quotas(key, namespace, observation)
+    group_count = observation.group_items.get(key, 0)
+    resource_count = 0
     for page in range(MAX_PAGES):
         authorize()
-        if observation.items_read >= MAX_ITEMS:
+        remaining = min(resource_quota - resource_count, observation.item_quota - group_count,
+                        MAX_ITEMS - observation.items_read)
+        if remaining <= 0:
             raise KubernetesTransportError('item_limit')
-        document = transport.request(namespace, resource, continuation)
+        document = transport.request(namespace, resource, continuation, limit=min(50, remaining))
         authorize()
         items, continuation = project_list(document, resource, namespace)
-        if observation.items_read + len(items) > MAX_ITEMS:
+        if len(items) > remaining:
             raise KubernetesTransportError('item_limit')
         observation.items_read += len(items)
+        resource_count += len(items)
+        group_count += len(items)
+        observation.group_items[key] = group_count
         if not items:
-            observation.store(key, namespace, rows)
+            observation.store(key, namespace, rows, evidence_quota)
         for item in items:
-            observation.store(key, namespace, rows + [item])
+            observation.store(key, namespace, rows + [item], evidence_quota)
             rows.append(item)
         authorize()
         if not continuation:

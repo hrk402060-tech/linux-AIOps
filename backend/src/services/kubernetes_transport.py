@@ -93,13 +93,14 @@ class KubernetesTransport:
         if connection.sock is not None:
             connection.sock.settimeout(connection.timeout)
 
-    def request(self, namespace: str, resource: str, continuation: str = '') -> dict[str, object]:
+    def request(self, namespace: str, resource: str, continuation: str = '',
+                limit: int = 50) -> dict[str, object]:
         if (not isinstance(namespace, str) or not NAMESPACE.fullmatch(namespace)
             or resource not in RESOURCE_KINDS or not isinstance(continuation, str)
-            or len(continuation) > 2048):
+            or len(continuation) > 2048 or type(limit) is not int or not 1 <= limit <= 50):
             raise KubernetesTransportError('invalid_action')
         prefix = '/api/v1' if resource in {'pods', 'events'} else '/apis/apps/v1'
-        query = {'limit': '50', **({'continue': continuation} if continuation else {})}
+        query = {'limit': str(limit), **({'continue': continuation} if continuation else {})}
         path = f'{prefix}/namespaces/{namespace}/{resource}?' + urlencode(query)
         request_deadline = min(self.deadline, time.monotonic() + REQUEST_SECONDS)
         connection = http.client.HTTPSConnection(self.host, self.port, context=self.context,
