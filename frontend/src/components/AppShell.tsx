@@ -35,7 +35,7 @@ import { requestedPlatformPage, userDocsHref } from '../utils/userDocsNavigation
 
 const { Header, Sider, Content } = Layout;
 
-type WorkspaceKey = 'workspace' | 'kubernetes' | 'monitoring' | 'security' | 'system';
+type WorkspaceKey = 'workspace' | 'monitoring' | 'security' | 'system';
 type NavigationItem = { key: PageKey; icon?: ReactNode; label: string };
 type WorkspaceDefinition = {
   key: WorkspaceKey;
@@ -52,13 +52,11 @@ const workspaces: WorkspaceDefinition[] = [
     { key: 'server-monitoring', icon: <Activity size={16} />, label: '服务器监控' },
     { key: 'assets', icon: <Server size={16} />, label: '服务器资产' },
     { key: 'cmdb', icon: <Network size={16} />, label: '业务服务' },
+    { key: 'kubernetes-clusters', icon: <Boxes size={16} />, label: 'Kubernetes 管理' },
     { key: 'automation', icon: <Wrench size={16} />, label: '自动化任务' },
     { key: 'terminal', icon: <SquareTerminal size={16} />, label: 'SSH 远程' },
     { key: 'ops-assistant', icon: <Bot size={16} />, label: 'AI 运维助手' },
     { key: 'patches', icon: <FileText size={16} />, label: '补丁管理' },
-  ] },
-  { key: 'kubernetes', label: 'Kubernetes 管理', icon: <Boxes size={18} />, description: '集群接入与连接状态', defaultPage: 'kubernetes-clusters', children: [
-    { key: 'kubernetes-clusters', icon: <Boxes size={16} />, label: '集群接入' },
   ] },
   { key: 'monitoring', label: '监控告警', icon: <Radar size={18} />, description: '运行状态与事件', defaultPage: 'observability', children: [
     { key: 'observability', icon: <Gauge size={16} />, label: '服务监控' },
@@ -83,7 +81,7 @@ const workspaces: WorkspaceDefinition[] = [
 
 const pageWorkspaces: Record<PageKey, WorkspaceKey> = {
   dashboard: 'workspace', 'server-monitoring': 'workspace', assets: 'workspace', cmdb: 'workspace', automation: 'workspace', terminal: 'workspace', 'ops-assistant': 'workspace', patches: 'workspace',
-  'kubernetes-clusters': 'kubernetes',
+  'kubernetes-clusters': 'workspace',
   observability: 'monitoring', probes: 'monitoring', alerts: 'monitoring', incidents: 'monitoring',
   scans: 'security', schedules: 'security', baselines: 'security', exposures: 'security', 'credential-risks': 'security', findings: 'security', knowledge: 'security', agent: 'security', reports: 'security',
   system: 'system', credentials: 'system', 'audit-log': 'system',
@@ -189,7 +187,7 @@ const pageLabels: Record<PageKey, string> = {
   knowledge: '漏洞知识库', agent: '漏洞 AI 助手', system: '系统状态', automation: '自动化任务', 'ops-assistant': 'AI 运维助手',
   'user-security': '安全设置', 'security-settings': '安全设置',
   probes: 'API 拨测',
-  'kubernetes-clusters': '集群接入',
+  'kubernetes-clusters': 'Kubernetes 管理',
 };
 
 export function AppShell({ children, currentUser, onLogout, selectedPage, onNavigate, onSearchNavigate }: {

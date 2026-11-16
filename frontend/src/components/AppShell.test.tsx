@@ -17,7 +17,7 @@ const expectedPages: Record<PageKey, [string, string]> = {
   'server-monitoring': ['工作台', '服务器监控'],
   assets: ['工作台', '服务器资产'], automation: ['工作台', '自动化任务'],
   terminal: ['工作台', 'SSH 远程'], 'ops-assistant': ['工作台', 'AI 运维助手'], patches: ['工作台', '补丁管理'],
-  'kubernetes-clusters': ['Kubernetes 管理', '集群接入'],
+  'kubernetes-clusters': ['工作台', 'Kubernetes 管理'],
   observability: ['监控告警', '服务监控'], probes: ['监控告警', 'API 拨测'],
   alerts: ['监控告警', '活动告警'], incidents: ['监控告警', '故障管理'],
   scans: ['安全中心', '漏洞扫描'], schedules: ['安全中心', '安全检查'],
@@ -29,13 +29,12 @@ const expectedPages: Record<PageKey, [string, string]> = {
   'user-security': ['系统管理', '安全设置'], 'security-settings': ['系统管理', '安全设置'],
 };
 const groupEntries: Record<string, string[]> = {
-  工作台: ['综合总览', '服务器监控', '服务器资产', '业务服务', '自动化任务', 'SSH 远程', 'AI 运维助手', '补丁管理'],
-  'Kubernetes 管理': ['集群接入'],
+  工作台: ['综合总览', '服务器监控', '服务器资产', '业务服务', 'Kubernetes 管理', '自动化任务', 'SSH 远程', 'AI 运维助手', '补丁管理'],
   监控告警: ['服务监控', 'API 拨测', '活动告警', '故障管理'],
   安全中心: ['漏洞扫描', '安全检查', '漏洞治理', '漏洞知识库', '漏洞 AI 助手', '安全报告'],
   系统管理: [],
 };
-const switchableWorkspaces = ['工作台', 'Kubernetes 管理', '监控告警', '安全中心'];
+const switchableWorkspaces = ['工作台', '监控告警', '安全中心'];
 
 function Harness({ initialPage = 'dashboard', user = currentUser }: {
   initialPage?: PageKey; user?: typeof currentUser;
@@ -88,7 +87,7 @@ describe('AppShell 工作台导航', () => {
 
   it('nav_interaction: switches workspaces, visible menus and header together', async () => {
     const { container } = render(<Harness />);
-    for (const [group, page] of [['Kubernetes 管理', 'kubernetes-clusters'], ['监控告警', 'observability'], ['安全中心', 'scans'], ['工作台', 'dashboard']]) {
+    for (const [group, page] of [['监控告警', 'observability'], ['安全中心', 'scans'], ['工作台', 'dashboard']]) {
       await switchTo(group);
       expect(screen.getByRole('status')).toHaveTextContent(page);
       expect(menu().getAllByRole('menuitem').map((item) => item.textContent)).toEqual(groupEntries[group]);
@@ -116,6 +115,30 @@ describe('AppShell 工作台导航', () => {
     fireEvent.click(item);
     await waitFor(() => expect(item).not.toBeVisible());
     expect(screen.getByRole('status')).toHaveTextContent('dashboard');
+  });
+
+  it('k8s_navigation: opens Kubernetes management from the existing workspace menu', async () => {
+    const { container } = render(<Harness />);
+    fireEvent.click(menu().getByText('Kubernetes 管理'));
+    expect(screen.getByRole('status')).toHaveTextContent('kubernetes-clusters');
+    expect(container.querySelector('.workspace-nav-heading strong')).toHaveTextContent('工作台');
+    expect(container.querySelector('.topbar-context strong')).toHaveTextContent('Kubernetes 管理');
+    expect(container.querySelector('.ant-menu-item-selected')).toHaveTextContent('Kubernetes 管理');
+    await switchTo('监控告警');
+    await switchTo('工作台');
+    expect(screen.getByRole('status')).toHaveTextContent('kubernetes-clusters');
+  }, 60_000);
+
+  it('k8s_navigation: restores the existing cluster page from the old workspace memory', () => {
+    localStorage.setItem('sentinel_navigation:user-1', JSON.stringify({
+      activePage: 'kubernetes-clusters', kubernetes: 'kubernetes-clusters', workspace: 'terminal',
+    }));
+    const { container } = render(<Harness />);
+    expect(screen.getByRole('status')).toHaveTextContent('kubernetes-clusters');
+    expect(container.querySelector('.workspace-nav-heading strong')).toHaveTextContent('工作台');
+    expect(container.querySelector('.ant-menu-item-selected')).toHaveTextContent('Kubernetes 管理');
+    expect(JSON.parse(localStorage.getItem('sentinel_navigation:user-1')!))
+      .toMatchObject({ activePage: 'kubernetes-clusters', workspace: 'kubernetes-clusters' });
   });
 
   it('切回工作台恢复最近页面，再次点击当前工作台不重置 SSH', async () => {
