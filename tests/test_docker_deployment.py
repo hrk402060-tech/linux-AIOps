@@ -3,6 +3,8 @@
 from pathlib import Path
 import unittest
 
+import yaml
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 REQUIRED_DEPLOYMENT_FILES = (
@@ -36,6 +38,15 @@ class DockerDeploymentTest(unittest.TestCase):
         compose = (PROJECT_ROOT / "compose.yaml").read_text(encoding="utf-8")
         self.assertNotIn("sentinel-local-review-token", compose)
         self.assertNotIn("CREDENTIAL_MASTER_KEY=", compose)
+
+    def test_kubernetes_target_policy_reaches_backend(self) -> None:
+        compose = yaml.safe_load((PROJECT_ROOT / "compose.yaml").read_text(encoding="utf-8"))
+        environment = compose["services"]["backend"]["environment"]
+        template = (PROJECT_ROOT / "deploy/.env.example").read_text(encoding="utf-8").splitlines()
+        for name in ("KUBERNETES_API_ALLOWED_CIDRS", "KUBERNETES_API_DENIED_CIDRS"):
+            with self.subTest(name=name):
+                self.assertEqual(environment[name], "${" + name + ":-}")
+                self.assertIn(name + "=", template)
 
     def test_backend_entrypoint_runs_migrations(self) -> None:
         entrypoint = (PROJECT_ROOT / "backend/entrypoint.sh").read_text(encoding="utf-8")
