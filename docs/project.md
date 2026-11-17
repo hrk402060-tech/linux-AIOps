@@ -1,6 +1,6 @@
 # Project Context
 
-## Kubernetes 管理一期：集群总览（候选，待 PM 发布）
+## Kubernetes 管理一期：集群总览（已发布）
 
 - 范围：在已发布的 `工作台 → Kubernetes 管理 → 集群接入` 之上增加
   `集群总览` 页签和真实采集链路；不新增一级菜单，不改变原 PageKey、
@@ -28,10 +28,13 @@
   周期采集，默认开启。
 - 验证：在 `192.168.10.17` 隔离 Docker 完成后端目标 `47 passed`、
   PostgreSQL 并发/迁移 `4 passed`、前端目标 `15 passed`、Ruff、
-  TypeScript 和 Vite 构建；仅使用临时数据库和测试容器，生产容器、配置、
-  数据库和真实 Kubernetes 集群未修改。
-- 状态：候选代码已提交并推送 GitHub `main`（`c0b0a6d`），等待 PM 明确
-  “发布”后再执行生产迁移和容器更新。
+  TypeScript 和 Vite 构建；生产发布后双入口首页和 health 均正常，
+  匿名 Kubernetes 接口返回 `401`，三个生产容器 healthy。
+- 状态：PM 已明确发布。生产已从 `20261116_52` 升级到
+  `20261117_53`，同步本阶段白名单后重载 backend/frontend，未重建
+  PostgreSQL、未修改生产配置、业务数据或真实 Kubernetes 集群。
+  正式入口为 `http://192.168.10.17:8088/` 和
+  `http://192.168.110.215:8088/`。
 
 ## Kubernetes 管理一期（2026-11-16，集群接入已发布）
 
