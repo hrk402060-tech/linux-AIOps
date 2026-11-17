@@ -30,8 +30,8 @@
   PostgreSQL 并发/迁移 `4 passed`、前端目标 `15 passed`、Ruff、
   TypeScript 和 Vite 构建；仅使用临时数据库和测试容器，生产容器、配置、
   数据库和真实 Kubernetes 集群未修改。
-- 状态：候选代码已准备提交并推送 GitHub，等待 PM 明确“发布”后再执行
-  生产迁移和容器更新。
+- 状态：候选代码已提交并推送 GitHub `main`（`c0b0a6d`），等待 PM 明确
+  “发布”后再执行生产迁移和容器更新。
 
 ## Kubernetes 管理一期（2026-11-16，集群接入已发布）
 
