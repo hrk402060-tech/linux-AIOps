@@ -41,6 +41,7 @@ class Settings(BaseSettings):
     probe_allowed_cidrs: str = Field(default="", validation_alias="SENTINEL_PROBE_ALLOWED_CIDRS")
     kubernetes_api_allowed_cidrs: str = ""
     kubernetes_api_denied_cidrs: str = ""
+    kubernetes_collection_workers_enabled: bool = True
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

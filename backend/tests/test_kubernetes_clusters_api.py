@@ -48,6 +48,7 @@ def kclient(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Generator[TestCl
         credential_master_key=base64.b64encode(bytes(range(32))).decode(),
         api_admin_token="test-admin-token-with-at-least-32-characters",
         auto_create_schema=True, diagnostic_workers_enabled=False,
+        kubernetes_collection_workers_enabled=False,
         kubernetes_api_allowed_cidrs="192.0.2.20/32",
         kubernetes_api_denied_cidrs="198.51.100.0/24",
     )

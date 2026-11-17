@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -37,6 +38,7 @@ class KubernetesClusterPatch(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=100)
     service_id: str | None = Field(default=None, max_length=36)
     lifecycle: str | None = Field(default=None, pattern="^(active|disabled|archived)$")
+    collection_interval_seconds: Literal[0, 60, 300] | None = None
     expected_revision: int = Field(ge=1)
     reason: str = Field(default="更新集群配置", min_length=1, max_length=500)
 

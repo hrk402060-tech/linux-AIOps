@@ -1,11 +1,45 @@
 # Project Context
 
+## Kubernetes 管理一期：集群总览（候选，待 PM 发布）
+
+- 范围：在已发布的 `工作台 → Kubernetes 管理 → 集群接入` 之上增加
+  `集群总览` 页签和真实采集链路；不新增一级菜单，不改变原 PageKey、
+  权限边界或集群接入业务。
+- 后端接口：`GET /api/v1/kubernetes/clusters/{id}/overview`、
+  `POST /api/v1/kubernetes/clusters/{id}/refresh` 和
+  `GET /api/v1/kubernetes/clusters/{id}/collections/{run_id}`。
+  采集结果持久化为有界投影，队列使用数据库唯一活动约束、租约抢占、
+  过期恢复和 CAS 提交，管理员会话、用户修订、凭据修订、策略摘要和
+  集群状态在读取与提交前复核。
+- 只读数据：Node、Namespace、Pod、Deployment、StatefulSet、DaemonSet、
+  Service 和 Warning Event 统计；Node Metrics 使用真实
+  `metrics.k8s.io` 样本聚合 CPU/内存，缺失、过期或不完整时显示不可用，
+  不补零、不读取平台本机指标。初始化容器异常、分页版本冲突、UID 冲突、
+  错误资源类型和响应上限均按失败或部分成功处理。
+- 页面：集群筛选、搜索、手动采集、30/60 秒页面刷新、采集周期设置、资源
+  统计、节点就绪/异常、异常 Pod、Metrics 覆盖率、Warning Event 和采集
+  错误提示。详情始终绑定当前集群，搜索无结果会清空旧详情，过期数据保留
+  但明确标记。
+- 安全：只允许真实管理员读取和刷新；kubeconfig 继续 AES-GCM 密文保存，
+  AI、operator、auditor 和应急令牌不获得集群连接权限。本阶段不包含节点
+  变更、工作负载写操作、升级、备份恢复或 Helm。
+- 迁移：新增 `20261117_53`，仅创建 `kubernetes_collection_runs` 及索引，
+  不修改已有业务数据。`KUBERNETES_COLLECTION_WORKERS_ENABLED` 可关闭后台
+  周期采集，默认开启。
+- 验证：在 `192.168.10.17` 隔离 Docker 完成后端目标 `47 passed`、
+  PostgreSQL 并发/迁移 `4 passed`、前端目标 `15 passed`、Ruff、
+  TypeScript 和 Vite 构建；仅使用临时数据库和测试容器，生产容器、配置、
+  数据库和真实 Kubernetes 集群未修改。
+- 状态：候选代码已准备提交并推送 GitHub，等待 PM 明确“发布”后再执行
+  生产迁移和容器更新。
+
 ## Kubernetes 管理一期（2026-11-16，集群接入已发布）
 
-PM 已确认一期设计，按页面阶段门禁先实施集群接入；验收后再开发集群总览、
-资源清单和告警关联。本节下方保留完整一期规划，不代表全部功能已经实现。
+PM 已确认一期设计，集群接入已发布；集群总览已完成候选实现和隔离验证，
+待 PM 发布后再进入生产。资源清单和告警关联仍属于后续阶段。
 PM 明确要求发布后，集群接入已上线正式 8088，迁移至 `20261116_52`。
-本轮没有接入或修改真实目标集群，集群总览、资源清单和告警关联仍待本页验收。
+本轮没有接入或修改真实目标集群；集群总览候选已完成隔离验收，资源清单和
+告警关联仍待后续阶段。
 
 ### 导航归属调整（2026-11-17，已发布）
 

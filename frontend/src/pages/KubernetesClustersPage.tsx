@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Button, Empty, Input, Select, Space, Table, Tag, Tooltip } from 'antd';
-import { CheckCircle2, Edit3, KeyRound, Plus, RefreshCw, ShieldOff, TestTube2 } from 'lucide-react';
+import { CheckCircle2, Edit3, Gauge, KeyRound, Plus, RefreshCw, ShieldOff, TestTube2 } from 'lucide-react';
 import type { AuthUser } from '../api/auth';
 import { ApiError } from '../api/client';
 import {
@@ -45,7 +45,9 @@ function certificateCell(value: string | null) {
   </Tag></Tooltip>;
 }
 
-export function KubernetesClustersPage({ currentUser }: { currentUser: Pick<AuthUser, 'role'> }) {
+export function KubernetesClustersPage({ currentUser, onOpenOverview }: {
+  currentUser: Pick<AuthUser, 'role'>; onOpenOverview?: (cluster: KubernetesCluster) => void;
+}) {
   const [items, setItems] = useState<KubernetesCluster[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -152,7 +154,9 @@ export function KubernetesClustersPage({ currentUser }: { currentUser: Pick<Auth
     </div> },
     { title: '失败原因', width: 230, render: (_: unknown, item: KubernetesCluster) => item.error_code || item.error_message
       ? <span>{kubernetesFailureMessage(item.error_code, '检测未通过，请重新测试连接')}</span> : '—' },
-    { title: '操作', width: 180, fixed: 'right' as const, render: (_: unknown, item: KubernetesCluster) => <Space size={4}>
+    { title: '操作', width: onOpenOverview ? 220 : 180, fixed: 'right' as const, render: (_: unknown, item: KubernetesCluster) => <Space size={4}>
+      {onOpenOverview ? <Tooltip title="查看集群总览"><Button aria-label={`查看 ${item.name} 总览`}
+        icon={<Gauge size={15} />} disabled={unavailable} onClick={() => onOpenOverview(item)} /></Tooltip> : null}
       <Tooltip title="编辑集群"><Button aria-label={`编辑 ${item.name}`} icon={<Edit3 size={15} />} disabled={unavailable} onClick={() => setEditing(item)} /></Tooltip>
       <Tooltip title="轮换凭据"><Button aria-label={`轮换 ${item.name} 凭据`} icon={<KeyRound size={15} />} disabled={unavailable || item.lifecycle === 'archived'} onClick={() => setEditor({ cluster: item })} /></Tooltip>
       <Tooltip title="测试连接"><Button aria-label={`测试 ${item.name}`} icon={<TestTube2 size={15} />} disabled={unavailable || item.lifecycle !== 'active'} onClick={() => setTesting(item)} /></Tooltip>

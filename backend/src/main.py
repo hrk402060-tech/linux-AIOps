@@ -43,6 +43,8 @@ from src.models.ops_assistant import OpsConversation, OpsMessage  # noqa: F401
 from src.models.kubernetes_cluster import (  # noqa: F401
     KubernetesCluster, KubernetesClusterAudit, KubernetesClusterCredential, KubernetesConnectionTest,
 )
+from src.models.kubernetes_collection import KubernetesCollectionRun  # noqa: F401
+from src.services.kubernetes_overview_worker import run_scheduler as run_kubernetes_scheduler
 from src.services import diagnostic_job_state
 from src.services.diagnostic_job_worker import (
     DiagnosticSchedulerHealth, run_scheduler as run_diagnostic_scheduler,
@@ -108,12 +110,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             session_factory, application.state.credential_vault, stop_event,
             application.state.diagnostic_scheduler_health,
         )) if runtime_settings.diagnostic_workers_enabled else None)
+        kubernetes_scheduler = (asyncio.create_task(run_kubernetes_scheduler(
+            session_factory, application.state.credential_vault, runtime_settings, stop_event,
+        )) if runtime_settings.kubernetes_collection_workers_enabled else None)
         try:
             yield
         finally:
             stop_event.set()
             if diagnostic_scheduler is not None:
                 await diagnostic_scheduler
+            if kubernetes_scheduler is not None:
+                await kubernetes_scheduler
             await asyncio.gather(
                 scheduler, monitoring_scheduler, scan_schedule_scheduler, notification_scheduler,
             )

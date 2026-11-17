@@ -14,6 +14,7 @@ os.environ.setdefault(
     "CREDENTIAL_MASTER_KEY", base64.b64encode(bytes(range(32))).decode("ascii")
 )
 os.environ.setdefault("API_ADMIN_TOKEN", "test-admin-token-with-at-least-32-characters")
+os.environ["KUBERNETES_COLLECTION_WORKERS_ENABLED"] = "false"
 
 @pytest.fixture
 def client(tmp_path: Path) -> Generator[TestClient, None, None]:

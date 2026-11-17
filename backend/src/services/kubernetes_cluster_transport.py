@@ -50,6 +50,8 @@ class RequestBudget:
     policy: KubernetesTargetPolicy = field(
         default_factory=lambda: KubernetesTargetPolicy.from_settings(get_settings()),
     )
+    response_limit: int = MAX_RESPONSE_BYTES
+    total_limit: int = MAX_TOTAL_BYTES
 
     def remaining(self) -> float:
         remaining = self.deadline - time.monotonic()
@@ -59,7 +61,7 @@ class RequestBudget:
 
     def charge(self, size: int) -> None:
         self.received_bytes += size
-        if self.received_bytes > MAX_TOTAL_BYTES:
+        if self.received_bytes > self.total_limit:
             raise KubernetesConnectionError("response_too_large", "检测响应超过总大小限制")
 
 
@@ -202,7 +204,7 @@ def _read_body(response: http.client.HTTPResponse, budget: RequestBudget) -> byt
         size = int(length) if length is not None else 0
     except ValueError as exc:
         raise KubernetesConnectionError("invalid_response", "集群响应长度无效") from exc
-    if size < 0 or size > MAX_RESPONSE_BYTES:
+    if size < 0 or size > budget.response_limit:
         raise KubernetesConnectionError("response_too_large", "检测响应超过大小限制")
     if response.getheader("Content-Encoding", "identity").lower() != "identity":
         raise KubernetesConnectionError("invalid_response", "集群响应编码不受支持")
@@ -210,12 +212,12 @@ def _read_body(response: http.client.HTTPResponse, budget: RequestBudget) -> byt
     count = 0
     while True:
         budget.remaining()
-        chunk = response.read1(min(8192, MAX_RESPONSE_BYTES + 1 - count))
+        chunk = response.read1(min(8192, budget.response_limit + 1 - count))
         budget.remaining()
         if not chunk:
             break
         count += len(chunk)
-        if count > MAX_RESPONSE_BYTES:
+        if count > budget.response_limit:
             raise KubernetesConnectionError("response_too_large", "检测响应超过大小限制")
         parts.append(chunk)
     if length is not None and count != size:
@@ -228,6 +230,13 @@ def request_json(
 ) -> tuple[dict[str, object], datetime | None]:
     if (payload is None and path not in READ_PATHS) or (payload is not None and path not in REVIEW_PATHS):
         raise KubernetesConnectionError("path_rejected", "检测请求超出固定白名单")
+    return _request_json(parsed, path, budget, payload)
+
+
+def _request_json(
+    parsed: ParsedKubeconfig, path: str, budget: RequestBudget,
+    payload: dict[str, object] | None = None,
+) -> tuple[dict[str, object], datetime | None]:
     connection: _PinnedHTTPSConnection | None = None
     try:
         budget.policy.require_configured()
@@ -289,6 +298,7 @@ def _check_status(status: int, review: bool = False) -> None:
         401: ("upstream_unauthorized", "集群身份认证失败"),
         403: ("upstream_forbidden", "集群身份缺少所需权限"),
         404: ("api_unavailable", "集群所需 API 不可用"),
+        410: ("resource_expired", "集群资源分页已过期"),
         429: ("upstream_throttled", "集群 API 正在限流"),
     }
     if 300 <= status < 400:

@@ -13,7 +13,7 @@ export interface KubernetesCluster {
   authorization_status: string;
   version: string | null;
   capabilities: Record<string, unknown> | null;
-  collection_interval_seconds: number;
+  collection_interval_seconds: 0 | 60 | 300;
   server_cert_expires_at: string | null;
   ca_cert_expires_at: string | null;
   client_cert_expires_at: string | null;
@@ -48,6 +48,7 @@ export interface KubernetesClusterUpdateInput {
   lifecycle?: KubernetesClusterLifecycle;
   expected_revision: number;
   reason?: string;
+  collection_interval_seconds?: 0 | 60 | 300;
 }
 
 export interface KubernetesClusterDraftInput {
@@ -165,11 +166,14 @@ export function kubernetesRequestError(error: unknown): string {
   return '集群请求失败，请检查网络后重试';
 }
 
-async function request<T>(url: string, options?: RequestInit, fallback = 'Kubernetes 集群请求失败'): Promise<T> {
+export async function request<T>(
+  url: string, options?: RequestInit, fallback = 'Kubernetes 集群请求失败', timeout = 15_000,
+): Promise<T> {
   const response = await apiFetch(url, {
     ...options,
     headers: { 'Content-Type': 'application/json', ...options?.headers },
-    signal: options?.signal ?? AbortSignal.timeout(15_000),
+    signal: options?.signal
+      ? AbortSignal.any([options.signal, AbortSignal.timeout(timeout)]) : AbortSignal.timeout(timeout),
   });
   if (!response.ok) {
     const body = await response.json().catch(() => null) as { detail?: unknown; code?: unknown } | null;
@@ -218,7 +222,7 @@ export function testKubernetesCluster(id: string, payload: { reason: string }): 
     method: 'POST',
     body: JSON.stringify(payload),
     signal: AbortSignal.timeout(40_000),
-  }, 'Kubernetes 集群连接测试失败，请检查网络、证书和授权');
+  }, 'Kubernetes 集群连接测试失败，请检查网络、证书和授权', 40_000);
 }
 
 export function testKubernetesClusterDraft(payload: KubernetesClusterDraftInput): Promise<KubernetesClusterTestResult> {
@@ -226,7 +230,7 @@ export function testKubernetesClusterDraft(payload: KubernetesClusterDraftInput)
     method: 'POST',
     body: JSON.stringify(payload),
     signal: AbortSignal.timeout(40_000),
-  }, 'Kubernetes 集群连接测试失败，请检查 kubeconfig、context 和权限');
+  }, 'Kubernetes 集群连接测试失败，请检查 kubeconfig、context 和权限', 40_000);
 }
 
 export function rotateKubernetesClusterCredential(id: string, payload: KubernetesCredentialRotateInput): Promise<KubernetesCluster> {
@@ -234,5 +238,5 @@ export function rotateKubernetesClusterCredential(id: string, payload: Kubernete
     method: 'PUT',
     body: JSON.stringify(payload),
     signal: AbortSignal.timeout(40_000),
-  }, 'Kubernetes 凭据轮换失败，请重新测试 kubeconfig');
+  }, 'Kubernetes 凭据轮换失败，请重新测试 kubeconfig', 40_000);
 }

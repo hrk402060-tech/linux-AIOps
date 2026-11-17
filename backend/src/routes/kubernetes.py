@@ -7,16 +7,21 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.routing import APIRoute
 from pydantic import BaseModel, ValidationError
 from sqlalchemy.orm import Session
+from sqlalchemy import select
 
 from src.auth import AuthPrincipal, require_admin
 from src.database import get_session
 from src.models.kubernetes_cluster import KubernetesCluster, KubernetesClusterAudit
+from src.models.kubernetes_collection import KubernetesCollectionRun
+from src.models.auth import AuthSession
 from src.schemas.kubernetes_cluster import (
     KubernetesClusterCreate, KubernetesClusterPatch, KubernetesClusterResponse,
     KubernetesClusterTest, KubernetesCredentialRotate,
 )
 from src.services import kubernetes_clusters as service
 from src.services.kubernetes_cluster_target_policy import KubernetesTargetPolicy
+from src.services import kubernetes_overview, kubernetes_overview_jobs
+from src.services.auth import hash_token
 
 
 class SafeKubernetesRoute(APIRoute):
@@ -194,3 +199,64 @@ def get_audits(
          "trace_id": item.trace_id, "created_at": item.created_at}
         for item in rows
     ]}
+
+
+@router.get("/clusters/{cluster_id}/overview")
+def get_overview(
+    cluster_id: str, request: Request, session: Session = Depends(get_session),
+    principal: AuthPrincipal = Depends(require_real_admin),
+) -> dict[str, object]:
+    cluster = _cluster(session, cluster_id)
+    try:
+        policy = KubernetesTargetPolicy.from_settings(request.app.state.runtime_settings)
+    except service.KubernetesClusterError as exc:
+        raise _error(session, exc) from exc
+    result = kubernetes_overview.overview(session, cluster, policy)
+    service._audit(session, cluster_id, principal.username, "overview_viewed", "accepted", str(uuid4()))
+    service._commit(session)
+    return result
+
+
+@router.post("/clusters/{cluster_id}/refresh", status_code=202)
+def refresh_overview(
+    cluster_id: str, request: Request, session: Session = Depends(get_session),
+    principal: AuthPrincipal = Depends(require_real_admin),
+) -> dict[str, object]:
+    _cluster(session, cluster_id)
+    raw = request.cookies.get(request.app.state.runtime_settings.auth_cookie_name, "")
+    auth = session.scalar(select(AuthSession).where(AuthSession.token_hash == hash_token(raw)))
+    try:
+        run, merged = kubernetes_overview_jobs.enqueue(
+            session, cluster_id, KubernetesTargetPolicy.from_settings(request.app.state.runtime_settings),
+            principal.user_id, auth.id if auth else None,
+        )
+    except service.KubernetesClusterError as exc:
+        raise _error(session, exc) from exc
+    return {"cluster_id": cluster_id, "run_id": run.id, "state": run.state, "merged": merged}
+
+
+@router.get("/clusters/{cluster_id}/collections/{run_id}")
+def get_collection_run(
+    cluster_id: str, run_id: str, request: Request, session: Session = Depends(get_session),
+    principal: AuthPrincipal = Depends(require_real_admin),
+) -> dict[str, object]:
+    cluster = _cluster(session, cluster_id)
+    run = session.get(KubernetesCollectionRun, run_id)
+    if run is None or run.cluster_id != cluster_id:
+        raise HTTPException(status_code=404, detail="采集记录不存在")
+    try:
+        policy = KubernetesTargetPolicy.from_settings(request.app.state.runtime_settings)
+    except service.KubernetesClusterError as exc:
+        raise _error(session, exc) from exc
+    current = (
+        kubernetes_overview_jobs.current_run(session, cluster, run, policy)
+        and kubernetes_overview_jobs._requester_valid(
+            session, run, kubernetes_overview_jobs.db_now(session),
+        )
+    )
+    result = kubernetes_overview.serialize_run(
+        run, None if current else "cancelled", None if current else "collection_revoked",
+    )
+    service._audit(session, cluster_id, principal.username, "collection_viewed", "accepted", str(uuid4()))
+    service._commit(session)
+    return result

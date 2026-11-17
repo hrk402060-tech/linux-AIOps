@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 from cryptography.exceptions import InvalidTag
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.exc import StaleDataError
@@ -15,6 +15,7 @@ from src.models.cmdb import CmdbService
 from src.models.kubernetes_cluster import (
     KubernetesCluster, KubernetesClusterAudit, KubernetesClusterCredential,
 )
+from src.models.kubernetes_collection import KubernetesCollectionRun
 from src.schemas.kubernetes_cluster import (
     KubernetesClusterCreate, KubernetesClusterPatch, KubernetesCredentialRotate,
 )
@@ -76,6 +77,18 @@ def _decrypt_config(vault: CredentialVault, cluster: KubernetesCluster) -> Parse
 def _commit(session: Session) -> None:
     try:
         session.commit()
+    except (StaleDataError, IntegrityError) as exc:
+        session.rollback()
+        raise KubernetesClusterConflict("集群已变化或名称已存在，请刷新后重试") from exc
+    except SQLAlchemyError:
+        session.rollback()
+        logger.exception("Kubernetes cluster transaction failed")
+        raise
+
+
+def _flush(session: Session) -> None:
+    try:
+        session.flush()
     except (StaleDataError, IntegrityError) as exc:
         session.rollback()
         raise KubernetesClusterConflict("集群已变化或名称已存在，请刷新后重试") from exc
@@ -176,7 +189,7 @@ def create_cluster(
     policy.require_configured()
     result = consume_test(session, payload.test_id, parsed, actor, policy.digest)
     cluster = KubernetesCluster(id=str(uuid4()), name=payload.name, service_id=payload.service_id,
-                                lifecycle="active", revision=1, collection_interval_seconds=0)
+                                lifecycle="active", revision=1, collection_interval_seconds=60)
     _set_credential(cluster, parsed, vault, 1)
     _apply_result(cluster, result)
     session.add(cluster)
@@ -189,6 +202,16 @@ def create_cluster(
 def _check_revision(cluster: KubernetesCluster, revision: int) -> None:
     if cluster.revision != revision:
         raise KubernetesClusterConflict("集群已变化，请刷新后重试")
+
+
+def _cancel_collection_runs(session: Session, cluster_id: str) -> None:
+    session.execute(update(KubernetesCollectionRun).where(
+        KubernetesCollectionRun.cluster_id == cluster_id,
+        KubernetesCollectionRun.state.in_(("queued", "running")),
+    ).values(
+        state="cancelled", error_code="collection_revoked",
+        finished_at=datetime.now(timezone.utc), lease_expires_at=None, projection=None,
+    ))
 
 
 def patch_cluster(
@@ -204,7 +227,12 @@ def patch_cluster(
         cluster.name = payload.name
     if payload.lifecycle:
         cluster.lifecycle = payload.lifecycle
+    if payload.collection_interval_seconds is not None:
+        cluster.collection_interval_seconds = payload.collection_interval_seconds
     cluster.revision += 1
+    if payload.lifecycle in {"disabled", "archived"} or payload.collection_interval_seconds == 0:
+        _flush(session)
+        _cancel_collection_runs(session, cluster.id)
     _audit(session, cluster.id, actor, "updated", "accepted", trace_id, payload.reason)
     _commit(session)
     session.refresh(cluster)
@@ -224,6 +252,8 @@ def rotate_credential(
     _set_credential(cluster, parsed, vault, cluster.credential_revision + 1)
     _apply_result(cluster, result)
     cluster.revision += 1
+    _flush(session)
+    _cancel_collection_runs(session, cluster.id)
     _audit(session, cluster.id, actor, "credential_rotated", "accepted", trace_id, payload.reason)
     _commit(session)
     session.refresh(cluster)
