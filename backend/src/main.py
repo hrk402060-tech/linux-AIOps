@@ -40,6 +40,7 @@ from src.routes.diagnostic_jobs import router as diagnostic_jobs_router
 from src.routes.recovery import router as recovery_router
 from src.routes.operations import router as operations_router
 from src.routes.kubernetes import router as kubernetes_router
+from src.routes.kubernetes_changes import router as kubernetes_changes_router
 from src.routes.identity_sources import router as identity_sources_router
 from src.routes.identity_login import router as identity_login_router
 from src.routes.identity_mfa import router as identity_mfa_router
@@ -272,6 +273,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         prefix="/api/v1",
         dependencies=[Depends(require_admin)],
     )
+    application.include_router(kubernetes_changes_router, prefix="/api/v1")
 
     @application.get("/api/health", tags=["health"])
     def health() -> dict[str, str]:

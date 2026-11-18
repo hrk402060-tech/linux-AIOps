@@ -37,6 +37,10 @@ LDAP/AD 仅允许验证 TLS 的 LDAPS/StartTLS；OIDC 仅允许 HTTPS。先保�
 关闭本地登录。现场身份源、通知接收端及模型需分别联调；协议测试不替代现场
 验收。Webhook 地址与令牌加密，改地址而不输入新令牌会清除旧令牌以避免错投。
 
+## Kubernetes 集群变更预检
+
+候选入口为“工作台 → Kubernetes 管理 → 集群变更”。`POST /api/v1/kubernetes/clusters/{id}/change-preflight` 接受操作类型、当前集群修订和对应字段，只使用现有快照，记录审计。无额外依赖、迁移或集群权限。该阶段不会扩容、升级、生成备份、恢复或部署；备份/恢复表单的命名空间范围也不等于集群级备份能力。
+
 ## Kubernetes 资源只读查看
 
 资源清单位于“工作台 → Kubernetes 管理 → 集群总览 → 只读查看”，使用后台

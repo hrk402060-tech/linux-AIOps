@@ -1,0 +1,12 @@
+.k8s-preflight { display: grid; gap: 14px; min-width: 0; }
+.k8s-preflight .page-heading { margin: 0; }
+.k8s-preflight .page-heading h2 { margin: 0; font-size: 18px; }
+.k8s-preflight-controls .ant-select { width: 180px; max-width: 100%; }
+.k8s-preflight-fields, .k8s-preflight-result dl {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 8px 16px;
+}
+.k8s-preflight-result dl { margin: 12px 0; }
+.k8s-preflight-result dt { color: #5c6965; }
+.k8s-preflight-result dd { margin: 2px 0 0; overflow-wrap: anywhere; }
+.k8s-preflight-result ul { margin: 0; padding: 0; list-style: none; }
+.k8s-preflight-result li { display: flex; align-items: baseline; gap: 8px; padding: 8px 0; border-top: 1px solid #e5e9e7; }

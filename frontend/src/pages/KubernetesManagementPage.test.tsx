@@ -12,6 +12,12 @@ vi.mock('./KubernetesOverviewPage', () => ({
   }) => <><p>总览目标 {initialCluster?.id ?? '未选择'}</p><button onClick={onOpenConnections}>返回接入</button></>,
 }));
 describe('Kubernetes management tabs', () => {
+  it('shows the changes tab only for administrators', () => {
+    const view = render(<KubernetesManagementPage currentUser={{ role: 'auditor' }} />);
+    expect(screen.queryByRole('tab', { name: '集群变更' })).not.toBeInTheDocument();
+    view.rerender(<KubernetesManagementPage currentUser={{ role: 'admin' }} />);
+    expect(screen.getByRole('tab', { name: '集群变更' })).toBeInTheDocument();
+  });
   it('preserves the existing entry and passes the selected cluster into overview', () => {
     render(<KubernetesManagementPage currentUser={{ role: 'admin' }} />);
     expect(screen.getByRole('tab', { name: '集群接入' })).toHaveAttribute('aria-selected', 'true');
