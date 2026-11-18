@@ -24,6 +24,10 @@ def require_operator_scope(session: Session, job: DiagnosticJob) -> None:
         or user.role not in {"admin", "operator"}
     ):
         raise DiagnosticAuthorizationError("Diagnostic requester is no longer active")
+    from src.services.access_policy import effective_permissions
+    permissions = effective_permissions(session, user.id, user.role)
+    if permissions is not None and "alerts:write" not in permissions:
+        raise DiagnosticAuthorizationError("Diagnostic requester lost feature access")
     if user.role == "admin" or user.asset_scope == "all":
         return
     assigned = session.scalar(select(UserAssetAccess.id).where(

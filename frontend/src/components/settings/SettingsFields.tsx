@@ -60,6 +60,7 @@ export function SettingsFields({ category, tab }: { category: SettingsCategory; 
     {category === 'ai' && tab === 'context' ? <>
       <Form.Item name="ops_assistant_enabled" label="运维助手" valuePropName="checked"><Switch /></Form.Item>
       <Form.Item name="vulnerability_assistant_enabled" label="漏洞安全助手" valuePropName="checked"><Switch /></Form.Item>
+      <Form.Item name="external_vulnerability_enabled" label="允许外部漏洞研判" valuePropName="checked"><Switch aria-label="允许外部漏洞研判" /></Form.Item>
       <Form.Item name="include_terminal_output" label="包含终端输出" valuePropName="checked"><Switch /></Form.Item>
       <Form.Item name="include_asset_context" label="包含资产上下文" valuePropName="checked"><Switch /></Form.Item>
       {numberField('history_messages', '历史消息数量', 0, 20)}

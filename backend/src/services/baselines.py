@@ -97,10 +97,10 @@ def execute_task(
             return
         results: list[dict[str, object]] = []
         try:
-            require_background_assets(session, operator_name, operator_user_id, task.asset_ids)
+            require_background_assets(session, operator_name, operator_user_id, task.asset_ids, feature="baselines")
             for asset_id in task.asset_ids:
                 require_background_assets(
-                    session, operator_name, operator_user_id, task.asset_ids
+                    session, operator_name, operator_user_id, task.asset_ids, feature="baselines"
                 )
                 asset = session.get(Asset, asset_id)
                 if asset is None:
@@ -118,14 +118,14 @@ def execute_task(
                     secret = vault.decrypt(credential.encrypted_secret, credential.nonce, credential.id, credential.credential_type.value, credential.key_version)
                     checks = baseline_collector.collect(asset, credential, secret)
                     require_background_assets(
-                        session, operator_name, operator_user_id, task.asset_ids
+                        session, operator_name, operator_user_id, task.asset_ids, feature="baselines"
                     )
                     results.append({"asset_id": asset.id, "asset_name": asset.name, "status": "checked", "checks": checks})
                 except AssetAuthorizationError:
                     raise
                 except Exception as exc:
                     results.append(_failure(asset.id, asset.name, type(exc).__name__, str(exc)[:500], asset))
-            require_background_assets(session, operator_name, operator_user_id, task.asset_ids)
+            require_background_assets(session, operator_name, operator_user_id, task.asset_ids, feature="baselines")
             task.results = results
             _transition(session, task, BaselineStatus.AGGREGATING, 85, "正在汇总合规结果")
             checks = [check for result in results for check in result["checks"]]

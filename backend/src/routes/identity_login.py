@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from src.auth import validate_request_origin
 from src.database import get_session
-from src.schemas.auth import UserResponse
+from src.services.auth_user_projection import project_user
 from src.schemas.identity import IdentityLogin
 from src.routes.identity_validation import SafeIdentityRoute
 from src.services import identity_login, identity_sessions
@@ -71,7 +71,7 @@ def login_ldap(
         response = JSONResponse({"detail": result.requirement}, status_code=401)
         flow_cookie(request, response, MFA_COOKIE, result.challenge)
         return response
-    response = JSONResponse(UserResponse.model_validate(result.user).model_dump(mode="json"))
+    response = JSONResponse(project_user(session, result.user).model_dump(mode="json"))
     login_cookie(request, response, result)
     return response
 

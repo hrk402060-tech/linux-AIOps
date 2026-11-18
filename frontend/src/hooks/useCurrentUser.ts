@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getCurrentUser, type AuthUser } from '../api/auth';
 import { clearDashboardCache } from './dashboardSnapshotCache';
+import { permissionScope } from '../utils/pageAccess';
 
 const REFRESH_INTERVAL_MS = 30_000;
 
@@ -8,6 +9,7 @@ function changed(previous: AuthUser, next: AuthUser): boolean {
   return previous.id !== next.id
     || (previous.access_revision ?? 0) !== (next.access_revision ?? 0)
     || previous.role !== next.role
+    || permissionScope(previous) !== permissionScope(next)
     || previous.enabled !== next.enabled
     || previous.asset_scope !== next.asset_scope
     || previous.must_change_password !== next.must_change_password;

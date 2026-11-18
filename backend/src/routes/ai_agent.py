@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from uuid import uuid4
 
 from src.database import get_session
-from src.auth import authenticated_operator, require_system_admin
+from src.auth import AuthPrincipal, authenticated_operator, require_admin, require_system_admin
 from src.models.ai_agent import AgentRecommendation
 from src.models.vulnerability import VulnerabilityFinding
 from src.models.ai_provider import AIProviderAudit, AIProviderCredential
@@ -17,7 +17,8 @@ from src.schemas.ai_agent import (
     AgentWorkspaceResponse,
 )
 from src.services import ai_agent as service
-from src.services.ai_providers import get_provider, provider_metadata
+from src.services import asset_access, external_vulnerability_ai
+from src.services.ai_providers import provider_metadata
 from src.routes.ai_settings import router as settings_router
 from src.services.platform_settings import ai_policy
 
@@ -67,7 +68,10 @@ class ProviderValidateRequest(BaseModel):
 @router.get('/providers/config', dependencies=[Depends(require_system_admin)])
 def list_provider_configs(session: Session = Depends(get_session)) -> list[dict[str, object]]:
     configured = {item.provider_id: item for item in session.query(AIProviderCredential).all()}
-    catalog = service.provider_catalog()
+    policy = ai_policy(session)
+    catalog = external_vulnerability_ai.catalog(
+        session, policy.external_vulnerability_enabled and policy.vulnerability_assistant_enabled,
+    )
     return [{**item, 'configured': item['id'] in configured, 'enabled': configured[item['id']].enabled if item['id'] in configured else False, 'api_key_masked': '********' if item['id'] in configured and configured[item['id']].encrypted_api_key else None} for item in catalog]
 
 
@@ -105,6 +109,8 @@ def set_provider_enabled(
     provider_id: str, payload: ProviderEnabledRequest, request: Request,
     session: Session = Depends(get_session)
 ) -> dict[str, object]:
+    if provider_id not in external_vulnerability_ai.MODELS:
+        raise HTTPException(status_code=422, detail='不支持的外部漏洞模型')
     item = session.get(AIProviderCredential, provider_id)
     if item is None or item.encrypted_api_key is None or item.nonce is None:
         raise HTTPException(status_code=404, detail='模型密钥尚未配置')
@@ -126,6 +132,8 @@ def validate_provider_config(
     provider_id: str, payload: ProviderValidateRequest, request: Request,
     session: Session = Depends(get_session),
 ) -> dict[str, object]:
+    if provider_id not in external_vulnerability_ai.MODELS:
+        raise HTTPException(status_code=422, detail='不支持的外部漏洞模型')
     item = session.get(AIProviderCredential, provider_id)
     if item is None or item.encrypted_api_key is None or item.nonce is None or item.key_version is None:
         raise HTTPException(status_code=404, detail='模型密钥尚未配置')
@@ -156,16 +164,43 @@ def _audit(
     ))
 
 
+@router.post('/providers/config/{provider_id}/test', dependencies=[Depends(require_system_admin)])
+def test_provider_connection(
+    provider_id: str, request: Request, session: Session = Depends(get_session),
+) -> dict[str, object]:
+    if provider_id not in external_vulnerability_ai.MODELS:
+        raise HTTPException(status_code=422, detail='不支持的外部漏洞模型')
+    item = session.get(AIProviderCredential, provider_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail='模型密钥尚未配置')
+    operator = authenticated_operator(request)
+    try:
+        model = external_vulnerability_ai.test_connection(item, request.app.state.credential_vault)
+    except external_vulnerability_ai.ExternalModelError as error:
+        _audit(session, item, 'test_failed', operator, str(error))
+        session.commit()
+        raise HTTPException(status_code=error.status_code, detail=str(error)) from error
+    _audit(session, item, 'tested', operator, '外部模型返回有效测试响应；未发送漏洞数据')
+    session.commit()
+    return {'provider_id': provider_id, 'model': model, 'network_called': True}
+
+
 @router.get("", response_model=AgentWorkspaceResponse)
 def read_workspace(
     queue_page: int = Query(default=1, ge=1),
     queue_page_size: int = Query(default=50, ge=1, le=50),
     history_page: int = Query(default=1, ge=1),
     history_page_size: int = Query(default=50, ge=1, le=50),
+    principal: AuthPrincipal = Depends(require_admin),
     session: Session = Depends(get_session),
 ) -> AgentWorkspaceResponse:
+    policy = ai_policy(session)
     return AgentWorkspaceResponse.model_validate(service.get_workspace(
         session, queue_page, queue_page_size, history_page, history_page_size,
+        allowed=asset_access.visible_asset_ids(session, principal),
+        providers=external_vulnerability_ai.catalog(
+            session, policy.external_vulnerability_enabled and policy.vulnerability_assistant_enabled,
+        ),
     ))
 
 
@@ -174,19 +209,36 @@ def read_workspace(
     status_code=status.HTTP_201_CREATED,
 )
 def create_triage(
-    payload: AgentTriageRequest, session: Session = Depends(get_session)
+    payload: AgentTriageRequest, request: Request,
+    principal: AuthPrincipal = Depends(require_admin), session: Session = Depends(get_session),
 ) -> AgentRecommendationResponse:
-    if not ai_policy(session).vulnerability_assistant_enabled:
+    policy = ai_policy(session)
+    if not policy.vulnerability_assistant_enabled:
         raise HTTPException(status_code=403, detail="漏洞助手已由管理员停用")
-    try:
-        get_provider(payload.provider_id)
-    except ValueError as error:
-        raise HTTPException(status_code=422, detail=str(error)) from error
+    provider = provider_metadata(payload.provider_id)
+    if provider is None:
+        raise HTTPException(status_code=422, detail="不支持的模型提供商")
     finding = session.get(VulnerabilityFinding, payload.finding_id)
     if finding is None:
         raise HTTPException(status_code=404, detail="漏洞发现不存在")
+    asset_access.require_asset(session, principal, finding.asset_id)
+    result = None
     try:
-        recommendation = service.create_triage(session, finding, payload.provider_id)
+        if provider['kind'] == 'external':
+            if not policy.external_vulnerability_enabled:
+                raise HTTPException(status_code=403, detail="外部漏洞研判未获管理员授权")
+            current = service.require_current(session, finding.id)
+            result = external_vulnerability_ai.analyze(
+                session, request.app.state.credential_vault, payload.provider_id, current,
+            )
+            session.expire_all()
+            asset_access.require_asset(session, principal, current.asset_id)
+            updated_policy = ai_policy(session)
+            if not updated_policy.vulnerability_assistant_enabled or not updated_policy.external_vulnerability_enabled:
+                raise HTTPException(status_code=403, detail="外部漏洞研判授权已撤销")
+        recommendation = service.create_triage(session, finding, payload.provider_id, result)
+    except external_vulnerability_ai.ExternalModelError as error:
+        raise HTTPException(status_code=error.status_code, detail=str(error)) from error
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
     return AgentRecommendationResponse.model_validate(recommendation)
@@ -198,11 +250,14 @@ def create_triage(
 )
 def review_recommendation(
     recommendation_id: str, payload: AgentReviewRequest, request: Request,
+    principal: AuthPrincipal = Depends(require_admin),
     session: Session = Depends(get_session),
 ) -> AgentRecommendationResponse:
     recommendation = session.get(AgentRecommendation, recommendation_id)
-    if recommendation is None:
+    finding = session.get(VulnerabilityFinding, recommendation.finding_id) if recommendation else None
+    if recommendation is None or finding is None:
         raise HTTPException(status_code=404, detail="研判建议不存在")
+    asset_access.require_asset(session, principal, finding.asset_id)
     try:
         reviewed = service.review_recommendation(
             session, recommendation, payload.decision, authenticated_operator(request),

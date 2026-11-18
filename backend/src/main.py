@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from src.auth import require_admin, require_authenticated
+from src.auth import require_admin, require_authenticated, require_feature_access
 from src.config import Settings, get_settings
 from src.database import Base, create_session_factory
 from src.routes.credentials import router as credentials_router
@@ -27,6 +27,7 @@ from src.routes.audit_log import router as audit_log_router
 from src.routes.patches import router as patches_router
 from src.routes.system import router as system_router
 from src.routes.auth import router as auth_router
+from src.routes.access_policy import router as access_policy_router
 from src.routes.cmdb import router as cmdb_router
 from src.routes.observability import router as observability_router
 from src.routes.ssh_host_keys import router as ssh_host_keys_router
@@ -163,6 +164,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     application.include_router(patches_router, prefix='/api/v1', dependencies=[Depends(require_admin)])
     application.include_router(system_router, prefix='/api/v1', dependencies=[Depends(require_admin)])
     application.include_router(auth_router, prefix="/api/v1")
+    application.include_router(access_policy_router, prefix="/api/v1")
     for settings_router in (identity_sources_router, identity_login_router, identity_mfa_router,
                             platform_data_router, notification_channels_router):
         application.include_router(settings_router, prefix="/api/v1")
@@ -257,7 +259,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     application.include_router(terminal_router, prefix="/api/v1")
     application.include_router(
-        ops_assistant_router, prefix="/api/v1",
+        ops_assistant_router, prefix="/api/v1", dependencies=[Depends(require_feature_access)],
     )
 
     application.include_router(

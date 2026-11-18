@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { ConfigProvider } from 'antd';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SecurityChecksPage } from './SecurityChecksPage';
+import type { AuthUser } from '../api/auth';
 import { securityCheckTabs, type SecurityCheckPageKey } from '../types/security-check';
 
 const endpoints: Record<SecurityCheckPageKey, string> = {
@@ -12,13 +13,13 @@ const endpoints: Record<SecurityCheckPageKey, string> = {
 const buttons: Record<SecurityCheckPageKey, string> = {
   schedules: '新建计划', baselines: '新建检查', exposures: '新建检测', 'credential-risks': '新建评估',
 };
-function show(activeKey: SecurityCheckPageKey = 'schedules') {
+function show(activeKey: SecurityCheckPageKey = 'schedules', currentUser?: AuthUser) {
   const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => [] });
   vi.stubGlobal('fetch', fetchMock);
   function Harness() {
     const [page, setPage] = useState(activeKey);
     return <ConfigProvider theme={{ token: { motion: false } }}>
-      <SecurityChecksPage activeKey={page} onNavigate={setPage} />
+      <SecurityChecksPage activeKey={page} onNavigate={setPage} currentUser={currentUser} />
     </ConfigProvider>;
   }
   return { ...render(<Harness />), fetchMock };
@@ -26,6 +27,14 @@ function show(activeKey: SecurityCheckPageKey = 'schedules') {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('SecurityChecksPage', () => {
+  it('only offers security check tabs granted by the administrator', async () => {
+    const { fetchMock } = show('baselines', { id: 'policy-user', username: 'reader', role: 'operator',
+      enabled: true, must_change_password: false, display_name: null, created_at: '', last_login_at: null,
+      permissions: ['baselines:read'] });
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['基线合规']);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/v1/baselines', expect.any(Object)));
+    expect(fetchMock).not.toHaveBeenCalledWith('/api/v1/scan-schedules', expect.any(Object));
+  });
   it.each(securityCheckTabs)('opens the existing $key page with one heading and only active requests', async ({ key, label }) => {
     const { fetchMock } = show(key);
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);

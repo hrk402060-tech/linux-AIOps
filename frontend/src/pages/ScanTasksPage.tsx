@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Empty, Input, message, Popconfirm, Progress, Select, Space, Table, Tag, Tooltip } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import type { AuthUser } from '../api/auth';
+import { canAccessPage } from '../utils/pageAccess';
 import { Archive, Ban, Download, Eye, Play, Plus, RefreshCw, Repeat2, RotateCcw, Search, ShieldCheck, Trash2 } from 'lucide-react';
 
 import { getAssets } from '../api/assets';
@@ -33,8 +34,8 @@ const formatDate = (value: string) => new Intl.DateTimeFormat('zh-CN', platformD
   dateStyle: 'medium', timeStyle: 'short',
 })).format(new Date(value));
 
-export function ScanTasksPage({ currentUser = { role: 'auditor' } }: { currentUser?: Pick<AuthUser, 'role'> }) {
-  const canWrite = currentUser.role === 'admin' || currentUser.role === 'operator';
+export function ScanTasksPage({ currentUser = { role: 'auditor' } }: { currentUser?: Pick<AuthUser, 'role' | 'permissions'> }) {
+  const canWrite = canAccessPage(currentUser, 'scans', 'write');
   const canRemove = currentUser.role === 'admin';
   const [items, setItems] = useState<ScanTask[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);

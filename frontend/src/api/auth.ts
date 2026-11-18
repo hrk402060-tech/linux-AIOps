@@ -13,6 +13,7 @@ export interface AuthUser {
   created_at: string;
   last_login_at: string | null;
   access_revision?: number;
+  permissions?: string[] | null;
   failed_login_attempts?: number;
   locked_until?: string | null;
   mfa_enabled?: boolean;

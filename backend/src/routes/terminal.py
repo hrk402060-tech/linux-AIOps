@@ -417,6 +417,10 @@ def _require_socket_access(
         principal = AuthPrincipal(
             user.username, user.role, user.id, "session", user.must_change_password
         )
+        from src.services.access_policy import effective_permissions
+        permissions = effective_permissions(session, user.id, user.role)
+        if permissions is not None and "terminal:write" not in permissions:
+            raise ValueError("SSH 远程操作权限已撤销")
     try:
         asset_access.require_asset(session, principal, asset_id, ssh=True)
     except HTTPException as exc:

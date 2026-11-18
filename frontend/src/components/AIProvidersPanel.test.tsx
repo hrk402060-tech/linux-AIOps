@@ -19,7 +19,7 @@ it('distinguishes saved credentials from a connected external vulnerability engi
   const externalRow = within((await screen.findByText('DeepSeek')).closest('tr')!);
   expect(localRow.getByText('本地就绪')).toBeInTheDocument();
   expect(localRow.queryByRole('button', { name: '配置密钥' })).not.toBeInTheDocument();
-  expect(externalRow.getByText('外部推理未接通')).toBeInTheDocument();
+  expect(externalRow.getByText('不可用')).toBeInTheDocument();
   expect(externalRow.getByText('********')).toBeInTheDocument();
   expect(fetchMock).toHaveBeenCalledTimes(1);
 });
@@ -42,6 +42,18 @@ it('retains key validation as a local decryption check, not a connection test', 
   fireEvent.click(screen.getByRole('button', { name: '校验已存密钥' }));
   expect(await screen.findByText('已存密钥可解密，未验证模型连接。')).toBeInTheDocument();
   expect(fetchMock).toHaveBeenCalledWith('/api/v1/agent/providers/config/deepseek/validate', expect.objectContaining({ method: 'POST', body: '{}' }));
+});
+it('tests the external model and surfaces the actual connection result', async () => {
+  const fetchMock = setup();
+  await screen.findByText('DeepSeek');
+  fetchMock.mockResolvedValueOnce(response({ model: 'deepseek-flash', network_called: true }));
+  fireEvent.click(screen.getByRole('button', { name: '测试连接' }));
+  expect(await screen.findByText('模型已返回有效测试响应。')).toBeInTheDocument();
+  expect(fetchMock).toHaveBeenLastCalledWith('/api/v1/agent/providers/config/deepseek/test', expect.objectContaining({ method: 'POST' }));
+  fetchMock.mockResolvedValueOnce(response({ detail: '外部漏洞模型响应超时' }, 504));
+  fireEvent.click(screen.getByRole('button', { name: '测试连接' }));
+  expect(await screen.findByText('外部漏洞模型响应超时')).toBeInTheDocument();
+  expect(screen.queryByText('模型已返回有效测试响应。')).not.toBeInTheDocument();
 });
 it('retains explicit provider enable and disable management', async () => {
   const fetchMock = setup();

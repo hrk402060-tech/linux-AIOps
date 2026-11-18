@@ -49,6 +49,12 @@ export async function validateProviderConfig(providerId: string): Promise<{ conf
   return parse(await apiFetch(endpoint + '/providers/config/' + providerId + '/validate', { method: 'POST', headers, body: JSON.stringify({}) }), '模型密钥校验失败');
 }
 
+export async function testProviderConnection(providerId: string): Promise<{ model: string; network_called: true }> {
+  return parse(await apiFetch(endpoint + '/providers/config/' + encodeURIComponent(providerId) + '/test', {
+    method: 'POST', headers,
+  }), '漏洞模型连接失败');
+}
+
 export async function createAgentTriage(
   findingId: string, providerId: string,
 ): Promise<AgentRecommendation> {

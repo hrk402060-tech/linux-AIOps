@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from src.models.ai_agent import AgentRecommendation
 from src.models.asset import Asset, AssetLifecycleStatus
 from src.models.vulnerability import VulnerabilityCase, VulnerabilityFinding
-from src.services.ai_providers import get_provider, provider_catalog
+from src.services.ai_providers import TriageResult, get_provider, provider_catalog, provider_metadata
 
 logger = logging.getLogger(__name__)
 
@@ -44,8 +44,15 @@ def current_findings_statement() -> Select[tuple[VulnerabilityFinding]]:
 def get_workspace(
     session: Session, queue_page: int = 1, queue_page_size: int = 50,
     history_page: int = 1, history_page_size: int = 50,
+    *, allowed: set[str] | None = None, providers: list[dict[str, object]] | None = None,
 ) -> dict[str, object]:
     current = current_findings_statement()
+    history = select(AgentRecommendation)
+    if allowed is not None:
+        current = current.where(VulnerabilityFinding.asset_id.in_(allowed))
+        history = history.join(VulnerabilityFinding, VulnerabilityFinding.id == AgentRecommendation.finding_id).where(
+            VulnerabilityFinding.asset_id.in_(allowed),
+        )
     pending = ~exists(select(AgentRecommendation.id).where(
         AgentRecommendation.finding_id == VulnerabilityFinding.id,
     ))
@@ -57,14 +64,14 @@ def get_workspace(
     findings = session.execute(current.add_columns(VulnerabilityCase.status).order_by(
         VulnerabilityFinding.detected_at.desc(), VulnerabilityFinding.id.desc(),
     ).offset((queue_page - 1) * queue_page_size).limit(queue_page_size)).all()
-    recommendations = list(session.scalars(select(AgentRecommendation).order_by(
+    recommendations = list(session.scalars(history.order_by(
         AgentRecommendation.created_at.desc(), AgentRecommendation.id.desc(),
     ).offset((history_page - 1) * history_page_size).limit(history_page_size)))
-    statuses = dict(session.execute(select(
-        AgentRecommendation.status, func.count(AgentRecommendation.id),
+    statuses = dict(session.execute(history.with_only_columns(
+        AgentRecommendation.status, func.count(AgentRecommendation.id), maintain_column_froms=True,
     ).group_by(AgentRecommendation.status)).all())
     return {
-        "providers": provider_catalog(), "queue_total": int(totals[0]),
+        "providers": providers if providers is not None else provider_catalog(), "queue_total": int(totals[0]),
         "queue_page": queue_page, "history_page": history_page,
         "history_total": sum(statuses.values()),
         "summary": {
@@ -88,7 +95,7 @@ def _finding_projection(
     }
 
 
-def _require_current(session: Session, finding_id: str) -> VulnerabilityFinding:
+def require_current(session: Session, finding_id: str) -> VulnerabilityFinding:
     finding = session.scalar(current_findings_statement().where(
         VulnerabilityFinding.id == finding_id,
     ).execution_options(populate_existing=True))
@@ -98,21 +105,25 @@ def _require_current(session: Session, finding_id: str) -> VulnerabilityFinding:
 
 
 def create_triage(
-    session: Session, finding: VulnerabilityFinding, provider_id: str
+    session: Session, finding: VulnerabilityFinding, provider_id: str,
+    result: TriageResult | None = None,
 ) -> AgentRecommendation:
-    current = _require_current(session, finding.id)
-    provider = get_provider(provider_id)
-    result = provider.analyze(current)
+    current = require_current(session, finding.id)
+    metadata = provider_metadata(provider_id)
+    if metadata is None:
+        raise ValueError("不支持的模型提供商")
+    if result is None:
+        result = get_provider(provider_id).analyze(current)
     try:
         # Lock disposition and lifecycle while validating the persistence boundary.
         session.scalar(select(Asset).where(Asset.id == current.asset_id).with_for_update())
         session.scalar(select(VulnerabilityCase).where(
             VulnerabilityCase.id == current.case_id,
         ).with_for_update())
-        current = _require_current(session, current.id)
+        current = require_current(session, current.id)
         recommendation = AgentRecommendation(
             id=str(uuid4()), finding_id=current.id, cve_id=current.cve_id,
-            asset_name=current.asset_name, provider_id=provider.id, provider_name=provider.name,
+            asset_name=current.asset_name, provider_id=provider_id, provider_name=str(metadata["name"]),
             status="pending_review", priority=result.priority,
             risk_analysis=result.risk_analysis, remediation_steps=result.remediation_steps,
             validation_steps=result.validation_steps, rollback_plan=result.rollback_plan,

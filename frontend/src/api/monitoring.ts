@@ -1,5 +1,8 @@
 import { apiFetch, parseApiResponse } from './client';
 import type { FleetOverview, FleetTrends, MonitorSnapshot, SeverityRules } from '../types/monitoring';
+import type { DashboardSnapshot } from '../types/dashboard';
+
+export type MonitoringSummary = Pick<DashboardSnapshot, 'assets' | 'monitoring_assets' | 'resource_trends' | 'monitoring_mode'>;
 
 async function request<T>(path: string, signal?: AbortSignal, init?: RequestInit): Promise<T> {
   const timeout = AbortSignal.timeout(30_000);
@@ -10,6 +13,9 @@ async function request<T>(path: string, signal?: AbortSignal, init?: RequestInit
 }
 export function getFleet(signal?: AbortSignal): Promise<FleetOverview> {
   return request('/fleet', signal);
+}
+export function getMonitoringSummary(): Promise<MonitoringSummary> {
+  return request('/summary');
 }
 export function getFleetTrends(assetIds: string[], hours: number, signal?: AbortSignal): Promise<FleetTrends> {
   const params = new URLSearchParams({ hours: String(hours) });

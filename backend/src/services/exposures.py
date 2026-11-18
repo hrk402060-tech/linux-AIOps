@@ -103,10 +103,10 @@ def execute_task(
             return
         results: list[dict[str, object]] = []
         try:
-            require_background_assets(session, operator_name, operator_user_id, task.asset_ids)
+            require_background_assets(session, operator_name, operator_user_id, task.asset_ids, feature="exposures")
             for asset_id in task.asset_ids:
                 require_background_assets(
-                    session, operator_name, operator_user_id, task.asset_ids
+                    session, operator_name, operator_user_id, task.asset_ids, feature="exposures"
                 )
                 asset = session.get(Asset, asset_id)
                 if asset is None:
@@ -124,14 +124,14 @@ def execute_task(
                     secret = vault.decrypt(credential.encrypted_secret, credential.nonce, credential.id, credential.credential_type.value, credential.key_version)
                     listeners = exposure_collector.collect(asset, credential, secret)
                     require_background_assets(
-                        session, operator_name, operator_user_id, task.asset_ids
+                        session, operator_name, operator_user_id, task.asset_ids, feature="exposures"
                     )
                     results.append({"asset_id": asset.id, "asset_name": asset.name, "status": "checked", "listeners": listeners})
                 except AssetAuthorizationError:
                     raise
                 except Exception as exc:
                     results.append(_failure(asset.id, asset.name, type(exc).__name__, str(exc)[:500], asset))
-            require_background_assets(session, operator_name, operator_user_id, task.asset_ids)
+            require_background_assets(session, operator_name, operator_user_id, task.asset_ids, feature="exposures")
             task.results = results
             _transition(session, task, ExposureStatus.AGGREGATING, 85, "正在汇总监听范围")
             listeners = [item for result in results for item in result["listeners"]]

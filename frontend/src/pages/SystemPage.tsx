@@ -22,6 +22,7 @@ import { RevokeUserSessionsModal, UserSessionsModal } from '../components/UserSe
 import { UserMfaModal } from '../components/UserMfaModal';
 import { useUserMfa } from '../hooks/useUserMfa';
 import { IdentityBindingsPanel } from '../components/settings/IdentityBindingsPanel';
+import { FeatureAccessPanel } from '../components/FeatureAccessPanel';
 
 const emptyStatus: SystemStatus = {
   database_status: 'unavailable', database_engine: '-', schema_revision: null,
@@ -48,6 +49,7 @@ export function SystemPage({
   const [loading, setLoading] = useState(!usersOnly);
   const [users, setUsers] = useState<AuthUser[]>([]);
   const [userLoading, setUserLoading] = useState(false);
+  const [featureAccessOpen, setFeatureAccessOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [resetTarget, setResetTarget] = useState<AuthUser | null>(null);
   const [accessTarget, setAccessTarget] = useState<AuthUser | null>(null);
@@ -191,7 +193,10 @@ export function SystemPage({
       {currentUser.role === 'admin' ? <section className="user-management">
         <div className="panel-heading">
           <div><strong>用户与权限</strong><span>用户密码不可查看，停用和重置密码会撤销已有会话</span></div>
-          <Button type="primary" icon={<UserPlus size={17} />} onClick={() => setCreateOpen(true)}>新建用户</Button>
+          <Space wrap>
+            {usersOnly && !featureAccessOpen ? <Button icon={<ShieldCheck size={17} />} onClick={() => setFeatureAccessOpen(true)}>功能权限</Button> : null}
+            <Button type="primary" icon={<UserPlus size={17} />} onClick={() => setCreateOpen(true)}>新建用户</Button>
+          </Space>
         </div>
         <div className="table-frame"><Table<AuthUser>
           rowKey="id" loading={userLoading} dataSource={users} pagination={false}
@@ -212,6 +217,7 @@ export function SystemPage({
         /></div>
       </section> : null}
     </Spin>
+    {usersOnly && currentUser.role === 'admin' && featureAccessOpen ? <FeatureAccessPanel users={users} /> : null}
     {usersOnly && currentUser.role === 'admin' ? <IdentityBindingsPanel /> : null}
     <Modal title="新建平台用户" open={createOpen} footer={null} onCancel={() => setCreateOpen(false)} destroyOnHidden>
       <Form form={createForm} layout="vertical" onFinish={(values) => void submitUser(values)} initialValues={{ role: 'operator', asset_scope: 'assigned' }}>

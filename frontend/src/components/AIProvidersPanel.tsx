@@ -2,7 +2,7 @@ import { formatPlatformDateTime } from '../utils/platformPreferences';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Button, Empty, Input, Modal, Space, Table, Tag } from 'antd';
 import { History, RefreshCw } from 'lucide-react';
-import { getProviderConfigs, saveProviderConfig, setProviderEnabled, validateProviderConfig } from '../api/ai-agent';
+import { getProviderConfigs, saveProviderConfig, setProviderEnabled, testProviderConnection, validateProviderConfig } from '../api/ai-agent';
 import { getAIProviderAudit, type AuditLogEntry } from '../api/audit-log';
 import type { AgentProvider } from '../types/ai-agent';
 
@@ -58,7 +58,7 @@ export function AIProvidersPanel() {
     await mutate(async () => {
       await saveProviderConfig(provider.id, apiKey.trim(), provider.enabled ?? false);
       if (mounted.current) { setApiKey(''); setTarget(null); }
-    }, '漏洞模型密钥已加密保存，外部推理仍未接通。', true);
+    }, '漏洞模型密钥已加密保存。', true);
   };
   const openAudit = async (page = 1) => {
     const sequence = ++auditSequence.current;
@@ -79,13 +79,14 @@ export function AIProvidersPanel() {
     {notice ? <Alert type="success" showIcon message={notice} /> : null}
     <div className="table-frame"><Table<AgentProvider> rowKey="id" size="small" loading={loading} dataSource={providers} pagination={false} scroll={{ x: 760 }} columns={[
       { title: '模型提供商', dataIndex: 'name' },
-      { title: '推理状态', render: (_, item) => <Tag color={item.kind === 'local' ? 'green' : 'default'}>{item.kind === 'local' ? '本地就绪' : '外部推理未接通'}</Tag> },
+      { title: '推理状态', render: (_, item) => <Tag color={item.status === 'ready' ? 'green' : 'default'}>{item.kind === 'local' ? '本地就绪' : item.status === 'ready' ? '允许调用' : '不可用'}</Tag> },
       { title: '配置状态', render: (_, item) => item.kind === 'local' ? '无需密钥' : item.configured ? item.enabled ? '已保存、已启用' : '已保存、已停用' : '尚未配置' },
       { title: '已存密钥', render: (_, item) => item.api_key_masked ?? '-' },
       { title: '操作', render: (_, item) => item.kind === 'external' ? <Space wrap>
         <Button disabled={blocked} onClick={() => { setTarget(item); setApiKey(''); }}>配置密钥</Button>
         <Button disabled={blocked || !item.configured} onClick={() => void mutate(() => validateProviderConfig(item.id), '已存密钥可解密，未验证模型连接。', false)}>校验已存密钥</Button>
-        <Button aria-label={item.enabled ? '停用' : '启用'} disabled={blocked || !item.configured} onClick={() => void mutate(() => setProviderEnabled(item.id, !item.enabled), item.enabled ? '模型配置已停用。' : '模型配置已启用，外部推理仍未接通。', true)}>{item.enabled ? '停用' : '启用'}</Button>
+        <Button disabled={blocked || !item.configured} onClick={() => void mutate(() => testProviderConnection(item.id), '模型已返回有效测试响应。', false)}>测试连接</Button>
+        <Button aria-label={item.enabled ? '停用' : '启用'} disabled={blocked || !item.configured} onClick={() => void mutate(() => setProviderEnabled(item.id, !item.enabled), item.enabled ? '模型配置已停用。' : '模型配置已启用。', true)}>{item.enabled ? '停用' : '启用'}</Button>
       </Space> : null },
     ]} /></div>
     <Modal title={`配置 ${target?.name ?? ''} 密钥`} open={target !== null} onCancel={() => { if (!working) { setTarget(null); setApiKey(''); } }} onOk={() => void save()} okText="加密保存" cancelText="取消" confirmLoading={working} okButtonProps={{ disabled: blocked || apiKey.trim().length < 8 || apiKey.trim().length > 400 }} cancelButtonProps={{ disabled: working }} maskClosable={!working} destroyOnHidden>
@@ -95,7 +96,7 @@ export function AIProvidersPanel() {
       {auditError ? <Alert type="error" message={auditError} action={<Button aria-label="重试配置审计" onClick={() => void openAudit(auditPage)}>重试</Button>} /> : null}
       <Table<AuditLogEntry> rowKey="id" size="small" loading={auditLoading} dataSource={auditItems} scroll={{ x: 720 }} pagination={{ current: auditPage, total: auditTotal, pageSize: 8, showSizeChanger: false, onChange: (page) => void openAudit(page) }} locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={auditError ? '加载失败' : '暂无配置审计记录'} /> }} columns={[
         { title: '提供商', dataIndex: 'target', width: 150 },
-        { title: '动作', dataIndex: 'action', width: 110, render: (value: string) => <Tag>{({ configured: '配置', validated: '校验', enabled: '启用', disabled: '停用', cleared: '清除密钥' } as Record<string, string>)[value] ?? value}</Tag> },
+        { title: '动作', dataIndex: 'action', width: 110, render: (value: string) => <Tag>{({ configured: '配置', validated: '校验', enabled: '启用', disabled: '停用', cleared: '清除密钥', tested: '连接成功', test_failed: '连接失败' } as Record<string, string>)[value] ?? value}</Tag> },
         { title: '操作人', dataIndex: 'operator', width: 130 }, { title: '详情', dataIndex: 'detail' },
         { title: '时间', dataIndex: 'occurred_at', width: 180, render: (value: string) => formatPlatformDateTime(value) },
       ]} />

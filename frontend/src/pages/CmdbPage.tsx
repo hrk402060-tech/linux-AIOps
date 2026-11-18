@@ -1,5 +1,6 @@
 import { formatPlatformDateTime } from '../utils/platformPreferences';
 import { useEffect, useMemo, useState } from 'react';
+import { canAccessPage } from '../utils/pageAccess';
 import { Alert, Button, Input, Modal, Select, Space, Table, Tag, Tooltip, message } from 'antd';
 import { Archive, Eye, Pencil, Plus, Power, PowerOff, RefreshCw, RotateCcw, Search } from 'lucide-react';
 
@@ -36,7 +37,7 @@ export function CmdbPage({ currentUser, initialServiceId }: { currentUser: AuthU
   const [discoveryApplicationId, setDiscoveryApplicationId] = useState<string>();
   const [discoveryConfirming, setDiscoveryConfirming] = useState(false);
   const [messages, holder] = message.useMessage();
-  const canWrite = currentUser.role !== 'auditor';
+  const canWrite = canAccessPage(currentUser, 'cmdb', 'write');
   const isAdmin = currentUser.role === 'admin';
   const load = async () => {
     setLoading(true);

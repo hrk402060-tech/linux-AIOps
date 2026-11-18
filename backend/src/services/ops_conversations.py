@@ -73,10 +73,13 @@ def create(session: Session, owner: str, payload: ConversationCreate) -> OpsConv
 
 def list_owned(
     session: Session, owner: str, archived: bool, offset: int, limit: int,
+    visible_asset_ids: set[str] | None = None,
 ) -> ConversationList:
     condition = (
         OpsConversation.owner_key == owner, OpsConversation.archived == archived,
     )
+    if visible_asset_ids is not None:
+        condition += (or_(OpsConversation.asset_id.is_(None), OpsConversation.asset_id.in_(visible_asset_ids)),)
     total = session.scalar(select(func.count()).select_from(OpsConversation).where(*condition)) or 0
     items = session.scalars(select(OpsConversation).where(*condition).order_by(
         OpsConversation.updated_at.desc(), OpsConversation.id.desc(),

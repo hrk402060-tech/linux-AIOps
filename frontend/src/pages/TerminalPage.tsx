@@ -17,7 +17,9 @@ const sessionLabels: Record<TerminalSessionSummary['status'], string> = {
   failed: '失败', terminated: '已终止', timeout: '已超时', revoked: '权限已撤销',
 };
 
-export function TerminalPage({ initialAssetId, standalone = false }: { initialAssetId?: string | null; standalone?: boolean }) {
+export function TerminalPage({ initialAssetId, standalone = false, canConnect = true, canUseAssistant = true }: {
+  initialAssetId?: string | null; standalone?: boolean; canConnect?: boolean; canUseAssistant?: boolean;
+}) {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [assetsLoading, setAssetsLoading] = useState(true);
   const [assetsError, setAssetsError] = useState('');
@@ -33,7 +35,7 @@ export function TerminalPage({ initialAssetId, standalone = false }: { initialAs
   const [connectionState, setConnectionState] = useState('未连接');
   const [connectionDetails, setConnectionDetails] = useState<TerminalConnectionDetails | null>(null);
   const [terminalContext, setTerminalContext] = useState('');
-  const [assistantOpen, setAssistantOpen] = useState(true);
+  const [assistantOpen, setAssistantOpen] = useState(canUseAssistant);
   const [historyError, setHistoryError] = useState('');
   const historyRequest = useRef(0);
   const [messageApi, contextHolder] = message.useMessage();
@@ -94,7 +96,7 @@ export function TerminalPage({ initialAssetId, standalone = false }: { initialAs
     () => assets.find((item) => item.id === assetId) ?? null, [assetId, assets],
   );
   const connect = async () => {
-    if (!selected || assetsLoading || assetsError) return;
+    if (!canConnect || !selected || assetsLoading || assetsError) return;
     const generation = ++connectionGeneration.current;
     setConnecting(true); setTicket(null); setConnectionState('连接中');
     setDisconnecting(false);
@@ -123,8 +125,8 @@ export function TerminalPage({ initialAssetId, standalone = false }: { initialAs
     void loadRecentSessions();
   }, [loadRecentSessions]);
   const collectOutput = useCallback((value: string) => {
-    setTerminalContext((current) => (current + value).slice(-12000));
-  }, []);
+    if (canUseAssistant) setTerminalContext((current) => (current + value).slice(-12000));
+  }, [canUseAssistant]);
   const disconnectCurrent = async () => {
     if (!ticket || disconnecting) return;
     const generation = connectionGeneration.current;
@@ -148,7 +150,7 @@ export function TerminalPage({ initialAssetId, standalone = false }: { initialAs
   const standalonePath = selected ? terminalAssetHref(selected.id) : undefined;
   if (catalogOpen) return <section className="terminal-page terminal-page--catalog">{contextHolder}
     <header className="terminal-page-header"><h1>SSH 远程</h1><div className="terminal-page-header-meta"><Server size={17} /><span>{assets.length} 台服务器</span></div></header>
-    <TerminalAssetCatalog assets={assets} loading={assetsLoading} error={assetsError} onReload={() => void loadAssets()}
+    <TerminalAssetCatalog assets={assets} loading={assetsLoading} error={assetsError} onReload={() => void loadAssets()} canConnect={canConnect}
       onOpenInPage={(id) => { setAssetId(id); setCatalogOpen(false); }} />
   </section>;
   return <section className={`terminal-page ${standalone ? 'terminal-page--standalone' : ''} ${ticket ? 'terminal-page--session' : ''}`}>{contextHolder}
@@ -157,7 +159,7 @@ export function TerminalPage({ initialAssetId, standalone = false }: { initialAs
       <div className="terminal-standalone-actions"><Tag color={connectionState === '已连接' ? 'green' : 'default'}>{connectionState}</Tag><Button type="text" icon={<ArrowLeft size={16} />} onClick={returnToPlatform}>返回平台</Button></div>
     </header> : <header className="terminal-page-header">
       <div><span className="page-eyebrow">运维 / SSH 远程</span><h1>SSH 远程</h1><p>在浏览器建立安全终端，AI 仅分析终端输出并提供只读建议。</p></div>
-      <div className="terminal-page-header-meta"><Button size="small" icon={<ArrowLeft size={15} />} disabled={switchingLocked} onClick={() => setCatalogOpen(true)}>服务器列表</Button>{selected ? <Button size="small" icon={<ExternalLink size={15} />} href={standalonePath} target="_blank" rel="noopener noreferrer">新标签打开</Button> : null}</div>
+      <div className="terminal-page-header-meta"><Button size="small" icon={<ArrowLeft size={15} />} disabled={switchingLocked} onClick={() => setCatalogOpen(true)}>服务器列表</Button>{selected && canConnect ? <Button size="small" icon={<ExternalLink size={15} />} href={standalonePath} target="_blank" rel="noopener noreferrer">新标签打开</Button> : null}</div>
     </header>}
     {!assetsLoading && !assetsError && assetId && !selected ? <Alert role="alert" type="warning" message="服务器不存在或当前账号无权访问，请重新选择服务器" /> : null}
     {assetsError ? <Alert role="alert" type="error" message={assetsError} /> : null}
@@ -183,16 +185,16 @@ export function TerminalPage({ initialAssetId, standalone = false }: { initialAs
         <div className="terminal-control-band">
           <div className="terminal-target"><Select aria-label="当前服务器" value={assetId || undefined} placeholder="选择服务器" showSearch optionFilterProp="label" onChange={setAssetId} disabled={switchingLocked}
             options={assets.map((item) => ({ value: item.id, label: item.name + ' · ' + item.host }))} />
-            <Button type="primary" icon={<PlugZap size={17} />} loading={connecting} disabled={!selected || assetsLoading || Boolean(assetsError) || disconnecting || connectionState === '已连接' || connectionState === '连接中'} onClick={() => void connect()}>连接</Button>
+            {canConnect ? <Button type="primary" icon={<PlugZap size={17} />} loading={connecting} disabled={!selected || assetsLoading || Boolean(assetsError) || disconnecting || connectionState === '已连接' || connectionState === '连接中'} onClick={() => void connect()}>连接</Button> : null}
             {connectionState === '已连接' || disconnecting ? <Button danger loading={disconnecting} icon={<CircleStop size={17} />} onClick={() => void disconnectCurrent()}>断开</Button> : null}</div>
-          <div className="terminal-security"><ShieldCheck size={17} /><span>凭据仅在后端解密 · 终端票据单次有效</span><Tag color={connectionState === '已连接' ? 'green' : 'default'}>{connectionState}</Tag><Button type="text" icon={assistantOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />} aria-label={assistantOpen ? '收起 AI 助手' : '展开 AI 助手'} onClick={() => setAssistantOpen((current) => !current)} /></div>
+          <div className="terminal-security"><ShieldCheck size={17} /><span>凭据仅在后端解密 · 终端票据单次有效</span><Tag color={connectionState === '已连接' ? 'green' : 'default'}>{connectionState}</Tag>{canUseAssistant ? <Button type="text" icon={assistantOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />} aria-label={assistantOpen ? '收起 AI 助手' : '展开 AI 助手'} onClick={() => setAssistantOpen((current) => !current)} /> : null}</div>
         </div>
         {connectionDetails?.message ? <div className="terminal-security" role="status"><span>{connectionDetails.message}</span>
           {connectionDetails.ended_at && !Number.isNaN(Date.parse(connectionDetails.ended_at)) ? <time aria-label="会话结束时间" dateTime={connectionDetails.ended_at}>{formatPlatformDateTime(connectionDetails.ended_at)}</time> : null}</div> : null}
         <div className={`terminal-workspace ${assistantOpen ? '' : 'terminal-workspace--assistant-collapsed'}`}><div className="terminal-stage">{selected && ticket && ticketAsset.current === selected.id
           ? <TerminalConsole asset={selected} ticket={ticket} onStateChange={stateChanged} onOutput={collectOutput} />
           : <div className="terminal-placeholder"><TerminalSquare size={30} /><strong>选择服务器并建立 SSH 会话</strong><span>连接后终端将在当前浏览器工作台打开</span></div>}</div>
-          <div className="terminal-assistant-slot" aria-hidden={!assistantOpen}><TerminalAssistantPanel key={ticket?.session_id ?? assetId} sessionId={ticket?.session_id ?? null} context={terminalContext} connected={connectionState === '已连接'} /></div></div>
+          {canUseAssistant ? <div className="terminal-assistant-slot" aria-hidden={!assistantOpen}><TerminalAssistantPanel key={ticket?.session_id ?? assetId} sessionId={ticket?.session_id ?? null} context={terminalContext} connected={connectionState === '已连接'} /></div> : null}</div>
       </main>
     </div>
   </section>;

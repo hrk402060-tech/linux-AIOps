@@ -1,0 +1,10 @@
+.feature-access-panel { margin-block: 20px; min-width: 0; }
+.feature-access-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.feature-access-heading h2 { margin: 0; font-size: 16px; }
+.feature-access-tabs { border: 0; padding: 0; margin: 0; min-width: 0; }
+.feature-access-panel .ant-table-wrapper { margin-top: 12px; overflow-x: auto; }
+.feature-access-panel .ant-table-cell { overflow-wrap: anywhere; }
+.feature-permission-list { max-height: 40vh; overflow: auto; border: 1px solid #e4e9e6; border-radius: 6px; }
+.feature-permission-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; padding: 8px; gap: 8px; }
+.feature-permission-row + .feature-permission-row { border-top: 1px solid #edf0ee; }
+.feature-permission-row > span { overflow-wrap: anywhere; }

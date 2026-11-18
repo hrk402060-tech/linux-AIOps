@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Alert, Button, Drawer, Empty, Form, Input, InputNumber, Modal, Select, Space, Spin, Table, Tag, Tooltip, message } from 'antd';
 import { History, Play, Plus, RefreshCw, Settings2 } from 'lucide-react';
 import type { AuthUser } from '../api/auth';
+import { canAccessPage } from '../utils/pageAccess';
 import { getCmdbTree } from '../api/cmdb';
 import { createProbe, getProbePolicy, getProbeResults, getProbes, runProbe, updateProbe, updateProbePolicy, type HttpProbe, type ProbeCreate, type ProbeResult } from '../api/probes';
 import type { CmdbServiceTree } from '../types/cmdb';
@@ -16,7 +17,7 @@ function time(value: string) { return value ? formatPlatformDateTime(value, { ho
 export function ProbesPage({ currentUser, initialServiceId, initialProbe }: {
   currentUser: AuthUser; initialServiceId?: string; initialProbe?: { id: string; name: string };
 }) {
-  const readOnly = currentUser.role === 'auditor';
+  const readOnly = !canAccessPage(currentUser, 'probes', 'write');
   const isAdmin = currentUser.role === 'admin';
   const [items, setItems] = useState<HttpProbe[]>([]);
   const [total, setTotal] = useState(0);

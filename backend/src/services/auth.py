@@ -64,6 +64,10 @@ def create_user(
         must_change_password=must_change_password,
     )
     session.add(user)
+    if role != "admin":
+        from src.services.access_policy import initialize_user
+        session.flush()
+        initialize_user(session, user.id)
     if commit:
         session.commit()
         session.refresh(user)

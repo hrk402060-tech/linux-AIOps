@@ -9,8 +9,9 @@ function status(value: string) {
   </Tag>;
 }
 
-export function AutomationRecords({ data, activeTab, onTabChange }: {
+export function AutomationRecords({ data, activeTab, onTabChange, showIntegrations = true }: {
   data: WorkbenchData | null; activeTab: string; onTabChange: (key: string) => void;
+  showIntegrations?: boolean;
 }) {
   const missing = <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="记录尚未加载，请刷新重试" />;
   return <section id="automation-records" className="automation-records" aria-label="审批与变更记录">
@@ -39,6 +40,6 @@ export function AutomationRecords({ data, activeTab, onTabChange }: {
             { title: '状态', dataIndex: 'status', render: (value: string) => <Tag color={value === 'active' ? 'green' : 'default'}>{value === 'active' ? '已启用' : '已停用'}</Tag> },
           ]} /> : missing,
       },
-    ]} />
+    ].filter(({ key }) => showIntegrations || key !== 'integrations')} />
   </section>;
 }

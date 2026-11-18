@@ -11,6 +11,7 @@ from src.models.asset_access import UserAccessAudit, UserAssetAccess
 from src.models.auth import User
 from src.schemas.asset_access import AssetAccessEntry, UserAccessResponse, UserAccessUpdate
 from src.services import auth
+from src.services.access_policy import initialize_user
 
 if TYPE_CHECKING:
     from src.auth import AuthPrincipal
@@ -66,6 +67,8 @@ def update_user(
     before = snapshot(user)
     for key, value in changes.items():
         setattr(user, key, value.strip() if key == "display_name" and value else value)
+    if before["role"] == "admin" and user.role != "admin":
+        initialize_user(session, user.id)
     if user.role == "auditor":
         session.execute(update(UserAssetAccess).where(
             UserAssetAccess.user_id == user.id

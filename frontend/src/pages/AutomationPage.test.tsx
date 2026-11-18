@@ -62,6 +62,18 @@ beforeEach(() => {
   }));
 });
 
+it('skips sources outside the feature grants', async () => {
+  const fetchMock = vi.mocked(fetch);
+  render(<AutomationPage onNavigate={vi.fn()} currentUser={{ id: 'policy-user', username: 'reader',
+    role: 'operator', enabled: true, must_change_password: false, display_name: null, created_at: '',
+    last_login_at: null, permissions: ['automation:read'] }} />);
+  expect(await screen.findByRole('button', { name: '查看任务：生产巡检审批' })).toBeVisible();
+  for (const path of ['/api/v1/scan-schedules', '/api/v1/baselines', '/api/v1/operations/integrations']) {
+    expect(fetchMock).not.toHaveBeenCalledWith(path, expect.any(Object));
+  }
+  expect(screen.queryByRole('button', { name: '新建任务' })).not.toBeInTheDocument();
+});
+
 it('uses the confirmed title and removes introduction and policy strips', async () => {
   renderPage();
   await loaded();

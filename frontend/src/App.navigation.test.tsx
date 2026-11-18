@@ -110,6 +110,38 @@ afterEach(() => {
   window.history.replaceState({}, '', '/');
 });
 
+describe('管理员配置的功能权限', () => {
+  it('does not mount an unauthorized deep link or issue global search for managed users', async () => {
+    window.history.replaceState({}, '', '/?page=dashboard');
+    auth.getCurrentUser.mockResolvedValue({ ...auth.user, role: 'operator', permissions: ['assets:read'] });
+    render(<App />);
+    expect(await screen.findByText('资产搜索上下文 全部')).toBeVisible();
+    expect(screen.queryByText('总览测试页')).not.toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: '测试搜索上下文' })).not.toBeInTheDocument();
+    expect(within(screen.getByRole('menu', { name: '主导航' })).getAllByRole('menuitem').map((item) => item.textContent))
+      .toEqual(['服务器资产']);
+  });
+
+  it('keeps personal security available when an assigned policy has no grants', async () => {
+    auth.getCurrentUser.mockResolvedValue({ ...auth.user, role: 'operator', permissions: [] });
+    render(<App />);
+    expect(await screen.findByText('个人安全测试页')).toBeVisible();
+    expect(screen.queryByText('总览测试页')).not.toBeInTheDocument();
+  });
+
+  it('requires write permission for standalone SSH and unmounts on revocation', async () => {
+    window.history.replaceState({}, '', '/?terminal_asset=scope-node');
+    auth.getCurrentUser.mockResolvedValue({ ...auth.user, role: 'operator', permissions: ['terminal:read', 'terminal:write'] });
+    render(<App />);
+    expect(await screen.findByText('终端测试页 scope-node')).toBeVisible();
+    auth.getCurrentUser.mockResolvedValue({ ...auth.user, role: 'operator', permissions: ['terminal:read'] });
+    await act(async () => window.dispatchEvent(new Event('focus')));
+    expect(await screen.findByText('当前账号无权打开 SSH 会话')).toBeVisible();
+    expect(screen.queryByText('终端测试页 scope-node')).not.toBeInTheDocument();
+    expect(auth.terminalUnmount).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('使用文档独立页面', () => {
   it('security_navigation: 个人安全入口只打开个人绑定页', async () => {
     const page = 'user-security';

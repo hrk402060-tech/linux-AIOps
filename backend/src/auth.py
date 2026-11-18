@@ -5,7 +5,9 @@ from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from src.services.auth import get_session_user
+from src.services.access_policy import AccessPolicyUnavailableError, effective_permissions
 from src.services.auth_policy import AuthPolicyUnavailableError
+from src.services.feature_permissions import allowed_request
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -17,6 +19,7 @@ class AuthPrincipal:
     user_id: str | None
     auth_type: str
     must_change_password: bool = False
+    permissions: frozenset[str] | None = None
 
 
 def require_authenticated(
@@ -37,7 +40,8 @@ def require_authenticated(
         with request.app.state.session_factory() as session:
             try:
                 result = get_session_user(session, raw_token, settings)
-            except AuthPolicyUnavailableError as error:
+                permissions = effective_permissions(session, result[1].id, result[1].role) if result else None
+            except (AuthPolicyUnavailableError, AccessPolicyUnavailableError) as error:
                 raise HTTPException(status_code=503, detail=str(error)) from error
         if result is not None:
             _, user = result
@@ -45,7 +49,7 @@ def require_authenticated(
                 validate_request_origin(request)
             principal = AuthPrincipal(
                 user.username, user.role, user.id, "session",
-                user.must_change_password,
+                user.must_change_password, permissions,
             )
             request.state.auth_principal = principal
             return principal
@@ -73,7 +77,15 @@ def require_admin(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="审计员账号仅允许只读访问",
         )
+    require_feature_access(request, principal)
     return principal
+
+
+def require_feature_access(request: Request, principal: AuthPrincipal = Depends(require_authenticated)) -> None:
+    if principal.permissions is None:
+        return
+    if principal.must_change_password or not allowed_request(principal.permissions, request):
+        raise HTTPException(status_code=403, detail="未获授权访问此功能")
 
 
 def require_system_admin(

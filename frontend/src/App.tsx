@@ -38,13 +38,14 @@ import { PlatformSettingsPage } from './pages/PlatformSettingsPage';
 import { UserDocsPage } from './pages/UserDocsPage';
 import { openTerminalTab } from './utils/terminalNavigation';
 import { requestedPlatformPage } from './utils/userDocsNavigation';
+import { canAccessPage, firstAccessiblePage, permissionScope } from './utils/pageAccess';
 
 export type PageKey = 'dashboard' | 'server-monitoring' | 'cmdb' | 'terminal' | 'observability' | 'probes' | 'assets' | 'scans' | 'schedules' | 'baselines' | 'exposures' | 'credential-risks' | 'findings' | 'incidents' | 'reports' | 'audit-log' | 'patches' | 'credentials' | 'knowledge' | 'agent' | 'alerts' | 'system' | 'settings' | 'user-authorization' | 'automation' | 'ops-assistant' | 'user-security' | 'security-settings' | 'kubernetes-clusters';
 
 export default function App() {
   const [monitorPreview, setMonitorPreview] = useState(() => import.meta.env.VITE_SERVER_MONITOR_PREVIEW === 'true'
     && new URLSearchParams(window.location.search).get('view') === 'server-monitoring-preview');
-  const [page, setPage] = useState<PageKey>(() => requestedPlatformPage() ?? 'dashboard');
+  const [requestedPage, setPage] = useState<PageKey>(() => requestedPlatformPage() ?? 'dashboard');
   const [settingsReturnPage, setSettingsReturnPage] = useState<PageKey>('dashboard');
   const [findingAssetId, setFindingAssetId] = useState<string | null>(null);
   const [terminalAssetId, setTerminalAssetId] = useState<string | null>(null);
@@ -65,9 +66,14 @@ export default function App() {
     setServiceAssistantContext(undefined);
   }, []);
   const { currentUser, authLoading, setCurrentUser } = useCurrentUser(resetScopedState);
-  const scopeKey = `${currentUser?.id ?? ''}:${currentUser?.role ?? ''}:${currentUser?.access_revision ?? 0}`;
+  const scopeKey = `${currentUser?.id ?? ''}:${currentUser?.role ?? ''}:${currentUser?.access_revision ?? 0}:${permissionScope(currentUser)}`;
+  const allowed = (target: PageKey, action: 'read' | 'write' = 'read') => currentUser !== null && canAccessPage(currentUser, target, action);
+  const permittedPage = (target: PageKey): PageKey => allowed(target) ? target
+    : currentUser ? firstAccessiblePage(currentUser) : 'dashboard';
+  const page = permittedPage(requestedPage);
   const standaloneTerminalAssetId = new URLSearchParams(window.location.search).get('terminal_asset');
   const navigate = (nextPage: PageKey) => {
+    if (!allowed(nextPage)) return;
     if (['settings', 'security-settings'].includes(nextPage) && !['settings', 'security-settings'].includes(page)) setSettingsReturnPage(page);
     if (monitorPreview) {
       setMonitorPreview(false);
@@ -86,23 +92,27 @@ export default function App() {
     setPage(nextPage);
   };
   const navigateToSearchResult = (target: SearchTarget) => {
+    if (!allowed(target.page)) return;
     navigate(target.page);
     setSearchTarget(target);
     setSearchNavigationId((value) => value + 1);
     if (target.page === 'findings') setFindingAssetId(target.assetId);
   };
   const viewAssetFindings = (assetId: string) => {
+    if (!allowed('findings')) return;
     setSearchTarget(null);
     setFindingAssetId(assetId);
     setPage('findings');
   };
   const openTerminalInPage = (assetId: string) => {
+    if (!allowed('terminal', 'write')) return;
     setSearchTarget(null);
     terminalNotice.destroy('terminal-tab-request');
     setTerminalAssetId(assetId);
     setPage('terminal');
   };
   const openAssetTerminal = (assetId: string) => {
+    if (!allowed('terminal', 'write')) return;
     try {
       openTerminalTab(assetId);
     } catch {
@@ -118,12 +128,15 @@ export default function App() {
     });
   };
   const openServiceProbeHistory = (serviceId: string, probe: { id: string; name: string }) => {
+    if (!allowed('probes')) return;
     setServiceProbeContext({ serviceId, probe }); setPage('probes');
   };
   const openServiceAlerts = (assetId: string, tab: 'activity' | 'external' = 'activity', alertId?: string) => {
+    if (!allowed('alerts')) return;
     setServiceAlertContext({ assetId, tab, alertId }); setPage('alerts');
   };
   const openServiceAssistant = (assetId: string, context: string) => {
+    if (!allowed('ops-assistant')) return;
     setServiceAssistantContext({ assetId, context }); setPage('ops-assistant');
   };
   useEffect(() => () => terminalNotice.destroy('terminal-tab-request'), [scopeKey, terminalNotice]);
@@ -138,32 +151,35 @@ export default function App() {
   if (new URLSearchParams(window.location.search).get('view') === 'docs') {
     return <UserDocsPage key={scopeKey} />;
   }
-  if (monitorPreview) {
+  if (monitorPreview && allowed('server-monitoring')) {
     return <AppShell key={scopeKey} currentUser={currentUser} onLogout={() => void signOut()} selectedPage="server-monitoring"
       onNavigate={navigate} onSearchNavigate={navigateToSearchResult}>
       {terminalNoticeHolder}
-      <ServerMonitoringPreviewPage key={scopeKey} canManage={currentUser.role !== 'auditor'} />
+      <ServerMonitoringPreviewPage key={scopeKey} canManage={allowed('server-monitoring', 'write')} />
     </AppShell>;
   }
-  if (new URLSearchParams(window.location.search).get('view') === 'dashboard-preview') {
+  if (new URLSearchParams(window.location.search).get('view') === 'dashboard-preview' && allowed('dashboard')) {
     return <AppShell key={scopeKey} currentUser={currentUser} onLogout={() => void signOut()} selectedPage="dashboard"
       onNavigate={navigate} onSearchNavigate={navigateToSearchResult}>
       {terminalNoticeHolder}
-      <DashboardPreviewPage onNavigate={navigate} onViewFindings={viewAssetFindings} onOpenTerminal={openAssetTerminal} />
+      <DashboardPreviewPage onNavigate={navigate} />
     </AppShell>;
   }
   if (standaloneTerminalAssetId) {
-    return <TerminalPage key={scopeKey} initialAssetId={standaloneTerminalAssetId} standalone />;
+    return allowed('terminal', 'write')
+      ? <TerminalPage key={scopeKey} initialAssetId={standaloneTerminalAssetId} standalone
+        canUseAssistant={allowed('ops-assistant')} />
+      : <main className="auth-loading"><div role="alert">当前账号无权打开 SSH 会话</div></main>;
   }
   const settingsOpen = page === 'settings' || page === 'security-settings';
-  const contentPage = settingsOpen ? settingsReturnPage : page;
+  const contentPage = settingsOpen ? permittedPage(settingsReturnPage) : page;
   return (
     <AppShell key={scopeKey} currentUser={currentUser} onLogout={() => void signOut()} selectedPage={page}
       onNavigate={navigate} onSearchNavigate={navigateToSearchResult}>
       {terminalNoticeHolder}
       <div className="workspace-settings-underlay" hidden={settingsOpen} key={scopeKey}>
       {contentPage === 'dashboard' ? <DashboardPage onNavigate={navigate} onViewFindings={viewAssetFindings} onOpenTerminal={openAssetTerminal} />
-        : contentPage === 'server-monitoring' ? <ServerMonitoringPreviewPage key={scopeKey} canManage={currentUser.role !== 'auditor'} />
+        : contentPage === 'server-monitoring' ? <ServerMonitoringPreviewPage key={scopeKey} canManage={allowed('server-monitoring', 'write')} />
         : contentPage === 'cmdb' ? <CmdbPage currentUser={currentUser}
           key={searchTarget?.page === 'cmdb' ? `${searchTarget.serviceId}:${searchNavigationId}` : 'cmdb'}
           initialServiceId={searchTarget?.page === 'cmdb' ? searchTarget.serviceId : undefined} />
@@ -171,9 +187,9 @@ export default function App() {
         : contentPage === 'user-authorization' ? <SystemPage currentUser={currentUser} onLogout={() => void signOut()} usersOnly />
         : contentPage === 'user-security' ? <UserSecurityPage onLogout={() => void signOut()} />
         : contentPage === 'patches' ? <PatchesPage />
-        : contentPage === 'automation' ? <AutomationPage onNavigate={navigate} />
+        : contentPage === 'automation' ? <AutomationPage onNavigate={navigate} currentUser={currentUser} />
         : contentPage === 'audit-log' ? <AuditLogPage />
-        : isSecurityCheckPage(contentPage) ? <SecurityChecksPage activeKey={contentPage} onNavigate={navigate} />
+        : isSecurityCheckPage(contentPage) ? <SecurityChecksPage activeKey={contentPage} onNavigate={navigate} currentUser={currentUser} />
         : contentPage === 'alerts' ? <EventsPage currentUser={currentUser} initialAssetId={serviceAlertContext?.assetId}
           initialTab={serviceAlertContext?.tab} initialAlertId={serviceAlertContext?.alertId}
           onOpenTerminal={openAssetTerminal} onOpenIncidents={() => navigate('incidents')} />
@@ -181,7 +197,8 @@ export default function App() {
         : contentPage === 'observability' ? <ObservabilityPage onOpenProbeHistory={openServiceProbeHistory} onOpenAlerts={openServiceAlerts}
           onOpenFindings={viewAssetFindings} onOpenTerminal={openAssetTerminal} onOpenAssistant={openServiceAssistant} />
         : contentPage === 'probes' ? <ProbesPage currentUser={currentUser} initialServiceId={serviceProbeContext?.serviceId} initialProbe={serviceProbeContext?.probe} />
-        : contentPage === 'terminal' ? <TerminalPage initialAssetId={terminalAssetId} />
+        : contentPage === 'terminal' ? <TerminalPage initialAssetId={terminalAssetId}
+          canConnect={allowed('terminal', 'write')} canUseAssistant={allowed('ops-assistant')} />
         : contentPage === 'ops-assistant' ? <OperationsAssistantPage userId={currentUser.id}
           initialAssetId={serviceAssistantContext?.assetId} initialContext={serviceAssistantContext?.context} />
         : contentPage === 'kubernetes-clusters' ? <KubernetesManagementPage currentUser={currentUser} />
@@ -199,7 +216,7 @@ export default function App() {
       </div>
       {settingsOpen ? <PlatformSettingsPage currentUser={currentUser}
         initialCategory={page === 'security-settings' ? 'security' : 'basic'}
-        onBack={() => setPage(settingsReturnPage)} /> : null}
+        onBack={() => setPage(permittedPage(settingsReturnPage))} /> : null}
     </AppShell>
   );
 }

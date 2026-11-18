@@ -156,19 +156,22 @@ class DashboardAttentionItem(BaseModel):
     target: str
 
 
-class DashboardResponse(BaseModel):
+class MonitoringSummaryResponse(BaseModel):
     assets: DashboardAssets
+    monitoring_assets: list[DashboardMonitoringAsset]
+    resource_trends: list[DashboardTrendPoint]
+    monitoring_mode: str
+
+
+class DashboardResponse(MonitoringSummaryResponse):
     vulnerabilities: DashboardVulnerabilities
     scans: DashboardScans
     knowledge: DashboardKnowledge
     recent_scans: list[RecentScan]
     affected_assets: list[AffectedAsset]
     resource_alerts: DashboardResourceAlerts
-    monitoring_assets: list[DashboardMonitoringAsset]
-    resource_trends: list[DashboardTrendPoint]
     active_alerts: list[DashboardActiveAlert]
     catalog: DashboardCatalog
     service_health: DashboardServiceHealth
     operations: DashboardOperations
     attention_items: list[DashboardAttentionItem]
-    monitoring_mode: str

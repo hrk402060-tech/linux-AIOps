@@ -1,10 +1,16 @@
 from datetime import datetime, timezone
+import json
 
 from fastapi.testclient import TestClient
+import httpx
+import pytest
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from src.models.ai_agent import AgentRecommendation
 from src.models.vulnerability import VulnerabilityCase, VulnerabilityFinding
 from src.models.asset import Asset, AssetEnvironment, OsFamily
+from src.services import external_vulnerability_ai
 
 
 def _add_finding(session: Session) -> VulnerabilityFinding:
@@ -176,3 +182,99 @@ def test_provider_config_normalizes_operator_whitespace(client: TestClient) -> N
 
     audit = client.get('/api/v1/audit-log?source=ai_provider_config').json()
     assert audit['items'][0]['operator'] == 'break-glass-admin'
+
+
+def _configure_external(client: TestClient, *, allow_egress: bool) -> None:
+    saved = client.post('/api/v1/agent/providers/config', json={
+        'provider_id': 'deepseek', 'api_key': 'test-vulnerability-provider-key', 'enabled': True,
+    })
+    assert saved.status_code == 201
+    if allow_egress:
+        policy = client.get('/api/v1/system/settings').json()['settings']['ai_policy']
+        saved_policy = client.put('/api/v1/system/settings/ai_policy', json={
+            **policy, 'external_vulnerability_enabled': True,
+        })
+        assert saved_policy.status_code == 200
+
+
+def _completion(**decision: object) -> dict[str, object]:
+    return {'choices': [{'finish_reason': 'stop', 'message': {
+        'content': json.dumps(decision),
+    }}]}
+
+
+def test_external_triage_requires_explicit_egress_and_never_sends_host_evidence(
+    client: TestClient, database_session: Session, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    finding = _add_finding(database_session)
+    calls: list[httpx.Request] = []
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        calls.append(request)
+        return httpx.Response(200, json=_completion(priority='normal', controls=['monitoring']))
+
+    monkeypatch.setattr(external_vulnerability_ai, '_client', lambda: httpx.Client(
+        transport=httpx.MockTransport(respond),
+    ))
+    payload = {'finding_id': finding.id, 'provider_id': 'deepseek'}
+    _configure_external(client, allow_egress=False)
+    assert client.post('/api/v1/agent/triage', json=payload).status_code == 403
+    assert not calls
+    _configure_external(client, allow_egress=True)
+    result = client.post('/api/v1/agent/triage', json=payload)
+    assert result.status_code == 201, result.text
+    request = calls.pop()
+    assert str(request.url) == 'https://api.deepseek.com/chat/completions'
+    assert request.headers['authorization'] == 'Bearer test-vulnerability-provider-key'
+    body = json.loads(request.content)
+    assert 'tools' not in body
+    assert json.loads(body['messages'][-1]['content']) == {
+        'cve_id': 'CVE-2026-3001', 'severity': 'critical', 'conclusion': 'confirmed',
+    }
+    advice = result.json()
+    assert advice['status'] == 'pending_review' and advice['can_execute'] is False
+    assert advice['priority'] == 'urgent' and advice['provider_id'] == 'deepseek'
+    assert '告警' in str(advice['remediation_steps'])
+
+
+@pytest.mark.parametrize('reply, expected', [
+    (httpx.Response(401, text='private upstream request details'), 502),
+    (httpx.Response(429), 503),
+    (httpx.Response(307, headers={'location': 'https://untrusted.example'}), 502),
+    (httpx.Response(200, json=_completion(priority='high', controls=['not_a_control'])), 502),
+    (httpx.Response(200, json=_completion(priority='high', controls=['monitoring'], instructions='ignored')), 502),
+])
+def test_external_triage_does_not_render_or_persist_invalid_provider_output(
+    client: TestClient, database_session: Session, monkeypatch: pytest.MonkeyPatch,
+    reply: httpx.Response, expected: int,
+) -> None:
+    finding = _add_finding(database_session)
+    _configure_external(client, allow_egress=True)
+    monkeypatch.setattr(external_vulnerability_ai, '_client', lambda: httpx.Client(
+        transport=httpx.MockTransport(lambda _: reply),
+    ))
+    result = client.post('/api/v1/agent/triage', json={
+        'finding_id': finding.id, 'provider_id': 'deepseek',
+    })
+    assert result.status_code == expected
+    assert 'private upstream' not in result.text
+    assert database_session.scalar(select(AgentRecommendation)) is None
+
+
+def test_provider_test_uses_synthetic_input_and_does_not_create_advice(
+    client: TestClient, database_session: Session, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _configure_external(client, allow_egress=False)
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        messages = json.loads(request.content)['messages']
+        assert json.loads(messages[-1]['content']) == {'connection_check': True}
+        return httpx.Response(200, json=_completion(priority='review', controls=['monitoring']))
+
+    monkeypatch.setattr(external_vulnerability_ai, '_client', lambda: httpx.Client(
+        transport=httpx.MockTransport(respond),
+    ))
+    tested = client.post('/api/v1/agent/providers/config/deepseek/test')
+    assert tested.status_code == 200
+    assert tested.json()['network_called'] is True
+    assert database_session.scalar(select(AgentRecommendation)) is None

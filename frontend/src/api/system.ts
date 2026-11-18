@@ -45,7 +45,7 @@ export interface PlatformSettingsResponse {
     tasks: { max_concurrency: number; terminal_max_connections: number; execution_timeout_seconds: number; failure_policy: 'continue' | 'stop'; terminal_idle_timeout_seconds: number; terminal_max_duration_seconds: number; require_confirmation: boolean };
     notifications: { enabled: boolean; default_channel: 'email' | 'webhook' | 'both'; quiet_hours_enabled?: boolean; quiet_hours_start: string; quiet_hours_end: string; retry_count: number };
     authentication: { local_login_enabled: boolean; ldap_enabled: boolean; oidc_enabled: boolean; new_account_policy: 'admin_only' | 'invite_only' };
-    ai_policy?: { ops_assistant_enabled: boolean; vulnerability_assistant_enabled: boolean; include_terminal_output: boolean; include_asset_context: boolean; history_messages: number; redact_sensitive_data: boolean };
+    ai_policy?: { ops_assistant_enabled: boolean; vulnerability_assistant_enabled: boolean; external_vulnerability_enabled?: boolean; include_terminal_output: boolean; include_asset_context: boolean; history_messages: number; redact_sensitive_data: boolean };
     storage: { retention_days: number; auto_cleanup_enabled: boolean; backup_enabled: boolean; backup_path: string; verify_backup_after_create: boolean; backup_interval_hours?: number; cleanup_interval_hours?: number };
   };
   security: AuthPolicy;

@@ -227,11 +227,35 @@ def test_admin_can_create_user_and_auditor_is_read_only(auth_client: TestClient)
         "role": "auditor",
     })
     assert created.status_code == 201
+    user_id = created.json()["id"]
+    policy_path = "/api/v1/auth/access-policy"
+    policy = auth_client.get(policy_path).json()
+    assert auth_client.put(policy_path, headers={"If-Match": policy["revision"]}, json={
+        "roles": [], "groups": [], "users": [{
+            "user_id": user_id, "role_ids": [], "group_ids": [], "permissions": ["assets:write"],
+        }],
+    }).status_code == 200
     auth_client.post("/api/v1/auth/logout")
-    login(auth_client, "audit-user", "Audit-Only-Password-2026")
+    assert login(auth_client, "audit-user", "Audit-Only-Password-2026")["permissions"] == ["assets:read"]
     assert auth_client.get("/api/v1/assets").status_code == 200
     denied = auth_client.post("/api/v1/assets", json={})
     assert denied.status_code == 403
+
+
+def test_demoted_admin_does_not_inherit_legacy_permissions(auth_client: TestClient) -> None:
+    activate_admin(auth_client)
+    created = auth_client.post("/api/v1/auth/users", json={
+        "username": "demoted-admin", "password": "Demoted-Test-2026!", "role": "admin",
+    })
+    assert created.status_code == 201
+    user = created.json()
+    assert user["permissions"] is None
+    updated = auth_client.patch(f"/api/v1/auth/users/{user['id']}", json={"role": "operator"})
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["permissions"] == []
+    auth_client.post("/api/v1/auth/logout")
+    assert login(auth_client, "demoted-admin", "Demoted-Test-2026!")["permissions"] == []
+    assert auth_client.get("/api/v1/assets").status_code == 403
 
 
 @pytest.mark.parametrize("password", [

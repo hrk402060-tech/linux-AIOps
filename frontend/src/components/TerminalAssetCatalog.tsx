@@ -13,9 +13,10 @@ interface Props {
   error: string;
   onReload: () => void;
   onOpenInPage: (assetId: string) => void;
+  canConnect?: boolean;
 }
 
-export function TerminalAssetCatalog({ assets, loading, error, onReload, onOpenInPage }: Props) {
+export function TerminalAssetCatalog({ assets, loading, error, onReload, onOpenInPage, canConnect = true }: Props) {
   const [group, setGroup] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(1);
@@ -59,21 +60,21 @@ export function TerminalAssetCatalog({ assets, loading, error, onReload, onOpenI
       <Spin spinning={loading}>
         <div className="terminal-catalog-table-scroll">
           <table className="terminal-catalog-table" aria-label="SSH 服务器资源">
-            <thead><tr><th>名称</th><th>地址</th><th>平台</th><th>账号</th><th>状态</th><th>操作</th></tr></thead>
+            <thead><tr><th>名称</th><th>地址</th><th>平台</th><th>账号</th><th>状态</th>{canConnect ? <th>操作</th> : null}</tr></thead>
             <tbody>{rows.map((item) => {
               const configured = Boolean(item.credential_id);
               const path = terminalAssetHref(item.id);
               return <tr key={item.id}>
-                <td><Tooltip title="在当前页打开"><button type="button" className="terminal-catalog-name" aria-label={`当前页打开 ${item.name}`}
-                  disabled={!configured} onClick={() => onOpenInPage(item.id)}><Server size={16} /><span title={item.name}>{item.name}</span></button></Tooltip></td>
+                <td>{canConnect ? <Tooltip title="在当前页打开"><button type="button" className="terminal-catalog-name" aria-label={`当前页打开 ${item.name}`}
+                  disabled={!configured} onClick={() => onOpenInPage(item.id)}><Server size={16} /><span title={item.name}>{item.name}</span></button></Tooltip> : <span title={item.name}>{item.name}</span>}</td>
                 <td><span title={`${item.host}:${item.ssh_port}`}>{item.host}:{item.ssh_port}</span></td>
                 <td><span title={osLabels[item.os_family]}>{item.os_family === 'auto' ? 'Linux' : osLabels[item.os_family]}</span></td>
                 <td><span>{item.credential?.username ?? '未配置'}</span></td>
                 <td><span className="terminal-catalog-status"><i className={`terminal-asset-status is-${item.status}`} />{statusLabels[item.status]}</span></td>
-                <td><Tooltip title={configured ? '新标签打开 SSH' : '请先在服务器资产配置 SSH 登录信息'}>
+                {canConnect ? <td><Tooltip title={configured ? '新标签打开 SSH' : '请先在服务器资产配置 SSH 登录信息'}>
                   <Button type="primary" aria-label={`新标签连接 ${item.name}`} disabled={!configured}
                     href={configured ? path : undefined} target="_blank" rel="noopener noreferrer" icon={<Monitor size={17} />} />
-                </Tooltip></td>
+                </Tooltip></td> : null}
               </tr>;
             })}</tbody>
           </table>

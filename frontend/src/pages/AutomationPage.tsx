@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Button, Dropdown, Empty, Input, Pagination, Progress, Segmented, Skeleton, Spin, Switch, Tooltip } from 'antd';
 import { ArrowRight, CalendarCheck, ChevronRight, Clock3, ListChecks, LoaderCircle, PanelRightClose, Plus, RadioTower, RefreshCw, Search } from 'lucide-react';
 import type { PageKey } from '../App';
+import type { AuthUser } from '../api/auth';
+import { canAccessPage } from '../utils/pageAccess';
 import { AutomationRecords } from './AutomationRecords';
 import {
   buildWorkbenchTasks, filterWorkbenchTasks, formatWorkbenchTime, loadWorkbenchData,
@@ -46,7 +48,7 @@ function TaskDetail({ task, open, onClose, onNavigate }: {
   </div>;
 }
 
-export function AutomationPage({ onNavigate }: { onNavigate: (page: PageKey) => void }) {
+export function AutomationPage({ onNavigate, currentUser }: { onNavigate: (page: PageKey) => void; currentUser?: AuthUser }) {
   const [data, setData] = useState<WorkbenchData | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -59,16 +61,20 @@ export function AutomationPage({ onNavigate }: { onNavigate: (page: PageKey) => 
   const [recordTab, setRecordTab] = useState('approvals');
   const dataRef = useRef(data);
   const requestVersion = useRef(0);
+  const allowed = useCallback((page: PageKey, action: 'read' | 'write' = 'read') => !currentUser || canAccessPage(currentUser, page, action), [currentUser]);
+  const visibleModules = moduleEntries.filter(({ key }) => allowed(key));
+  const writableModules = visibleModules.filter(({ key }) => allowed(key, 'write'));
+  const showIntegrations = allowed('alerts');
   const load = useCallback(async () => {
     const version = ++requestVersion.current;
     setLoading(true);
-    const result = await loadWorkbenchData(dataRef.current);
+    const result = await loadWorkbenchData(dataRef.current, allowed);
     if (version !== requestVersion.current) return;
     dataRef.current = result.data;
     setData(result.data);
     setErrors(result.errors);
     setLoading(false);
-  }, []);
+  }, [allowed]);
   useEffect(() => { void load(); return () => { requestVersion.current += 1; }; }, [load]);
   const tasks = useMemo(() => buildWorkbenchTasks(data), [data]);
   const filtered = useMemo(() => filterWorkbenchTasks(tasks, search, category, pendingOnly), [tasks, search, category, pendingOnly]);
@@ -102,11 +108,11 @@ export function AutomationPage({ onNavigate }: { onNavigate: (page: PageKey) => 
       <h1>自动化任务</h1>
       <div className="automation-heading-actions">
         <Button aria-label="刷新自动化任务" icon={<RefreshCw size={16} />} loading={loading} onClick={() => void load()}>刷新</Button>
-        <Dropdown trigger={['click']} menu={{ items: moduleEntries.map((entry) => ({
+        {writableModules.length ? <Dropdown trigger={['click']} menu={{ items: writableModules.map((entry) => ({
           key: entry.key, label: entry.label, onClick: () => onNavigate(entry.key),
         })) }}>
           <Button type="primary" icon={<Plus size={16} />}>新建任务</Button>
-        </Dropdown>
+        </Dropdown> : null}
       </div>
     </div>
     {errors.length ? <Alert role="alert" type="warning" showIcon
@@ -114,15 +120,15 @@ export function AutomationPage({ onNavigate }: { onNavigate: (page: PageKey) => 
       description={data && tasks.length ? '可用来源继续展示；失败来源保留上次数据或显示未知，请刷新重试。' : '请刷新重试，失败来源不计为零或正常。'}
       action={<Button size="small" onClick={() => void load()} loading={loading}>重试</Button>} /> : null}
     <div className="automation-metrics">
-      {metrics.map(({ key, label, count, icon: Icon }) => <div key={key} data-testid={`automation-metric-${key}`}>
+      {metrics.filter(({ key }) => showIntegrations || key !== 'integrations').map(({ key, label, count, icon: Icon }) => <div key={key} data-testid={`automation-metric-${key}`}>
         <div><span>{label}</span><strong>{count ?? '—'}</strong></div><Icon size={22} aria-hidden="true" />
       </div>)}
     </div>
-    <nav className="automation-module-shortcuts" aria-label="任务模块入口">
-      {moduleEntries.map((entry) => <Button type="text" key={entry.key} aria-label={`进入${entry.label}`} onClick={() => onNavigate(entry.key)}>
+    {visibleModules.length ? <nav className="automation-module-shortcuts" aria-label="任务模块入口">
+      {visibleModules.map((entry) => <Button type="text" key={entry.key} aria-label={`进入${entry.label}`} onClick={() => onNavigate(entry.key)}>
         {entry.label}<span>{data?.[entry.dataKey]?.length ?? '—'}</span><ChevronRight size={13} />
       </Button>)}
-    </nav>
+    </nav> : null}
     <div className="automation-controls">
       <Input aria-label="搜索任务" allowClear prefix={<Search size={16} />} placeholder="搜索任务名称、目标或执行记录"
         value={search} onChange={(event) => setSearch(event.target.value)} />
@@ -146,7 +152,7 @@ export function AutomationPage({ onNavigate }: { onNavigate: (page: PageKey) => 
                   <time>{formatWorkbenchTime(task.updatedAt)}</time></span>
                 <ChevronRight size={15} aria-hidden="true" />
               </button>)}
-            </div> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={search || category !== 'all' || pendingOnly ? '没有符合条件的任务' : '暂无任务，可新建任务或进入模块创建'} />}
+            </div> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={search || category !== 'all' || pendingOnly ? '没有符合条件的任务' : writableModules.length ? '暂无任务，可新建任务或进入模块创建' : '暂无任务'} />}
           <Pagination size="small" hideOnSinglePage showSizeChanger={false} pageSize={pageSize} current={currentPage}
             total={filtered.length} onChange={(next) => { setPage(next); setDetailOpen(false); }} />
         </section>
@@ -157,7 +163,7 @@ export function AutomationPage({ onNavigate }: { onNavigate: (page: PageKey) => 
           } else onNavigate(target);
         }} />
       </div>
-      <AutomationRecords data={data} activeTab={recordTab} onTabChange={setRecordTab} />
+      <AutomationRecords data={data} activeTab={recordTab} onTabChange={setRecordTab} showIntegrations={showIntegrations} />
     </Spin>
   </section>;
 }

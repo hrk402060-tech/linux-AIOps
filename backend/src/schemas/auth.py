@@ -38,6 +38,7 @@ class UserResponse(BaseModel):
     failed_login_attempts: int = 0
     locked_until: datetime | None = None
     mfa_enabled: bool = False
+    permissions: list[str] | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

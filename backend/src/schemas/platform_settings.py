@@ -108,6 +108,7 @@ class AIPolicySettings(BaseModel):
 
     ops_assistant_enabled: bool = True
     vulnerability_assistant_enabled: bool = True
+    external_vulnerability_enabled: bool = False
     include_terminal_output: bool = True
     include_asset_context: bool = True
     history_messages: int = Field(default=20, ge=0, le=20, strict=True)

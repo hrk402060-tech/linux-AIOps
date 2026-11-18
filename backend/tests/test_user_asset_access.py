@@ -63,7 +63,24 @@ def create_user(client: TestClient, username: str = "scoped-user", role: str = "
         "username": username, "password": "Scope-Test-2026!", "role": role,
     })
     assert response.status_code == 201, response.text
-    return response.json()
+    user = response.json()
+    if role != "admin":
+        grant_features(client, user, ["assets:read"] if role == "auditor" else [
+            "assets:write", "terminal:write", "ops-assistant:write",
+        ])
+    return user
+
+
+def grant_features(client: TestClient, user: dict, permissions: list[str]) -> None:
+    path = "/api/v1/auth/access-policy"
+    policy = client.get(path, headers=ADMIN).json()
+    assignments = [entry for entry in policy["users"] if entry["user_id"] != user["id"]]
+    result = client.put(path, headers={**ADMIN, "If-Match": policy["revision"]}, json={
+        "roles": policy["roles"], "groups": policy["groups"],
+        "users": [*assignments, {"user_id": user["id"], "role_ids": [], "group_ids": [],
+                                  "permissions": permissions}],
+    })
+    assert result.status_code == 200, result.text
 
 
 def create_asset(client: TestClient, name: str) -> str:
@@ -108,7 +125,7 @@ def test_new_user_denied_by_default_and_grants_do_not_leak_assets(client: TestCl
     assert response.status_code == 200
     assert [item["id"] for item in client.get("/api/v1/assets?lifecycle=all").json()] == [granted]
     assert hidden not in client.get("/api/v1/assets").text
-    with patch("src.services.assets.check_tcp_connectivity", return_value=(True, 1, "ok")) as network:
+    with patch("src.services.assets.open_client") as network:
         assert client.post(f"/api/v1/assets/{hidden}/check").status_code == 403
         assert client.post(f"/api/v1/assets/{granted}/check").status_code == 200
         assert client.post("/api/v1/terminal/tickets", json={"asset_id": granted}).status_code == 403
@@ -210,7 +227,8 @@ def test_other_user_cannot_disconnect_or_read_private_terminal(client: TestClien
         connect.assert_not_called()
 
 
-def test_active_terminal_ends_after_permission_is_removed(client: TestClient) -> None:
+@pytest.mark.parametrize("revoke_feature", [False, True])
+def test_active_terminal_ends_after_permission_is_removed(client: TestClient, revoke_feature: bool) -> None:
     user = create_user(client)
     asset = create_asset(client, "active-terminal")
     assert assign(client, user, [{"asset_id": asset, "can_ssh": True}]).status_code == 200
@@ -224,7 +242,14 @@ def test_active_terminal_ends_after_permission_is_removed(client: TestClient) ->
             websocket.send_json({"type": "auth", "ticket": ticket["ticket"]})
             assert websocket.receive_json()["type"] == "connected"
             assert websocket.receive_json()["type"] == "output"
-            assert assign(client, user, []).status_code == 200
+            if revoke_feature:
+                grant_features(client, user, ["assets:read"])
+                notice = websocket.receive_json()
+                assert notice["type"] == "error"
+                assert notice["reason"] == "revoked"
+                assert notice["message"] == "SSH 远程操作权限已撤销"
+            else:
+                assert assign(client, user, []).status_code == 200
             assert websocket.receive_json()["type"] == "closed"
     assert shell.active is False
 

@@ -34,6 +34,7 @@ def require_background_assets(
     operator: str | None,
     user_id: str | None,
     asset_ids: Iterable[str],
+    *, feature: str | None = None,
 ) -> None:
     """Re-read the requester's current account and asset grants before collection."""
     if user_id is None and operator in SYSTEM_OPERATORS:
@@ -50,6 +51,11 @@ def require_background_assets(
         or user.role not in {"admin", "operator"}
     ):
         raise AssetAuthorizationError("任务执行权限已撤销")
+    if feature is not None:
+        from src.services.access_policy import effective_permissions
+        permissions = effective_permissions(session, user.id, user.role)
+        if permissions is not None and f"{feature}:write" not in permissions:
+            raise AssetAuthorizationError("任务执行权限已撤销")
     allowed = None if user.role == "admin" or user.asset_scope == "all" else set(
         session.scalars(select(UserAssetAccess.asset_id).where(
             UserAssetAccess.user_id == user.id,

@@ -3,11 +3,10 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import { Alert, Button, Empty, Input, Select, Spin, Tag, message } from 'antd';
 import { Activity, Cpu, HardDrive, MemoryStick, RefreshCw, Server } from 'lucide-react';
 
-import { getDashboard } from '../api/dashboard';
-import type { DashboardMonitoringAsset, DashboardSnapshot } from '../types/dashboard';
+import { getMonitoringSummary, type MonitoringSummary } from '../api/monitoring';
+import type { DashboardMonitoringAsset } from '../types/dashboard';
 
-type MonitoringData = Pick<DashboardSnapshot, 'assets' | 'monitoring_assets' | 'resource_trends' | 'monitoring_mode'>;
-const emptyData: MonitoringData = {
+const emptyData: MonitoringSummary = {
   assets: { total: 0, online: 0, offline: 0, unknown: 0, disabled: 0 },
   monitoring_assets: [], resource_trends: [], monitoring_mode: 'ssh_agentless_near_realtime',
 };
@@ -17,7 +16,7 @@ const statusLabels: Record<string, { label: string; color: string }> = {
 };
 
 export function ServerMonitoringPage() {
-  const [data, setData] = useState<MonitoringData>(emptyData);
+  const [data, setData] = useState<MonitoringSummary>(emptyData);
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<string>();
   const [loading, setLoading] = useState(true);
@@ -26,9 +25,7 @@ export function ServerMonitoringPage() {
   const load = useCallback(async () => {
     setLoading(true); setError('');
     try {
-      const snapshot = await getDashboard();
-      setData({ assets: snapshot.assets, monitoring_assets: snapshot.monitoring_assets,
-        resource_trends: snapshot.resource_trends, monitoring_mode: snapshot.monitoring_mode });
+      setData(await getMonitoringSummary());
     } catch (value) {
       const text = value instanceof Error ? value.message : '服务器监控加载失败';
       setError(text); api.error(text);
@@ -89,7 +86,7 @@ function Metric({ label, value }: { label: string; value: number | null }) {
   const safe = value === null ? 0 : Math.min(Math.max(value, 0), 100);
   return <div><div className="server-monitoring-metric-label"><span>{label}</span><strong>{value === null ? '-' : `${value.toFixed(1)}${label === '负载' ? '' : '%'}`}</strong></div><i><b style={{ width: `${value === null ? 0 : safe}%` }} /></i></div>;
 }
-function ResourceTrend({ data }: { data: MonitoringData['resource_trends'] }) {
+function ResourceTrend({ data }: { data: MonitoringSummary['resource_trends'] }) {
   if (!data.length) return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无趋势样本" />;
   const width = 760; const height = 180; const pad = 18;
   const point = (index: number, value: number) => `${pad + (index * (width - pad * 2)) / Math.max(data.length - 1, 1)},${height - pad - (Math.min(Math.max(value, 0), 100) * (height - pad * 2)) / 100}`;

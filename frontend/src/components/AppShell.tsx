@@ -30,7 +30,8 @@ import {
 } from 'lucide-react';
 import type { PageKey } from '../App';
 import type { AuthUser } from '../api/auth';
-import { getNavigationPageKey } from '../types/security-check';
+import { getNavigationPageKey, securityCheckTabs } from '../types/security-check';
+import { canAccessPage, isPolicyManaged } from '../utils/pageAccess';
 import { GlobalSearch } from './GlobalSearch';
 import type { SearchTarget } from './GlobalSearch';
 import { requestedPlatformPage, userDocsHref } from '../utils/userDocsNavigation';
@@ -84,6 +85,19 @@ const workspaces: WorkspaceDefinition[] = [
   ] },
 ];
 
+function accessibleWorkspaces(user: AuthUser): WorkspaceDefinition[] {
+  const firstCheck = securityCheckTabs.find(({ key }) => canAccessPage(user, key))?.key;
+  return workspaces.map((workspace) => {
+    const children = workspace.children.flatMap((entry) => {
+      const key = entry.key === 'schedules' ? firstCheck : entry.key;
+      return key && canAccessPage(user, key) ? [{ ...entry, key }] : [];
+    });
+    const defaultPage = children.some(({ key }) => key === workspace.defaultPage)
+      ? workspace.defaultPage : children[0]?.key ?? workspace.defaultPage;
+    return { ...workspace, children, defaultPage };
+  });
+}
+
 const pageWorkspaces: Record<PageKey, WorkspaceKey> = {
   dashboard: 'workspace', 'server-monitoring': 'workspace', assets: 'workspace', cmdb: 'workspace', automation: 'workspace', terminal: 'workspace', 'ops-assistant': 'workspace', patches: 'workspace',
   'kubernetes-clusters': 'workspace',
@@ -126,15 +140,19 @@ function writeNavigationMemory(userId: string, memory: NavigationMemory) {
   }
 }
 
-function Navigation({ selectedPage, onNavigate, onSwitchWorkspace, collapsed = false, platformName }: {
+function Navigation({ selectedPage, onNavigate, onSwitchWorkspace, collapsed = false, platformName, available }: {
   selectedPage: PageKey; onNavigate: (page: PageKey) => void;
   onSwitchWorkspace: (workspace: WorkspaceDefinition) => void;
   collapsed?: boolean;
   platformName: string;
+  available: WorkspaceDefinition[];
 }) {
-  const activeWorkspace = workspaces.find((workspace) => workspace.key === pageWorkspaces[selectedPage]) ?? workspaces[0];
+  const activeWorkspace = available.find((workspace) => workspace.key === pageWorkspaces[selectedPage]) ?? available[0];
+  const selectable = available.filter((workspace) => workspace.key !== 'system' && workspace.children.length > 0);
   const items = (activeWorkspace.key === 'system' ? [] : activeWorkspace.children)
     .map((entry) => ({ key: entry.key, icon: entry.icon, label: entry.label }));
+  const selectedKey = getNavigationPageKey(selectedPage) === 'schedules'
+    ? activeWorkspace.children.find((entry) => entry.label === '安全检查')?.key ?? selectedPage : selectedPage;
   return (
     <div className="nav-content">
       <div className="brand" aria-label={platformName}>
@@ -143,14 +161,14 @@ function Navigation({ selectedPage, onNavigate, onSwitchWorkspace, collapsed = f
       </div>
       <div className="workspace-nav-heading">
         <strong>{activeWorkspace.label}</strong>
-        <Dropdown
+        {selectable.length > 0 ? <Dropdown
           trigger={['click']}
           overlayClassName="workspace-switcher-dropdown"
           placement="bottomLeft"
           menu={{
             selectable: true,
             selectedKeys: [activeWorkspace.key],
-            items: workspaces.filter((workspace) => workspace.key !== 'system').map((workspace) => ({
+            items: selectable.map((workspace) => ({
               key: workspace.key, icon: workspace.icon, label: workspace.label,
               onClick: () => onSwitchWorkspace(workspace),
             })),
@@ -158,7 +176,7 @@ function Navigation({ selectedPage, onNavigate, onSwitchWorkspace, collapsed = f
         >
           <Button type="text" className="workspace-switcher" aria-label="切换工作台"
             title="切换工作台" icon={<ArrowLeftRight size={18} />} />
-        </Dropdown>
+        </Dropdown> : null}
       </div>
       <ConfigProvider theme={{ token: { colorPrimary: '#1677ff' } }}>
       <Menu
@@ -166,7 +184,7 @@ function Navigation({ selectedPage, onNavigate, onSwitchWorkspace, collapsed = f
         className="nav-menu"
         mode="inline"
         theme="light"
-        selectedKeys={[getNavigationPageKey(selectedPage)]}
+        selectedKeys={[selectedKey]}
         inlineCollapsed={collapsed}
         items={items}
         onClick={({ key }) => { if (Object.hasOwn(pageWorkspaces, key)) onNavigate(key as PageKey); }}
@@ -204,6 +222,7 @@ export function AppShell({ children, currentUser, onLogout, selectedPage, onNavi
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const platform = usePlatformPreferences(currentUser.id, selectedPage, onNavigate);
+  const available = accessibleWorkspaces(currentUser);
   const preference = useRef<{ userId: string; memory: NavigationMemory; restoring?: PageKey } | null>(null);
   const activeWorkspace = workspaces.find((workspace) => workspace.key === pageWorkspaces[selectedPage]) ?? workspaces[0];
   useEffect(() => {
@@ -215,7 +234,7 @@ export function AppShell({ children, currentUser, onLogout, selectedPage, onNavi
           : selectedPage === 'dashboard' && !requestedPlatformPage() ? memory.activePage : undefined };
     }
     const state = preference.current;
-    if (state.restoring && state.restoring !== selectedPage) {
+    if (state.restoring && state.restoring !== selectedPage && canAccessPage(currentUser, state.restoring)) {
       onNavigate(state.restoring);
       return;
     }
@@ -223,17 +242,18 @@ export function AppShell({ children, currentUser, onLogout, selectedPage, onNavi
     state.memory.activePage = selectedPage;
     state.memory[pageWorkspaces[selectedPage]] = selectedPage;
     writeNavigationMemory(currentUser.id, state.memory);
-  }, [currentUser.id, onNavigate, selectedPage]);
+  }, [currentUser, onNavigate, selectedPage]);
   const switchWorkspace = (workspace: WorkspaceDefinition) => {
     if (workspace.key === activeWorkspace.key) return;
     const memory = preference.current?.userId === currentUser.id ? preference.current.memory : {};
-    onNavigate(memory[workspace.key] ?? workspace.defaultPage);
+    const remembered = memory[workspace.key];
+    onNavigate(remembered && canAccessPage(currentUser, remembered) ? remembered : workspace.defaultPage);
     setMobileOpen(false);
   };
   return (
     <ConfigProvider componentSize={platform.display_density === 'compact' ? 'small' : 'middle'}>
     <Layout data-density={platform.display_density} className={`app-layout${collapsed ? ' sidebar-collapsed' : ''}`}>
-      <Sider width={232} collapsedWidth={72} collapsed={collapsed} trigger={null} className="desktop-sider"><Navigation platformName={platform.platform_name} collapsed={collapsed} selectedPage={selectedPage} onNavigate={onNavigate} onSwitchWorkspace={switchWorkspace} /><Tooltip title={collapsed ? '展开侧栏' : '收起侧栏'}><Button className="sidebar-collapse" type="text" aria-label={collapsed ? '展开侧栏' : '收起侧栏'} icon={collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />} onClick={() => setCollapsed((value) => !value)} /></Tooltip></Sider>
+      <Sider width={232} collapsedWidth={72} collapsed={collapsed} trigger={null} className="desktop-sider"><Navigation available={available} platformName={platform.platform_name} collapsed={collapsed} selectedPage={selectedPage} onNavigate={onNavigate} onSwitchWorkspace={switchWorkspace} /><Tooltip title={collapsed ? '展开侧栏' : '收起侧栏'}><Button className="sidebar-collapse" type="text" aria-label={collapsed ? '展开侧栏' : '收起侧栏'} icon={collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />} onClick={() => setCollapsed((value) => !value)} /></Tooltip></Sider>
       <Drawer
         className="mobile-navigation"
         placement="left"
@@ -242,7 +262,7 @@ export function AppShell({ children, currentUser, onLogout, selectedPage, onNavi
         width={300}
         closable={false}
       >
-        <Navigation platformName={platform.platform_name} selectedPage={selectedPage} onNavigate={(page) => { onNavigate(page); setMobileOpen(false); }} onSwitchWorkspace={switchWorkspace} />
+        <Navigation available={available} platformName={platform.platform_name} selectedPage={selectedPage} onNavigate={(page) => { onNavigate(page); setMobileOpen(false); }} onSwitchWorkspace={switchWorkspace} />
       </Drawer>
       <Layout>
         <Header className="topbar">
@@ -256,7 +276,7 @@ export function AppShell({ children, currentUser, onLogout, selectedPage, onNavi
             />
           </Tooltip>
           <div className="topbar-context"><span>{activeWorkspace.label}</span><strong>{pageLabels[selectedPage]}</strong></div>
-          <GlobalSearch key={currentUser.id} onNavigate={onNavigate} onSearchNavigate={onSearchNavigate} />
+          {!isPolicyManaged(currentUser) ? <GlobalSearch key={currentUser.id} onNavigate={onNavigate} onSearchNavigate={onSearchNavigate} /> : null}
           <div className="topbar-account-actions">
           {currentUser.role === 'admin' ? <Tooltip title="系统设置"><Button type="text" className="settings-gear" aria-label="打开系统设置" icon={<Settings size={18} />} onClick={() => onNavigate('settings')} /></Tooltip> : null}
           <Dropdown
@@ -268,10 +288,10 @@ export function AppShell({ children, currentUser, onLogout, selectedPage, onNavi
                   onClick: () => onNavigate('user-security') },
                 ...(currentUser.role === 'admin' ? [{ key: 'user-authorization', icon: <Users size={16} />, label: '用户与授权',
                   onClick: () => onNavigate('user-authorization') }] : []),
-                { key: 'system', icon: <Settings size={16} />, label: '平台状态',
-                  onClick: () => onNavigate('system') },
-                { key: 'audit-log', icon: <FileText size={16} />, label: '审计日志',
-                  onClick: () => onNavigate('audit-log') },
+                ...(canAccessPage(currentUser, 'system') ? [{ key: 'system', icon: <Settings size={16} />, label: '平台状态',
+                  onClick: () => onNavigate('system') }] : []),
+                ...(canAccessPage(currentUser, 'audit-log') ? [{ key: 'audit-log', icon: <FileText size={16} />, label: '审计日志',
+                  onClick: () => onNavigate('audit-log') }] : []),
                 { type: 'divider' },
                 { key: 'logout', danger: true, icon: <LogOut size={16} />, label: '退出登录',
                   onClick: onLogout },

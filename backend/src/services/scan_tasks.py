@@ -146,11 +146,11 @@ def execute_task(
         if task is None or task.status != ScanStatus.SCANNING:
             return
         try:
-            require_background_assets(session, operator_name, operator_user_id, task.asset_ids)
+            require_background_assets(session, operator_name, operator_user_id, task.asset_ids, feature="scans")
             results, findings = _collect_targets(
                 session, task, vault, operator_user_id, operator_name
             )
-            require_background_assets(session, operator_name, operator_user_id, task.asset_ids)
+            require_background_assets(session, operator_name, operator_user_id, task.asset_ids, feature="scans")
             task = lock_task_row(session, task.id)
             if is_removed(session, task.id) or task.status != ScanStatus.SCANNING:
                 return
@@ -246,11 +246,11 @@ def _collect_targets(
         if task.status != ScanStatus.SCANNING or is_removed(session, task.id):
             break
         require_background_assets(
-            session, operator, operator_user_id, task.asset_ids
+            session, operator, operator_user_id, task.asset_ids, feature="scans"
         )
         result = _collect_asset(session, session.get(Asset, asset_id), advisories, task, vault)
         require_background_assets(
-            session, operator, operator_user_id, task.asset_ids
+            session, operator, operator_user_id, task.asset_ids, feature="scans"
         )
         task = lock_task_row(session, task.id)
         if is_removed(session, task.id) or task.status != ScanStatus.SCANNING:

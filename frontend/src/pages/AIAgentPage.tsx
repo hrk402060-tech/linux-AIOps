@@ -1,4 +1,5 @@
 import { formatPlatformDateTime } from '../utils/platformPreferences';
+import { canAccessPage } from '../utils/pageAccess';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Empty, Pagination, Select, Spin, Tag, Tooltip, message } from 'antd';
 import {
@@ -24,7 +25,7 @@ const priorityText: Record<string, string> = {
 };
 
 export function AIAgentPage({ currentUser }: { currentUser: AuthUser }) {
-  const canReview = currentUser.role !== 'auditor';
+  const canReview = canAccessPage(currentUser, 'agent', 'write');
   const [workspace, setWorkspace] = useState(emptyWorkspace);
   const [selection, setSelection] = useState<{ findingId: string | null; adviceId: string | null }>({ findingId: null, adviceId: null });
   const refreshSequence = useRef(0);
@@ -98,7 +99,7 @@ export function AIAgentPage({ currentUser }: { currentUser: AuthUser }) {
 
   return <section className="ai-agent-page">{contextHolder}
     <div className="page-heading agent-heading">
-      <div><p className="eyebrow">本地安全智能体</p><h1>AI Agent</h1></div>
+      <div><h1>漏洞 AI 助手</h1></div>
       <Tooltip title="刷新"><Button aria-label="刷新" aria-busy={loading} icon={<RefreshCw size={17} />} disabled={working} onClick={() => void load()} /></Tooltip>
     </div>
 
@@ -111,9 +112,9 @@ export function AIAgentPage({ currentUser }: { currentUser: AuthUser }) {
 
     <Spin spinning={loading}>
       <div className="agent-provider-row">
-        <div><Bot size={18} /><span><strong>推理引擎</strong><small>已预留多厂商 Provider 扩展接口</small></span></div>
-        <Select aria-label="推理引擎" value={providerId} disabled={working} onChange={setProviderId} options={workspace.providers.map((item) => ({ value: item.id, label: item.name }))} />
-        <Tag color={selectedProvider?.kind === 'local' ? 'green' : 'default'}>{selectedProvider?.kind === 'local' ? '本地就绪' : '外部推理未接通'}</Tag>
+        <div><Bot size={18} /><span><strong>推理引擎</strong></span></div>
+        <Select aria-label="推理引擎" value={providerId} disabled={working} onChange={setProviderId} options={workspace.providers.map((item) => ({ value: item.id, label: item.name, disabled: item.status !== 'ready' }))} />
+        {selectedProvider ? <Tag color={selectedProvider.status === 'ready' ? 'green' : 'default'}>{selectedProvider.kind === 'local' ? '本地就绪' : selectedProvider.status === 'ready' ? '允许调用' : '不可用'}</Tag> : null}
       </div>
 
       <div className="agent-workbench">
@@ -130,7 +131,7 @@ export function AIAgentPage({ currentUser }: { currentUser: AuthUser }) {
           <Select aria-label="全局建议历史" style={{ width: '100%', marginBottom: 12 }} placeholder="暂无建议历史" value={selection.adviceId ?? undefined} disabled={working || loading} onChange={selectAdvice} options={workspace.recommendations.map((item) => ({ value: item.id, label: `${item.cve_id} · ${item.asset_name} · ${statusLabel(item.status)} · ${item.id}` }))} />
           <nav aria-label="建议历史分页"><Pagination size="small" current={workspace.history_page} total={workspace.history_total} pageSize={50} showSizeChanger={false} disabled={working || loading} onChange={(page) => void load(workspace.queue_page, page)} /></nav>
           <div className="agent-section-title"><span><Sparkles size={17} />研判与修复建议</span>{selectedAdvice ? <Tag color={selectedAdvice.status === 'pending_review' ? 'gold' : selectedAdvice.status === 'approved' ? 'green' : 'default'}>{statusLabel(selectedAdvice.status)}</Tag> : null}</div>
-          {selectedAdvice ? <RecommendationView advice={selectedAdvice} /> : finding ? <div className="agent-empty-analysis"><Bot size={28} /><strong>{finding.cve_id}</strong><span>基于当前证据链生成本地研判与修复建议</span></div> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="请选择漏洞" />}
+          {selectedAdvice ? <RecommendationView advice={selectedAdvice} /> : finding ? <div className="agent-empty-analysis"><Bot size={28} /><strong>{finding.cve_id}</strong></div> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="请选择漏洞" />}
           <div className="agent-actions">
             {canReview ? <Button type="primary" icon={<Sparkles size={16} />} disabled={workspaceStale || loading || working || !finding || selectedProvider?.status !== 'ready'} loading={working} onClick={triage}>生成研判建议</Button> : null}
             {canReview && selectedAdvice?.status === 'pending_review' ? <>

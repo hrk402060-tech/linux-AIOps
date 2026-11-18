@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getAgentWorkspace } from '../api/ai-agent';
 import type { AuthUser } from '../api/auth';
 import type { AgentFinding, AgentRecommendation, AgentWorkspace } from '../types/ai-agent';
+import { formatPlatformDateTime } from '../utils/platformPreferences';
 import { AIAgentPage } from './AIAgentPage';
 
 const admin: AuthUser = {
@@ -50,9 +51,9 @@ function stubApi(initial: AgentWorkspace = workspace) {
   vi.stubGlobal('fetch', fetchMock);
   return { fetchMock, setWorkspace: (value: AgentWorkspace) => { current = value; } };
 }
-function renderPage(role: AuthUser['role'] = 'admin') {
+function renderPage(role: AuthUser['role'] = 'admin', permissions?: AuthUser['permissions']) {
   return render(<ConfigProvider theme={{ token: { motion: false } }}>
-    <AIAgentPage currentUser={{ ...admin, role }} />
+    <AIAgentPage currentUser={{ ...admin, role, permissions }} />
   </ConfigProvider>);
 }
 function expectMetric(label: string, value: number) {
@@ -119,7 +120,7 @@ describe('AIAgentPage', () => {
     fetchMock.mockResolvedValueOnce(response(reviewed));
     fireEvent.click(screen.getByRole('button', { name: '人工确认建议' }));
     expect(await screen.findByText('security-admin')).toBeInTheDocument();
-    expect(screen.getByText(new Date(reviewed.reviewed_at as string).toLocaleString('zh-CN'))).toBeInTheDocument();
+    expect(screen.getByText(formatPlatformDateTime(reviewed.reviewed_at))).toBeInTheDocument();
     expectMetric('待人工审核', 2);
     expectMetric('已确认建议', 11);
     expect(screen.queryByRole('button', { name: '人工确认建议' })).not.toBeInTheDocument();
@@ -266,9 +267,9 @@ describe('AIAgentPage', () => {
     if (role === 'operator') expect(screen.queryByRole('button', { name: '配置 API Key' })).not.toBeInTheDocument();
   });
 
-  it('keeps auditor read-only including provider mutations', async () => {
+  it.each(['auditor', 'operator'] as const)('keeps read-only %s from seeing write actions', async (role) => {
     stubApi({ ...workspace, recommendations: [recommendation], history_total: 1 });
-    renderPage('auditor');
+    renderPage(role, role === 'operator' ? ['agent:read'] : undefined);
     await screen.findByText(recommendation.risk_analysis);
     expect(screen.queryByRole('button', { name: '生成研判建议' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '人工确认建议' })).not.toBeInTheDocument();

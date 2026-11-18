@@ -5,6 +5,7 @@ import {
 } from 'antd';
 import { Eye, History, Plus, RefreshCw, StepForward } from 'lucide-react';
 import type { AuthUser } from '../api/auth';
+import { canAccessPage } from '../utils/pageAccess';
 import { getAssets } from '../api/assets';
 import {
   advanceIncident, createIncident, getIncidents, getIncidentTimeline,
@@ -34,7 +35,7 @@ const slaColors = { on_track: 'green', at_risk: 'gold', breached: 'red', met: 'b
 const selectOptions = (values: Record<string, string>) =>
   Object.entries(values).map(([value, label]) => ({ value, label }));
 
-export function IncidentsPage({ currentUser }: { currentUser: Pick<AuthUser, 'role'> }) {
+export function IncidentsPage({ currentUser }: { currentUser: Pick<AuthUser, 'role' | 'permissions'> }) {
   const [data, setData] = useState<{ total: number; items: Incident[] }>({ total: 0, items: [] });
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
@@ -48,7 +49,7 @@ export function IncidentsPage({ currentUser }: { currentUser: Pick<AuthUser, 'ro
   const [detail, setDetail] = useState<Incident | null>(null);
   const [form] = Form.useForm<IncidentCreate>();
   const [messages, holder] = message.useMessage();
-  const readOnly = currentUser.role === 'auditor';
+  const readOnly = !canAccessPage(currentUser, 'incidents', 'write');
   const load = async () => {
     setLoading(true);
     try { setData(await getIncidents(filters)); }

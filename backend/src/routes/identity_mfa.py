@@ -8,7 +8,7 @@ from src.auth import validate_request_origin
 from src.database import get_session
 from src.routes.identity_login import MFA_COOKIE, client_ip, login_cookie
 from src.routes.identity_validation import SafeIdentityRoute
-from src.schemas.auth import UserResponse
+from src.services.auth_user_projection import project_user
 from src.schemas.mfa import MfaCode, MfaSetupResponse
 from src.services import auth, identity_sessions, identity_store as store
 from src.services.identity_store import IdentityAuthenticationError, IdentitySourceError
@@ -63,7 +63,7 @@ def verify(
         )
     except (IdentitySourceError, IdentityAuthenticationError) as error:
         raise HTTPException(status_code=401, detail=str(error)) from error
-    response = JSONResponse(UserResponse.model_validate(result.user).model_dump(mode="json"))
+    response = JSONResponse(project_user(session, result.user).model_dump(mode="json"))
     login_cookie(request, response, result)
     return response
 
@@ -81,7 +81,7 @@ def confirm(
     except (IdentitySourceError, IdentityAuthenticationError) as error:
         raise HTTPException(status_code=401, detail=str(error)) from error
     response = JSONResponse({
-        "user": UserResponse.model_validate(result.user).model_dump(mode="json"),
+        "user": project_user(session, result.user).model_dump(mode="json"),
         "recovery_codes": recovery_codes,
     })
     login_cookie(request, response, result)

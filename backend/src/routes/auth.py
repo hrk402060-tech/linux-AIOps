@@ -15,6 +15,7 @@ from src.schemas.asset_access import UserAccessResponse, UserAccessUpdate
 from src.services import auth as service
 from src.services import auth_policy, platform_settings
 from src.services import user_management as management
+from src.services.auth_user_projection import project_user
 from src.services.terminal_access import stop_user_terminals
 from src.routes.auth_mfa import router as mfa_router
 from src.routes.auth_sessions import router as sessions_router
@@ -64,7 +65,7 @@ def login(
         samesite="lax",
         path="/",
     )
-    return UserResponse.model_validate(user)
+    return project_user(session, user)
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
@@ -91,7 +92,7 @@ def current_user(
     user = session.get(User, principal.user_id)
     if user is None:
         raise HTTPException(status_code=401, detail="会话已失效")
-    return UserResponse.model_validate(user)
+    return project_user(session, user)
 
 
 @router.post("/change-password", response_model=UserResponse)
@@ -114,7 +115,7 @@ def change_own_password(
         raise HTTPException(status_code=400, detail="当前密码错误") from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return UserResponse.model_validate(changed)
+    return project_user(session, changed)
 
 
 @router.get("/users", response_model=list[UserResponse])
@@ -123,7 +124,7 @@ def list_users(
     session: Session = Depends(get_session),
 ) -> list[UserResponse]:
     users = session.scalars(select(User).order_by(User.created_at.asc())).all()
-    return [UserResponse.model_validate(user) for user in users]
+    return [project_user(session, user) for user in users]
 
 
 @router.post("/users", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
@@ -145,7 +146,7 @@ def add_user(
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    return UserResponse.model_validate(user)
+    return project_user(session, user)
 
 
 @router.patch("/users/{user_id}", response_model=UserResponse)
@@ -174,7 +175,7 @@ def change_user(
         session, user_id, changes, principal,
     )
     stop_user_terminals(session, request.app.state.terminal_connections, user.username)
-    return UserResponse.model_validate(user)
+    return project_user(session, user)
 
 
 @router.post("/users/{user_id}/reset-password", response_model=UserResponse)
@@ -194,7 +195,7 @@ def change_password(
                              management.snapshot(user), "管理员重置密码并撤销会话")
     management.commit(session)
     stop_user_terminals(session, request.app.state.terminal_connections, user.username)
-    return UserResponse.model_validate(user)
+    return project_user(session, user)
 
 
 @router.post("/users/{user_id}/unlock", response_model=UserResponse)
@@ -211,7 +212,7 @@ def unlock_user(
         management.snapshot(user), "管理员解除登录锁定",
     )
     management.commit(session)
-    return UserResponse.model_validate(user)
+    return project_user(session, user)
 
 
 @router.get("/users/{user_id}/asset-access", response_model=UserAccessResponse)

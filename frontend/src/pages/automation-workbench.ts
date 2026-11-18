@@ -53,10 +53,13 @@ export const moduleEntries = [
 
 const sourceLabels = ['定时扫描', '基线合规', '暴露面检测', '弱口令风险', '补丁与变更', '审批队列', '变更与回滚', '外部告警接入'];
 
-export async function loadWorkbenchData(previous: WorkbenchData | null): Promise<{ data: WorkbenchData; errors: string[] }> {
+export async function loadWorkbenchData(previous: WorkbenchData | null, available: (page: PageKey) => boolean = () => true): Promise<{ data: WorkbenchData; errors: string[] }> {
+  const read = <T,>(page: PageKey, request: () => Promise<T>): Promise<T | null> => available(page)
+    ? request() : Promise.resolve(null);
   const results = await Promise.allSettled([
-    getScanSchedules(), getBaselineTasks(), getExposureTasks(), getCredentialRiskTasks(),
-    getPatchAdvice(), getAutomationApprovals(), getChangeRecords(), getExternalIntegrations(),
+    read('schedules', getScanSchedules), read('baselines', getBaselineTasks), read('exposures', getExposureTasks),
+    read('credential-risks', getCredentialRiskTasks), read('patches', getPatchAdvice),
+    getAutomationApprovals(), getChangeRecords(), read('alerts', getExternalIntegrations),
   ] as const);
   const keep = <T,>(result: PromiseSettledResult<T>, old: T | null | undefined): T | null =>
     result.status === 'fulfilled' ? result.value : old ?? null;

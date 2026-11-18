@@ -5,6 +5,7 @@ from src.auth import AuthPrincipal, require_admin
 from src.database import get_session
 from src.models.asset import Asset
 from src.services import asset_access
+from src.schemas.dashboard import MonitoringSummaryResponse
 from src.schemas.monitoring import (
     MonitoringEventResponse, MonitoringOverviewResponse, MonitoringPolicyResponse,
     MonitoringPolicyUpdate, MonitoringSnapshotResponse,
@@ -14,8 +15,21 @@ from src.schemas.monitoring_fleet import (
 )
 from src.services import monitoring as service
 from src.services import monitoring_fleet
+from src.services.dashboard import get_monitoring_summary
 
 router = APIRouter(prefix="/monitoring", tags=["monitoring"])
+
+
+@router.get("/summary", response_model=MonitoringSummaryResponse)
+def read_summary(
+    request: Request,
+    principal: AuthPrincipal = Depends(require_admin),
+    session: Session = Depends(get_session),
+) -> MonitoringSummaryResponse:
+    return MonitoringSummaryResponse.model_validate(get_monitoring_summary(
+        session, asset_access.visible_asset_ids(session, principal),
+        request.app.state.platform_runtime["connection"]["collection_interval_seconds"],
+    ))
 
 
 @router.get("/fleet", response_model=MonitoringFleetResponse)

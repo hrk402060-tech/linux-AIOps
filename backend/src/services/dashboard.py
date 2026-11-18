@@ -23,6 +23,18 @@ from src.services.observability import freshness_threshold_seconds
 KNOWLEDGE_STALE_AFTER = timedelta(hours=24)
 
 
+def get_monitoring_summary(
+    session: Session, visible_asset_ids: set[str] | None, monitoring_interval_seconds: int,
+) -> dict[str, object]:
+    scope = resolve_scope(session, visible_asset_ids)
+    return {
+        "assets": _asset_summary(session, scope),
+        "monitoring_assets": _monitoring_assets(session, scope, monitoring_interval_seconds, include_links=False),
+        "resource_trends": _resource_trends(session, scope),
+        "monitoring_mode": "ssh_agentless_near_realtime",
+    }
+
+
 def get_snapshot(
     session: Session, visible_asset_ids: set[str] | None = None,
     monitoring_interval_seconds: int = 300,
@@ -152,7 +164,8 @@ def _affected_assets(session: Session, scope: DashboardScope) -> list[dict[str, 
 
 
 def _monitoring_assets(
-    session: Session, scope: DashboardScope, monitoring_interval_seconds: int,
+    session: Session, scope: DashboardScope, monitoring_interval_seconds: int, *,
+    include_links: bool = True,
 ) -> list[dict[str, object]]:
     assets = list(session.scalars(_asset_statement(scope).order_by(Asset.name, Asset.id).limit(100)))
     latest = get_latest_snapshots(session, [item.id for item in assets])
@@ -167,8 +180,8 @@ def _monitoring_assets(
         .group_by(MonitoringAlertState.asset_id)
     ).all())
     finding_counts = get_finding_counts(get_latest_active_findings(session, scope.asset_ids))
-    service_context = _service_context(session, [item.id for item in assets])
-    scans = list(session.scalars(scope.tasks(ScanTask).where(ScanTask.archived.is_(False), not_removed()).order_by(ScanTask.created_at.desc()).limit(100)))
+    service_context = _service_context(session, [item.id for item in assets]) if include_links else {}
+    scans = list(session.scalars(scope.tasks(ScanTask).where(ScanTask.archived.is_(False), not_removed()).order_by(ScanTask.created_at.desc()).limit(100))) if include_links else []
     now = datetime.now(timezone.utc)
     freshness_after = timedelta(
         seconds=freshness_threshold_seconds(monitoring_interval_seconds)
