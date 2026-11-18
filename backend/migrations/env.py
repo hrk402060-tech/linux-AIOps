@@ -58,6 +58,7 @@ from src.models.kubernetes_cluster import (  # noqa: F401
     KubernetesCluster, KubernetesClusterAudit, KubernetesClusterCredential, KubernetesConnectionTest,
 )
 from src.models.kubernetes_collection import KubernetesCollectionRun  # noqa: F401
+from src.models.kubernetes_resource_snapshot import KubernetesResourceSnapshot  # noqa: F401
 
 config = context.config
 if config.config_file_name is not None:

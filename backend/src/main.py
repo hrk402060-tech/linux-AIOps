@@ -44,6 +44,7 @@ from src.models.kubernetes_cluster import (  # noqa: F401
     KubernetesCluster, KubernetesClusterAudit, KubernetesClusterCredential, KubernetesConnectionTest,
 )
 from src.models.kubernetes_collection import KubernetesCollectionRun  # noqa: F401
+from src.models.kubernetes_resource_snapshot import KubernetesResourceSnapshot  # noqa: F401
 from src.services.kubernetes_overview_worker import run_scheduler as run_kubernetes_scheduler
 from src.services import diagnostic_job_state
 from src.services.diagnostic_job_worker import (
