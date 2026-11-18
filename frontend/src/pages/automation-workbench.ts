@@ -1,3 +1,4 @@
+import { formatPlatformDateTime } from '../utils/platformPreferences';
 import type { PageKey } from '../App';
 import { getScanSchedules } from '../api/scan-tasks';
 import { getBaselineTasks } from '../api/baselines';
@@ -87,7 +88,7 @@ export function statusTone(status: string): 'normal' | 'warning' | 'danger' | 'm
 
 export function formatWorkbenchTime(value: string | null | undefined): string {
   if (!value || !Number.isFinite(Date.parse(value))) return '—';
-  return new Date(value).toLocaleString('zh-CN', { hour12: false });
+  return formatPlatformDateTime(value, { hour12: false });
 }
 
 function scheduledTask(item: ScanSchedule): WorkbenchTask {

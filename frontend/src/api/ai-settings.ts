@@ -25,6 +25,12 @@ export async function saveTerminalAISettings(payload: TerminalAISettingsUpdate):
     method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
   }), '运维 AI 配置保存失败');
 }
+export async function testTerminalAISettings(): Promise<{ ok: boolean; detail: string; checked_at: string }> {
+  return parseApiResponse(await apiFetch(`${endpoint}/test`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+    signal: AbortSignal.timeout(130_000),
+  }), '模型连接测试失败');
+}
 export function isValidTerminalAIUrl(value: string): boolean {
   if (/[\s\\?#]/.test(value) || /[\u0000-\u001f\u007f]/.test(value)) return false;
   try {

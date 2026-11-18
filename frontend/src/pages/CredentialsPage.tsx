@@ -1,3 +1,4 @@
+import { platformDateTimeOptions } from '../utils/platformPreferences';
 import { useEffect, useMemo, useState } from 'react';
 import {
   Button,
@@ -21,7 +22,7 @@ type FilterType = 'all' | CredentialType;
 
 function formatDate(value: string | null): string {
   if (!value) return '从未使用';
-  return new Intl.DateTimeFormat('zh-CN', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
+  return new Intl.DateTimeFormat('zh-CN', platformDateTimeOptions({ dateStyle: 'medium', timeStyle: 'short' })).format(new Date(value));
 }
 
 export function CredentialsPage() {

@@ -18,5 +18,5 @@ def read_dashboard(
 ) -> DashboardResponse:
     return DashboardResponse.model_validate(service.get_snapshot(
         session, visible_asset_ids(session, principal),
-        request.app.state.runtime_settings.monitoring_interval_seconds,
+        request.app.state.platform_runtime["connection"]["collection_interval_seconds"],
     ))

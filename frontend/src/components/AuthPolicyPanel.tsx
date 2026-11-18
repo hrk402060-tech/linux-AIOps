@@ -3,8 +3,9 @@ import { Alert, Button, Form, InputNumber, Select, Space, Spin, Switch, Tag, mes
 import { RefreshCw, Save } from 'lucide-react';
 
 import { getAuthPolicy, saveAuthPolicy, type AuthPolicy } from '../api/system';
+import { formatPlatformDateTime } from '../utils/platformPreferences';
 
-type AuthPolicyForm = Pick<AuthPolicy, 'login_failure_threshold' | 'lock_duration_seconds' | 'session_ttl_seconds' | 'mfa_enforcement' | 'allow_user_mfa_reset'>;
+type AuthPolicyForm = Pick<AuthPolicy, 'login_failure_threshold' | 'lock_duration_seconds' | 'session_ttl_seconds' | 'mfa_enforcement' | 'allow_user_mfa_reset' | 'password_min_length' | 'password_require_uppercase' | 'session_idle_timeout_seconds'>;
 
 function policyFields(policy: AuthPolicyForm): AuthPolicyForm {
   return {
@@ -13,12 +14,10 @@ function policyFields(policy: AuthPolicyForm): AuthPolicyForm {
     session_ttl_seconds: policy.session_ttl_seconds,
     mfa_enforcement: policy.mfa_enforcement,
     allow_user_mfa_reset: policy.allow_user_mfa_reset,
+    password_min_length: policy.password_min_length ?? 8,
+    password_require_uppercase: policy.password_require_uppercase ?? false,
+    session_idle_timeout_seconds: policy.session_idle_timeout_seconds ?? 43200,
   };
-}
-
-function formatDuration(seconds: number) {
-  if (seconds < 3600) return `${Math.round(seconds / 60)} 分钟`;
-  return `${Math.round(seconds / 3600)} 小时`;
 }
 
 export function AuthPolicyPanel() {
@@ -86,7 +85,7 @@ export function AuthPolicyPanel() {
   return <section className="user-management" aria-label="登录安全策略">
     {holder}
     <div className="panel-heading">
-      <div><strong>登录安全策略</strong><span>失败锁定、会话时长和 MFA 要求</span></div>
+      <div><strong>登录安全策略</strong></div>
       <Button aria-label="重新加载登录安全策略" icon={<RefreshCw size={16} />} loading={loading} disabled={saving} onClick={() => void load()} />
     </div>
     {error ? <Alert type="error" showIcon message={error} /> : null}
@@ -108,7 +107,16 @@ export function AuthPolicyPanel() {
           <Form.Item name="session_ttl_seconds" label="会话有效期（秒）" rules={[{ required: true, type: 'number', min: 900, max: 604800 }]}>
             <InputNumber min={900} max={604800} precision={0} />
           </Form.Item>
+          <Form.Item name="session_idle_timeout_seconds" label="会话空闲超时（秒）" rules={[{ required: true, type: 'integer', min: 300, max: 604800 }]}>
+            <InputNumber min={300} max={604800} precision={0} />
+          </Form.Item>
+          <Form.Item name="password_min_length" label="最短密码长度" rules={[{ required: true, type: 'integer', min: 8, max: 128 }]}>
+            <InputNumber min={8} max={128} precision={0} />
+          </Form.Item>
         </Space>
+        <Form.Item name="password_require_uppercase" label="密码必须包含大写字母" valuePropName="checked">
+          <Switch aria-label="密码必须包含大写字母" />
+        </Form.Item>
         <Form.Item name="mfa_enforcement" label="MFA 强制范围">
           <Select aria-label="MFA 强制范围" options={[
             { value: 'off', label: '不强制（用户可自行启用）' },
@@ -120,7 +128,7 @@ export function AuthPolicyPanel() {
           <Switch aria-label="允许用户自行关闭 MFA" />
         </Form.Item>
         <Space wrap style={{ marginTop: 16 }}>
-          {policy ? <Tag>{policy.updated_at ? `最后更新：${new Date(policy.updated_at).toLocaleString('zh-CN')}` : '使用环境默认值'}</Tag> : null}
+          {policy ? <Tag>{policy.updated_at ? `最后更新：${formatPlatformDateTime(policy.updated_at)}` : '使用环境默认值'}</Tag> : null}
           <Button type="primary" htmlType="submit" icon={<Save size={16} />} loading={saving} disabled={loading || saving || !policy}>保存登录策略</Button>
         </Space>
       </Form>

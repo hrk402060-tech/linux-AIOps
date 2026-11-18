@@ -16,9 +16,13 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
 from src.models.alert_notification import AlertNotification, AlertNotificationConfig
+from src.config import get_settings
 from src.services import alert_notification_config as config
 from src.services.alert_notifications import _audit, _commit, utc_now
 from src.services.crypto import CredentialCryptoError, CredentialVault
+from src.services import platform_settings
+from src.services.platform_settings import notification_values
+from src.services import notification_channels
 
 logger = logging.getLogger(__name__)
 SMTP_TIMEOUT_SECONDS = 5
@@ -76,12 +80,26 @@ def claim_next(session: Session) -> tuple[AlertNotification, str] | None:
     try:
         _recover_leases(session)
         channel = config.get_record(session)
-        if channel is None or not channel.enabled or not channel.recipients:
+        policy = notification_values(session, get_settings())
+        if policy["enabled"] and platform_settings.in_quiet_hours(session, get_settings()):
+            _commit(session)
+            return None
+        selected = policy["default_channel"]
+        email_ready = bool(channel and channel.enabled and channel.recipients)
+        webhook_ready = notification_channels.ready(session)
+        channel_ready = (email_ready if selected == "email" else webhook_ready
+                         if selected == "webhook" else email_ready and webhook_ready)
+        if not policy["enabled"] or not channel_ready:
             session.execute(update(AlertNotification).where(AlertNotification.status.in_(('pending', 'retry')))
-                            .values(status='blocked', error_code='notification_disabled' if channel and not channel.enabled
+                            .values(status='blocked', error_code='notification_disabled' if not policy["enabled"] or (channel and not channel.enabled)
                                     else 'notification_not_configured', next_attempt_at=None))
             _commit(session)
             return None
+        session.execute(update(AlertNotification).where(
+            AlertNotification.status == "blocked",
+            AlertNotification.error_code.in_(("notification_disabled", "notification_not_configured")),
+            AlertNotification.attempts < AlertNotification.max_attempts,
+        ).values(status="pending", next_attempt_at=utc_now(), error_code=None))
         now = utc_now()
         due = (AlertNotification.status.in_(('pending', 'retry')),
                AlertNotification.attempts < AlertNotification.max_attempts,
@@ -94,7 +112,7 @@ def claim_next(session: Session) -> tuple[AlertNotification, str] | None:
         token = str(uuid4())
         changed = session.execute(update(AlertNotification).where(AlertNotification.id == item.id, *due).values(
             status='sending', claim_token=token, lease_expires_at=now + timedelta(seconds=LEASE_SECONDS),
-            attempts=AlertNotification.attempts + 1, recipients=item.recipients or list(channel.recipients),
+            attempts=AlertNotification.attempts + 1, recipients=item.recipients or (list(channel.recipients) if channel else []),
             error_code=None, next_attempt_at=None,
         ).execution_options(synchronize_session=False)).rowcount
         _commit(session)
@@ -125,7 +143,7 @@ def finalize(session: Session, notification_id: str, token: str, error_code: str
     ).values(**changes, claim_token=None, lease_expires_at=None).execution_options(synchronize_session=False)).rowcount
     if changed:
         _audit(session, item.id, 'delivery_' + str(changes['status']), 'system',
-               'SMTP 已接受全部接收人；不代表已读' if error_code is None else '投递失败；保留累计次数与安全错误码')
+               '已配置的通知渠道已接受；不代表已读' if error_code is None else '投递失败；保留累计次数与安全错误码')
     _commit(session)
     return bool(changed)
 
@@ -149,6 +167,18 @@ def _password(channel: AlertNotificationConfig, vault: CredentialVault) -> str:
                              config.SECRET_TYPE, channel.key_version)
     except (CredentialCryptoError, InvalidTag, UnicodeDecodeError) as exc:
         raise NotificationDeliveryError('smtp_secret_unavailable') from exc
+
+
+def _allow_channel(session: Session, identifier: str, token: str, selected: str) -> bool:
+    policy = notification_values(session, get_settings())
+    if (
+        not policy["enabled"] or policy["default_channel"] != selected
+        or platform_settings.in_quiet_hours(session, get_settings())
+    ):
+        _block_claim(session, identifier, token)
+        return False
+    notification_channels.require_active_claim(session, identifier, token)
+    return True
 
 
 def send_smtp(
@@ -252,13 +282,24 @@ def deliver_batch(session_factory: sessionmaker[Session], vault: CredentialVault
             if stop is not None and stop.is_set():
                 finalize(session, item.id, token, 'worker_stopped')
                 break
-            if channel is None or not channel.enabled:
+            selected = notification_values(session, get_settings())["default_channel"]
+            if selected in {"email", "both"} and (channel is None or not channel.enabled):
                 _block_claim(session, item.id, token)
                 continue
             error_code = None
             try:
-                send_smtp(channel, item, vault, stop)
-            except NotificationDeliveryError as exc:
+                receipts = notification_channels.delivery_receipts(session, item.id)
+                if selected in {"email", "both"} and not receipts.get("email"):
+                    if not _allow_channel(session, item.id, token, selected):
+                        continue
+                    send_smtp(channel, item, vault, stop)
+                    notification_channels.acknowledge_channel(session, item.id, "email", token)
+                if selected in {"webhook", "both"} and not receipts.get("webhook"):
+                    if not _allow_channel(session, item.id, token, selected):
+                        continue
+                    notification_channels.send(session, vault, item)
+                    notification_channels.acknowledge_channel(session, item.id, "webhook", token)
+            except (NotificationDeliveryError, ValueError) as exc:
                 error_code = str(exc)
                 logger.warning('Notification delivery %s failed: %s', item.id, error_code)
             except Exception as exc:

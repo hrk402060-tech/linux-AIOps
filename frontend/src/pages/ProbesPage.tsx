@@ -1,3 +1,4 @@
+import { formatPlatformDateTime } from '../utils/platformPreferences';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Button, Drawer, Empty, Form, Input, InputNumber, Modal, Select, Space, Spin, Table, Tag, Tooltip, message } from 'antd';
 import { History, Play, Plus, RefreshCw, Settings2 } from 'lucide-react';
@@ -10,7 +11,7 @@ const errorLabels: Record<string, string> = { timeout: '超时', tls_error: 'TLS
 function resultTag(result: ProbeResult | null) {
   return result ? <Tag color={result.status === 'healthy' ? 'green' : 'red'}>{result.status === 'healthy' ? '通过' : errorLabels[result.error_code ?? ''] ?? '失败'}</Tag> : <Tag>未检查</Tag>;
 }
-function time(value: string) { return value ? new Date(value).toLocaleString('zh-CN', { hour12: false }) : '-'; }
+function time(value: string) { return value ? formatPlatformDateTime(value, { hour12: false }) : '-'; }
 
 export function ProbesPage({ currentUser, initialServiceId, initialProbe }: {
   currentUser: AuthUser; initialServiceId?: string; initialProbe?: { id: string; name: string };

@@ -11,6 +11,7 @@ from src.models.scan_task import ScanStatus, ScanTask
 from src.schemas.scan_task import ScanTaskCreate
 from src.services import scan_engine
 from src.services import vulnerabilities
+from src.services.platform_settings import task_policy
 from src.services.asset_access import (
     AssetAuthorizationError, all_assets_visible, evidence_asset_ids,
     require_background_assets,
@@ -236,7 +237,11 @@ def _collect_targets(
     advisories = _task_advisories(session, task)
     results: list[dict[str, object]] = []
     findings: list[dict[str, object]] = []
+    policy = task_policy(session)
+    started = datetime.now(timezone.utc)
     for index, asset_id in enumerate(task.asset_ids):
+        if (datetime.now(timezone.utc) - started).total_seconds() >= policy.execution_timeout_seconds:
+            raise ScanTaskValidationError("扫描任务达到配置执行时限，已停止后续采集")
         session.refresh(task)
         if task.status != ScanStatus.SCANNING or is_removed(session, task.id):
             break
@@ -255,6 +260,8 @@ def _collect_targets(
             findings.append({**finding, "asset_id": asset_id, "asset_name": result["asset_name"]})
         task.progress = 10 + round(65 * (index + 1) / len(task.asset_ids))
         session.commit()
+        if result.get("status") == "failed" and policy.failure_policy == "stop":
+            break
     return results, findings
 
 

@@ -5,6 +5,7 @@ from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from src.services.auth import get_session_user
+from src.services.auth_policy import AuthPolicyUnavailableError
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -34,7 +35,10 @@ def require_authenticated(
     raw_token = request.cookies.get(settings.auth_cookie_name)
     if raw_token:
         with request.app.state.session_factory() as session:
-            result = get_session_user(session, raw_token)
+            try:
+                result = get_session_user(session, raw_token, settings)
+            except AuthPolicyUnavailableError as error:
+                raise HTTPException(status_code=503, detail=str(error)) from error
         if result is not None:
             _, user = result
             if request.method not in {"GET", "HEAD", "OPTIONS"}:

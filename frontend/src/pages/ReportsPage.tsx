@@ -1,3 +1,4 @@
+import { platformDateTimeOptions } from '../utils/platformPreferences';
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Button, Empty, Input, message, Select, Spin, Table, Tag, Tooltip } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
@@ -16,9 +17,9 @@ const statusLabels: Record<ReportStatus, string> = {
 const statusColors: Record<ReportStatus, string> = {
   queued: 'blue', generating: 'processing', completed: 'green', failed: 'red',
 };
-const formatDate = (value: string | null) => value ? new Intl.DateTimeFormat('zh-CN', {
+const formatDate = (value: string | null) => value ? new Intl.DateTimeFormat('zh-CN', platformDateTimeOptions({
   dateStyle: 'medium', timeStyle: 'short',
-}).format(new Date(value)) : '暂无';
+})).format(new Date(value)) : '暂无';
 
 export function ReportsPage() {
   const [items, setItems] = useState<ScanReport[]>([]);

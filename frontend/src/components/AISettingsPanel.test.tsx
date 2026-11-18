@@ -15,6 +15,15 @@ function stubSettings() {
   return fetchMock;
 }
 afterEach(() => vi.unstubAllGlobals());
+it('tests the saved model and displays the real provider failure', async () => {
+  const fetchMock = stubSettings();
+  renderPanel();
+  await waitFor(() => expect(screen.getByLabelText('模型名称')).toHaveValue('local-model'));
+  fetchMock.mockResolvedValueOnce(response({ ok: false, detail: '模型认证失败', checked_at: '2026-11-17T01:00:00Z' }));
+  fireEvent.click(screen.getByRole('button', { name: '测试已保存模型' }));
+  expect(await screen.findByText('模型认证失败')).toBeInTheDocument();
+  expect(fetchMock).toHaveBeenLastCalledWith('/api/v1/agent/settings/terminal/test', expect.objectContaining({ method: 'POST', body: '{}' }));
+});
 it('allows an unconfigured disabled model without supplying a key or endpoint', async () => {
   const empty = { ...settings, enabled: false, base_url: '', model: '', api_key_masked: null, updated_at: null };
   const fetchMock = vi.fn().mockResolvedValue(response(empty));

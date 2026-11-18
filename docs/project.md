@@ -1,5 +1,26 @@
 # Project Context
 
+## Kubernetes 只读资源查看（2026-11-17，候选待发布）
+
+- 在现有 `工作台 → Kubernetes 管理 → 集群总览` 内增加资源清单页签，
+  不新增菜单、PageKey、权限或写操作。资源列表和详情始终绑定当前集群的
+  最新有效采集快照，支持资源类型、Namespace、名称/UID 和状态筛选。
+- 新增 `GET /api/v1/kubernetes/clusters/{id}/resources/{kind}` 与
+  `GET /api/v1/kubernetes/clusters/{id}/resources/{kind}/{uid}`。支持 Node、
+  Namespace、Pod、Deployment、StatefulSet、DaemonSet、Service 和 Warning
+  Event；未采集返回 `unobserved`，部分快照返回 `partial=true` 且 `total=null`，
+  不把缺失数据补成零或空的完整清单。
+- 新增迁移 `20261117_54` 和 `kubernetes_resource_snapshots`，按采集 run 保存
+  有界脱敏投影。仅保留状态、角色、地址、版本、副本、Pod IP、重启次数、
+  Service 端口和 Warning 事件摘要；不保存 Kubernetes 原始 `spec`、环境变量、
+  消息正文、Token、CA 或其他凭据。快照随采集 run 删除。
+- 仅真实管理员会话可读取资源；operator、auditor、应急令牌和匿名请求继续
+  拒绝。资源读取写入现有 Kubernetes 审计，不改变真实 Kubernetes 集群。
+- 本阶段在 `192.168.10.17` 隔离 Docker 完成目标后端、前端、迁移、Ruff、
+  TypeScript 和 Vite 构建后，才允许发布生产。发布只同步白名单源码/静态产物，
+  先执行 `20261117_53 -> 20261117_54`，不重建 PostgreSQL、不修改生产配置、
+  业务数据或真实集群。
+
 ## Kubernetes 管理一期：集群总览（已发布）
 
 - 范围：在已发布的 `工作台 → Kubernetes 管理 → 集群接入` 之上增加
@@ -866,3 +887,56 @@ The vulnerability AI remains scoped to security triage and recommendations. All 
 - Motion: add continuous grid drift, staggered character breathing/drift, orbit and pulse atmosphere, plus reduced-motion support. Existing eight state labels and state-driven transitions remain intact.
 - Security: no changes to authentication endpoints, HttpOnly cookies, password handling or sensitive-data rendering.
 - Delivery verification: frontend production build passed in the Docker Compose build, and the rebuilt frontend served HTTP 200 at `http://localhost:8088`; Vitest and local TypeScript commands were not used as a passing signal in that verification run.
+## 系统设置中心（2026-11-18，候选，未发布）
+
+架构评审：设置中心使用当前 `settings` 页面路由，不另建管理系统。通用设置、
+身份源和投递回执复用 `platform_settings`；登录策略、SMTP、模型密钥继续使用
+原有存储和加密服务，配置审计复用 `cmdb_change_audits`。迁移不重置既有配置。
+新增 `20261117_55` 只创建后台数据任务表，依赖前序资源快照迁移
+`20261117_54`。本阶段不发布生产，也不修改生产配置或数据。
+
+| 分类 | 已具备，继续复用 | 本次改造与新增 |
+| --- | --- | --- |
+| 基本 | 现有导航、页面及时间展示 | 平台名称、时区、密度、默认页面；登录用户读取无密钥偏好 |
+| 连接与采集 | 资产端口/账号/密文、SSH 直连、监控调度 | 超时、心跳、网络重试、主机密钥策略、周期与范围的真实消费者 |
+| 任务与执行 | 扫描、诊断、人工确认、终端会话 | 诊断并发动态伸缩、诊断/扫描时限、失败处理、终端限额和时限 |
+| 通知 | SMTP 配置、加密密码、通知队列 | 加密 HTTPS Webhook、真实测试、按渠道回执、重试、跨午夜免打扰 |
+| 认证 | 本地用户、会话、MFA | LDAP/AD、OIDC 登录及 TLS/签名校验、账号关联、限时预邀请与防锁出 |
+| 安全 | 锁定、密码哈希、MFA 强制策略、会话撤销 | 密码长度/大写要求、会话空闲策略、活动续期与过期/撤销竞争保护 |
+| AI | 已存运维模型、本地漏洞研判、密钥加密 | 真实模型测试、场景开关、历史数量、上下文范围、入出站及存储脱敏 |
+| 数据与存储 | 监控历史、数据库、凭据主密钥 | 清理预览、后台执行/租约/审计、定时清理、加密备份及隔离恢复校验 |
+
+UI：头像左侧齿轮进入独立设置页；八类目录、分类内顶部标签和分组表单，
+使用灰色/青绿色。设置打开时保留来源页面挂载，返回恢复筛选、选中主机和
+详情标签。个人 MFA/恢复码在头像“个人安全”；账号、角色及资产/SSH 授权在
+“用户与授权”；审计和平台状态独立。不存在跳板/代理、平台默认 SSH 端口或用户。
+用户组和自定义角色仍未实现，不把固定角色选择宣称为完整角色/用户组管理。
+
+配置生效：
+
+- 基本偏好：保存后通知当前浏览器更新；其他浏览器下次加载读取；默认页面仅在无导航历史时使用。
+- SSH 参数：下一次连接读取；认证/主机密钥失败不重试；心跳应用于新建连接。
+- 采集周期/范围：其他进程最多约 2 秒刷新，下一轮调度读取；不重启进行中的采集。
+- 并发：约 2 秒刷新；降低并发保留运行中的工作、阻止超额新领任务。
+- 扫描/诊断时限：在资产边界或只读采集授权检查点执行协作停止；不是所有模块的硬超时。
+- 登录/会话策略：下次登录或鉴权读取，终端持续核验会话；只有实际转发的用户输入续期。
+- 通知：新入队任务采用重试次数；每个渠道发送前重读开关、渠道与免打扰。
+- AI：下次请求读取；不追溯删除已有回答中的历史上下文；AI 不获得写权限。
+- 清理/备份：后台约 5 秒轮询；启用周期配置后按计划入队。清理仅作用于监控历史，保留最新快照及被证据引用的数据。
+
+备份验证读取真实磁盘密文并校验 SHA-256，解密后在隔离 SQLite 重建表、恢复
+数据，核对行摘要及外键；报告明确 `verification_target=isolated_sqlite`、
+`native_engine_restore_verified=false`。备份不含原凭据主密钥，恢复必须保留
+对应密钥。单份逻辑快照上限 16 MiB/100000 行，超限明确失败，不截断为成功。
+这不等于 PostgreSQL/MySQL 同引擎生产容灾恢复，后者仍待开发与演练。
+
+其余限制：LDAP/OIDC 协议已有真实库实现及隔离协议测试，尚无现场身份源端到端
+验收；Webhook/模型/SMTP 测试调用真实传输，但不把 mock 协议测试当成现场投递。
+外部漏洞提供商目前仅加密保存/启停和密钥解密检查，外部漏洞推理未接通；
+本地漏洞研判和运维模型可用。通知为至少一次投递，不能保证恰好一次。
+
+验证在 `192.168.10.17` 的独立 Docker 候选目录执行，生产数据库、环境文件和
+运行容器未改动。后端目标回归 367 项通过、2 项跳过，Ruff 通过；前端目标回归
+13 个文件、157 项全通过，最终样式调整后设置页 6 项复验和 TypeScript/Vite 构建
+通过。隔离 PostgreSQL 6 项通过，覆盖迁移升级/回退、既有数据保留、并发认领、
+超期恢复以及加密逻辑备份的隔离恢复验证。未做浏览器视觉验收或生产联调。

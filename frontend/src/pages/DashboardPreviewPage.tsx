@@ -1,3 +1,4 @@
+import { platformDateTimeOptions } from '../utils/platformPreferences';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Alert, Button, Empty, Spin, Tag, Tooltip, message } from 'antd';
 import {
@@ -156,7 +157,7 @@ function RiskChart({ data, onNavigate }: { data: DashboardSnapshot['vulnerabilit
   const max = Math.max(...items.map(([, value]) => value), 1);
   return <div className="preview-risk-chart"><div className="preview-risk-total"><strong>{data.pending}</strong><span>待处理漏洞</span><small>{data.manual_confirmation} 个需人工确认</small></div><div className="preview-risk-bars">{items.map(([key, count]) => <div key={key}><span className="preview-risk-label"><i style={{ background: severityMap[key].color }} />{severityMap[key].label}</span><div><b style={{ width: `${barWidth(count, max)}%`, background: severityMap[key].color }} /></div><strong>{count}</strong></div>)}</div><Button type="link" icon={<ShieldAlert size={15} />} onClick={() => onNavigate('findings')}>进入漏洞治理</Button></div>;
 }
-function formatTime(value: string | null) { return value ? new Intl.DateTimeFormat('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(value)) : '未采集'; }
+function formatTime(value: string | null) { return value ? new Intl.DateTimeFormat('zh-CN', platformDateTimeOptions({ month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })).format(new Date(value)) : '未采集'; }
 function metricLabel(metric: string) { return ({ cpu_percent: 'CPU', memory_percent: '内存', disk_percent: '磁盘', load_1m: '负载' } as Record<string, string>)[metric] ?? metric; }
 function scanLabel(status: string) { return ({ queued: '排队', scanning: '扫描中', aggregating: '汇总', completed: '完成', failed: '失败', cancelled: '取消' } as Record<string, string>)[status] ?? status; }
 function barWidth(value: number, max: number) { return value ? Math.max((value / max) * 100, 8) : 0; }

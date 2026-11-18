@@ -1,19 +1,21 @@
 import asyncio
 from datetime import datetime, timedelta, timezone
 import logging
+from collections.abc import Callable
 from uuid import uuid4
 
 from cryptography.exceptions import InvalidTag
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
 
-from src.models.asset import Asset, AssetLifecycleStatus, AssetStatus
+from src.models.asset import Asset, AssetEnvironment, AssetLifecycleStatus, AssetStatus
 from src.models.monitoring import (
     MonitoringAlertState, MonitoringEvent, MonitoringPolicy, MonitoringSnapshot,
 )
 from src.schemas.monitoring import MonitoringPolicyUpdate
 from src.services import monitor_collector
 from src.services import monitoring_alert_bridge
+from src.services.platform_settings import connection_policy
 from src.services.crypto import CredentialCryptoError, CredentialVault
 from src.services.scan_engine import ScanCollectionError
 
@@ -251,19 +253,29 @@ def get_overview(
 
 
 async def run_scheduler(
-    session_factory: sessionmaker[Session], vault: CredentialVault, interval: int, stop: asyncio.Event
+    session_factory: sessionmaker[Session], vault: CredentialVault,
+    interval: int | Callable[[], int], stop: asyncio.Event
 ) -> None:
+    from time import monotonic
+
+    last_collection = monotonic()
     while not stop.is_set():
+        current_interval = interval() if callable(interval) else interval
         try:
-            await asyncio.wait_for(stop.wait(), timeout=interval)
+            await asyncio.wait_for(stop.wait(), timeout=min(1, max(0.01, current_interval - (monotonic() - last_collection))))
             continue
         except TimeoutError:
-            pass
+            if monotonic() - last_collection < current_interval:
+                continue
+        last_collection = monotonic()
         with session_factory() as session:
-            asset_ids = list(session.scalars(select(Asset.id).where(
+            statement = select(Asset.id).where(
                 Asset.credential_id.is_not(None),
                 Asset.lifecycle_status == AssetLifecycleStatus.ENABLED,
-            )))
+            )
+            if connection_policy(session).collection_scope == "production_assets":
+                statement = statement.where(Asset.environment == AssetEnvironment.PRODUCTION)
+            asset_ids = list(session.scalars(statement))
         for asset_id in asset_ids:
             if stop.is_set():
                 return

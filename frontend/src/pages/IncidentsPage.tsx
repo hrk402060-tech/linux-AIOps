@@ -1,3 +1,4 @@
+import { formatPlatformDateTime } from '../utils/platformPreferences';
 import { useEffect, useMemo, useState } from 'react';
 import {
   Button, Drawer, Empty, Form, Input, Modal, Select, Space, Table, Tag, Timeline, message,
@@ -120,7 +121,7 @@ export function IncidentsPage({ currentUser }: { currentUser: Pick<AuthUser, 'ro
       { title: '状态', dataIndex: 'status', width: 110, render: (value: IncidentStatus) => <Tag color={statusColors[value]}>{statusLabels[value]}</Tag> },
       { title: 'SLA', width: 130, render: (_, item) => <Tag color={slaColors[item.sla_status ?? 'on_track']}>{slaLabels[item.sla_status ?? 'on_track']}</Tag> },
       { title: '关联告警', dataIndex: 'alert_id', width: 190, render: (value: string | null) => value ?? '-' },
-      { title: '创建时间', dataIndex: 'created_at', width: 170, render: (value: string) => new Date(value).toLocaleString() },
+      { title: '创建时间', dataIndex: 'created_at', width: 170, render: (value: string) => formatPlatformDateTime(value) },
       { title: '操作', fixed: 'right', width: 150, render: (_, item) => <Space>{!readOnly && nextStatus[item.status] ? <Button aria-label={`推进 ${item.title}`} icon={<StepForward size={16} />} onClick={() => { setTarget(item); setNote(''); setConfirmation(''); }} /> : null}<Button aria-label={`查看 ${item.title} 详情`} icon={<Eye size={16} />} onClick={() => setDetail(item)} /><Button aria-label={`查看 ${item.title} 时间线`} icon={<History size={16} />} onClick={() => void showTimeline(item)} /></Space> },
     ]} /></div>
     <Modal title="新建故障" open={createOpen} onCancel={() => setCreateOpen(false)} onOk={() => void submitCreate()} okText="创建故障" confirmLoading={loading} destroyOnHidden>
@@ -134,6 +135,6 @@ export function IncidentsPage({ currentUser }: { currentUser: Pick<AuthUser, 'ro
     </Modal>
     <Modal title="人工推进故障" open={target !== null} onCancel={() => setTarget(null)} onOk={() => void submitAdvance()} okText="确认推进" confirmLoading={loading} okButtonProps={{ disabled: !canAdvance }} destroyOnHidden>{target && advancingTo ? <><p><strong>{target.title}</strong></p><p>当前状态：{statusLabels[target.status]} → <strong>{statusLabels[advancingTo]}</strong>。此操作将写入不可变时间线。</p><Input.TextArea aria-label="处置备注" value={note} onChange={(event) => setNote(event.target.value)} rows={3} maxLength={1000} placeholder="请输入人工处置备注（至少 3 个字符）" />{advancingTo === 'closed' ? <><p className="confirmation-prompt">关闭必须由人工确认，请输入：<strong>确认关闭</strong></p><Input aria-label="关闭确认文本" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} placeholder="确认关闭" /></> : null}</> : null}</Modal>
     <IncidentDetailDrawer incident={detail} currentUser={currentUser} onClose={() => setDetail(null)} />
-    <Drawer title={`${timelineTitle} · 不可变时间线`} open={timeline !== null} onClose={() => setTimeline(null)} width={560}><Timeline items={(timeline ?? []).map((entry) => ({ color: statusColors[entry.status], children: <div className="timeline-entry"><strong>{statusLabels[entry.status]}</strong><span>{entry.note}</span><small>{entry.operator} · {new Date(entry.created_at).toLocaleString()}</small></div> }))} /></Drawer>
+    <Drawer title={`${timelineTitle} · 不可变时间线`} open={timeline !== null} onClose={() => setTimeline(null)} width={560}><Timeline items={(timeline ?? []).map((entry) => ({ color: statusColors[entry.status], children: <div className="timeline-entry"><strong>{statusLabels[entry.status]}</strong><span>{entry.note}</span><small>{entry.operator} · {formatPlatformDateTime(entry.created_at)}</small></div> }))} /></Drawer>
   </section>;
 }

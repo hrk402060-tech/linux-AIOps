@@ -9,8 +9,11 @@ from sqlalchemy.orm import Session
 
 from src.models.alert import Alert
 from src.models.alert_notification import AlertNotification, AlertNotificationAudit, AlertNotificationReceipt
+from src.config import get_settings
+from src.services.platform_settings import notification_values
 from src.schemas.alert_notification import NotificationResponse
 from src.services.alert_notification_config import get_record
+from src.services import notification_channels
 
 logger = logging.getLogger(__name__)
 
@@ -40,19 +43,32 @@ def enqueue(
     if existing is not None:
         return existing
     channel = get_record(session)
-    enabled = bool(channel and channel.enabled and channel.recipients)
+    policy = notification_values(session, get_settings())
+    enabled = channel_available(session)
     item = AlertNotification(
         id=str(uuid4()), dedupe_key=dedupe_key, kind=kind, alert_id=alert_id, analysis_id=analysis_id,
         subject=redact_text(subject).replace('\r', ' ').replace('\n', ' ')[:200],
         body=redact_text(body)[:8000], status='pending' if enabled else 'blocked',
         asset_locator={},
-        recipients=list(channel.recipients) if enabled and channel else [],
-        attempts=0, max_attempts=5, created_at=utc_now(),
+        recipients=list(channel.recipients) if channel else [],
+        attempts=0, max_attempts=int(policy["retry_count"]) + 1, created_at=utc_now(),
         error_code=None if enabled else 'notification_not_configured' if channel is None else 'notification_disabled',
         next_attempt_at=utc_now() if enabled else None,
     )
     session.add(item)
     return item
+
+
+def channel_available(session: Session) -> bool:
+    channel = get_record(session)
+    policy = notification_values(session, get_settings())
+    email_ready = bool(channel and channel.enabled and channel.recipients)
+    webhook_ready = notification_channels.ready(session)
+    selected = policy["default_channel"]
+    return bool(policy["enabled"]) and (
+        email_ready if selected == "email" else webhook_ready if selected == "webhook"
+        else email_ready and webhook_ready
+    )
 
 
 def enqueue_mapping_failure(
@@ -161,7 +177,7 @@ def retry_notification(session: Session, notification_id: str, operator: str) ->
     if item.attempts >= item.max_attempts:
         raise NotificationConflictError('通知已达到重试上限；需管理员排查渠道故障，不能重置次数')
     channel = get_record(session)
-    enabled = bool(channel and channel.enabled and channel.recipients)
+    enabled = channel_available(session)
     changes = {'status': 'pending' if enabled else 'blocked', 'next_attempt_at': utc_now() if enabled else None,
                'error_code': None if enabled else 'notification_not_configured' if channel is None else 'notification_disabled',
                'claim_token': None, 'lease_expires_at': None}
@@ -181,7 +197,7 @@ def retry_notification(session: Session, notification_id: str, operator: str) ->
 def acknowledge(session: Session, notification_id: str, operator: str) -> AlertNotification:
     item = get_notification(session, notification_id)
     if item.status != 'sent':
-        raise NotificationConflictError('只有 SMTP 已接受的通知可以登记人工确认')
+        raise NotificationConflictError('只有已投递成功的通知可以登记人工确认')
     if item.acknowledged_at is not None:
         return item
     changed = session.execute(update(AlertNotification).where(

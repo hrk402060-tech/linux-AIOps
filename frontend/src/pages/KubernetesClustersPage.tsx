@@ -1,3 +1,4 @@
+import { formatPlatformDateTime } from '../utils/platformPreferences';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Button, Empty, Input, Select, Space, Table, Tag, Tooltip } from 'antd';
 import { CheckCircle2, Edit3, Gauge, KeyRound, Plus, RefreshCw, ShieldOff, TestTube2 } from 'lucide-react';
@@ -35,7 +36,7 @@ function statusTag(value: string, labels: Record<string, string>) {
   return <Tag color={color}>{labels[value] ?? '未知'}</Tag>;
 }
 function formatDate(value: string | null): string {
-  return value && Number.isFinite(Date.parse(value)) ? new Date(value).toLocaleString() : '—';
+  return value && Number.isFinite(Date.parse(value)) ? formatPlatformDateTime(value) : '—';
 }
 function certificateCell(value: string | null) {
   if (!value || !Number.isFinite(Date.parse(value))) return <span>—</span>;

@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from src.auth import require_admin
+from src.auth import require_admin, require_authenticated
 from src.config import Settings, get_settings
 from src.database import Base, create_session_factory
 from src.routes.credentials import router as credentials_router
@@ -39,6 +39,12 @@ from src.routes.diagnostic_jobs import router as diagnostic_jobs_router
 from src.routes.recovery import router as recovery_router
 from src.routes.operations import router as operations_router
 from src.routes.kubernetes import router as kubernetes_router
+from src.routes.identity_sources import router as identity_sources_router
+from src.routes.identity_login import router as identity_login_router
+from src.routes.identity_mfa import router as identity_mfa_router
+from src.routes.platform_data import router as platform_data_router
+from src.routes.notification_channels import router as notification_channels_router
+from src.models.platform_data import PlatformDataJob  # noqa: F401
 from src.models.ops_assistant import OpsConversation, OpsMessage  # noqa: F401
 from src.models.kubernetes_cluster import (  # noqa: F401
     KubernetesCluster, KubernetesClusterAudit, KubernetesClusterCredential, KubernetesConnectionTest,
@@ -60,8 +66,10 @@ from src.services.monitoring import run_scheduler as run_monitoring_scheduler
 from src.services.terminal_connections import TerminalConnectionRegistry
 from src.services.terminal_tickets import TerminalTicketRegistry
 from src.services import terminal_sessions
+from src.services import platform_settings
 from src.services.scan_schedules import run_scheduler as run_scan_schedule_scheduler
 from src.services.alert_notification_delivery import run_scheduler as run_notification_scheduler
+from src.services.platform_data_worker import run_scheduler as run_data_scheduler
 
 PROJECT_NAME = "app-linux-vuln-sentinel"
 
@@ -89,9 +97,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             configure_sources(session, runtime_settings.connector_map)
             knowledge_backfill.recover_interrupted_jobs(session)
             terminal_sessions.recover_interrupted_sessions(session)
-            if runtime_settings.auto_create_schema:
-                diagnostic_job_state.seed(session)
+            diagnostic_job_state.seed(session)
+            platform_settings.apply_runtime(
+                application, platform_settings.runtime_values(session, runtime_settings)
+            )
         stop_event = asyncio.Event()
+        settings_refresh = asyncio.create_task(platform_settings.run_runtime_refresh(
+            application, session_factory, runtime_settings, stop_event,
+        ))
+        data_scheduler = (asyncio.create_task(run_data_scheduler(
+            session_factory, runtime_settings, application.state.credential_vault, stop_event,
+        )) if runtime_settings.platform_data_workers_enabled else None)
         scheduler = asyncio.create_task(run_scheduler(
             session_factory, runtime_settings.trusted_key_map,
             runtime_settings.connector_map, runtime_settings.knowledge_sync_interval_seconds,
@@ -99,7 +115,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         ))
         monitoring_scheduler = asyncio.create_task(run_monitoring_scheduler(
             session_factory, application.state.credential_vault,
-            runtime_settings.monitoring_interval_seconds, stop_event,
+            lambda: application.state.platform_runtime["connection"]["collection_interval_seconds"],
+            stop_event,
         ))
         scan_schedule_scheduler = asyncio.create_task(run_scan_schedule_scheduler(
             session_factory, application.state.credential_vault, stop_event,
@@ -110,6 +127,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         diagnostic_scheduler = (asyncio.create_task(run_diagnostic_scheduler(
             session_factory, application.state.credential_vault, stop_event,
             application.state.diagnostic_scheduler_health,
+            lambda: application.state.platform_runtime["tasks"]["max_concurrency"],
         )) if runtime_settings.diagnostic_workers_enabled else None)
         kubernetes_scheduler = (asyncio.create_task(run_kubernetes_scheduler(
             session_factory, application.state.credential_vault, runtime_settings, stop_event,
@@ -122,8 +140,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 await diagnostic_scheduler
             if kubernetes_scheduler is not None:
                 await kubernetes_scheduler
+            if data_scheduler is not None:
+                await data_scheduler
             await asyncio.gather(
-                scheduler, monitoring_scheduler, scan_schedule_scheduler, notification_scheduler,
+                scheduler, monitoring_scheduler, scan_schedule_scheduler, notification_scheduler, settings_refresh,
             )
 
     application = FastAPI(
@@ -143,9 +163,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     application.include_router(patches_router, prefix='/api/v1', dependencies=[Depends(require_admin)])
     application.include_router(system_router, prefix='/api/v1', dependencies=[Depends(require_admin)])
     application.include_router(auth_router, prefix="/api/v1")
+    for settings_router in (identity_sources_router, identity_login_router, identity_mfa_router,
+                            platform_data_router, notification_channels_router):
+        application.include_router(settings_router, prefix="/api/v1")
     application.state.session_factory = session_factory
     application.state.api_admin_token = runtime_settings.api_admin_token.get_secret_value()
     application.state.runtime_settings = runtime_settings
+    platform_settings.apply_runtime(application, platform_settings.defaults(runtime_settings))
     application.state.diagnostic_scheduler_health = DiagnosticSchedulerHealth(
         enabled=runtime_settings.diagnostic_workers_enabled,
     )
@@ -176,8 +200,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_origins=runtime_settings.origin_list,
         allow_origin_regex=runtime_settings.origin_regex,
         allow_credentials=True,
-        allow_methods=["GET", "POST", "PATCH", "DELETE"],
-        allow_headers=["Content-Type", "Authorization"],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+        allow_headers=["Content-Type", "Authorization", "If-Match"],
     )
     application.include_router(
         credentials_router, prefix="/api/v1", dependencies=[Depends(require_admin)]
@@ -250,6 +274,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @application.get("/api/health", tags=["health"])
     def health() -> dict[str, str]:
         return {"status": "ok"}
+
+    @application.get("/api/v1/system/preferences", dependencies=[Depends(require_authenticated)])
+    def preferences() -> dict[str, object]:
+        with session_factory() as session:
+            return platform_settings.read_category(session, runtime_settings, "basic")
 
     return application
 

@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     allowed_origins: str = "http://localhost:5173"
     auto_create_schema: bool = False
     diagnostic_workers_enabled: bool = True
+    platform_data_workers_enabled: bool = True
     knowledge_trusted_keys: str = "{}"
     knowledge_source_connectors: str = "{}"
     knowledge_sync_interval_seconds: int = Field(default=14400, ge=300, le=86400)

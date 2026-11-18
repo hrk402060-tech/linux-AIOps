@@ -1,3 +1,4 @@
+import { formatPlatformDateTime } from '../../utils/platformPreferences';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Button, Descriptions, Empty, Modal, Space, Table, Tag, Tooltip, message } from 'antd';
 import { CheckCheck, ChevronDown, ChevronRight, RefreshCw, RotateCcw } from 'lucide-react';
@@ -18,7 +19,7 @@ const kinds: Record<NotificationKind, string> = {
   alert_received: '告警接收', diagnostic_result: '定位结果', asset_mapping_failed: '资产映射失败',
   recovery_result: '恢复验证结果',
 };
-const formatTime = (value: string | null) => value ? new Date(value).toLocaleString() : '-';
+const formatTime = (value: string | null) => value ? formatPlatformDateTime(value) : '-';
 
 type HistoryProps = {
   currentUser: Pick<AuthUser, 'role'>; alertId?: string; onUpdated?: () => void; refreshVersion?: number;

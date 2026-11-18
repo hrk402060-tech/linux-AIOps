@@ -1,13 +1,13 @@
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from src.models.alert import Alert, RootCauseAnalysis
 from src.models.asset import Asset
 from src.models.diagnostic_job import DiagnosticJob, DiagnosticSlot
-from src.services import diagnostic_grants, diagnostic_job_access, diagnostic_job_state as state
+from src.services import diagnostic_grants, diagnostic_job_access, diagnostic_job_state as state, platform_settings
 from src.services.diagnostic_job_guard import DiagnosticClaim, utc
 
 LEASE_SECONDS = 90
@@ -15,6 +15,13 @@ LEASE_SECONDS = 90
 
 def claim_next(session: Session) -> DiagnosticClaim | None:
     state.lock(session)
+    maximum = platform_settings.task_policy(session).max_concurrency
+    active = session.scalar(select(func.count()).select_from(DiagnosticSlot).where(
+        DiagnosticSlot.job_id.is_not(None),
+    )) or 0
+    if active >= maximum:
+        session.rollback()
+        return None
     slot = session.scalar(select(DiagnosticSlot).where(DiagnosticSlot.job_id.is_(None)).order_by(DiagnosticSlot.id).limit(1))
     now = datetime.now(timezone.utc)
     job = session.scalar(select(DiagnosticJob).where(DiagnosticJob.status.in_(('queued', 'retry_wait')),

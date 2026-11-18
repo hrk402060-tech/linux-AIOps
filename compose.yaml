@@ -54,6 +54,8 @@ services:
       TERMINAL_AI_TIMEOUT_SECONDS: ${TERMINAL_AI_TIMEOUT_SECONDS:-30}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:8080}
       AUTO_CREATE_SCHEMA: "false"
+    volumes:
+      - platform_storage:/var/lib/linux-ops
     depends_on:
       postgres:
         condition: service_healthy
@@ -95,6 +97,7 @@ networks:
     driver: bridge
 
 volumes:
+  platform_storage:
   postgres_data:
     # Preserve the existing production database volume while the Compose project is renamed.
     name: linux-vuln-sentinel_postgres_data

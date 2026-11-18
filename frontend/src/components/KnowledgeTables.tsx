@@ -1,3 +1,4 @@
+import { platformDateTimeOptions } from '../utils/platformPreferences';
 import { Button, Empty, Popconfirm, Progress, Table, Tag, Tooltip } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { ExternalLink, Pause, Play, RefreshCw, RotateCcw } from 'lucide-react';
@@ -6,7 +7,7 @@ import type { KnowledgeAdvisory, KnowledgeBackfill, KnowledgeCoverageSource, Kno
 
 const severityLabels: Record<string, string> = { critical: '严重', high: '高危', medium: '中危', low: '低危', unknown: '未知' };
 const severityColors: Record<string, string> = { critical: 'magenta', high: 'red', medium: 'orange', low: 'blue', unknown: 'default' };
-const formatDate = (value: string | null) => value ? new Intl.DateTimeFormat('zh-CN', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value)) : '暂无';
+const formatDate = (value: string | null) => value ? new Intl.DateTimeFormat('zh-CN', platformDateTimeOptions({ dateStyle: 'medium', timeStyle: 'short' })).format(new Date(value)) : '暂无';
 const formatSchedule = (value: string | null) => {
   if (!value) return '手动导入';
   const parts = value.split(' ');

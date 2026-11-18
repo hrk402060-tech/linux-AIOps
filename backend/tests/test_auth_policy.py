@@ -22,6 +22,9 @@ def policy_payload(**overrides: object) -> dict[str, object]:
         "require_mfa": False,
         "mfa_enforcement": "off",
         "allow_user_mfa_reset": True,
+        "password_min_length": 8,
+        "password_require_uppercase": False,
+        "session_idle_timeout_seconds": 43200,
     }
     payload.update(overrides)
     return payload
@@ -186,6 +189,7 @@ def test_environment_defaults_are_used_until_admin_saves_policy(client: TestClie
             login_failure_threshold=8,
             lock_duration_seconds=1500,
             session_ttl_seconds=7200,
+            session_idle_timeout_seconds=7200,
         ),
         "source": "环境变量", "updated_by": "环境变量", "updated_at": None,
     }

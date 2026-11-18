@@ -9,7 +9,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from src.config import Settings
-from src.models.auth import User
+from src.models.auth import AuthSession, User
 from src.models.cmdb import CmdbChangeAudit
 from src.models.platform_setting import PlatformSetting
 from src.schemas.auth_policy import AuthPolicyResponse, AuthPolicyUpdate, MfaEnforcement
@@ -31,6 +31,9 @@ class AuthPolicy:
     require_mfa: bool
     mfa_enforcement: MfaEnforcement
     allow_user_mfa_reset: bool
+    password_min_length: int = 8
+    password_require_uppercase: bool = False
+    session_idle_timeout_seconds: int = 43200
 
 
 def defaults(settings: Settings) -> AuthPolicy:
@@ -41,6 +44,7 @@ def defaults(settings: Settings) -> AuthPolicy:
         require_mfa=False,
         mfa_enforcement="off",
         allow_user_mfa_reset=True,
+        session_idle_timeout_seconds=settings.auth_session_ttl_seconds,
     )
 
 
@@ -199,3 +203,22 @@ def save(
         logger.error("Authentication policy transaction failed: %s", type(error).__name__)
         raise ValueError("登录安全策略保存失败，请刷新后重试") from error
     return read(session, settings)
+
+
+def validate_new_password(session: Session, settings: Settings, password: str) -> None:
+    policy = resolve(session, settings)
+    if len(password) < policy.password_min_length:
+        raise ValueError(f"密码至少需要 {policy.password_min_length} 位")
+    if policy.password_require_uppercase and not any("A" <= character <= "Z" for character in password):
+        raise ValueError("密码必须包含大写英文字母")
+
+
+def session_is_valid(session: Session, settings: Settings, item: AuthSession) -> bool:
+    policy = resolve(session, settings)
+    now = datetime.now(timezone.utc)
+    def utc(value: datetime) -> datetime:
+        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+    return (
+        (now - utc(item.created_at)).total_seconds() < policy.session_ttl_seconds
+        and (now - utc(item.last_used_at)).total_seconds() < policy.session_idle_timeout_seconds
+    )

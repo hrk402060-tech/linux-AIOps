@@ -1,3 +1,4 @@
+import { formatPlatformDateTime } from '../utils/platformPreferences';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Button, Empty, List, message, Select, Tag } from 'antd';
 import { ArrowLeft, CircleStop, Clock3, ExternalLink, PanelRightClose, PanelRightOpen, PlugZap, Server, ShieldCheck, TerminalSquare } from 'lucide-react';
@@ -173,8 +174,8 @@ export function TerminalPage({ initialAssetId, standalone = false }: { initialAs
         <div className="terminal-recent-heading"><Clock3 size={15} /><strong>最近会话</strong></div>
         {historyError ? <small className="terminal-history-error">{historyError}</small> : null}
         <List size="small" split={false} dataSource={recentSessions.slice(0, 5)} locale={{ emptyText: '暂无会话记录' }} renderItem={(item) => <List.Item className="terminal-recent-item">
-          <button type="button" disabled={switchingLocked} onClick={() => setAssetId(item.asset_id)}><strong>{item.asset_name}</strong><span>{sessionLabels[item.status]} · {new Date(item.requested_at).toLocaleString()}</span>
-            {item.ended_at ? <span>结束于 {new Date(item.ended_at).toLocaleString()}</span> : null}
+          <button type="button" disabled={switchingLocked} onClick={() => setAssetId(item.asset_id)}><strong>{item.asset_name}</strong><span>{sessionLabels[item.status]} · {formatPlatformDateTime(item.requested_at)}</span>
+            {item.ended_at ? <span>结束于 {formatPlatformDateTime(item.ended_at)}</span> : null}
             {item.failure_reason ? <span title={item.failure_reason}>{item.failure_reason}</span> : null}</button>
         </List.Item>} />
       </aside>
@@ -187,7 +188,7 @@ export function TerminalPage({ initialAssetId, standalone = false }: { initialAs
           <div className="terminal-security"><ShieldCheck size={17} /><span>凭据仅在后端解密 · 终端票据单次有效</span><Tag color={connectionState === '已连接' ? 'green' : 'default'}>{connectionState}</Tag><Button type="text" icon={assistantOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />} aria-label={assistantOpen ? '收起 AI 助手' : '展开 AI 助手'} onClick={() => setAssistantOpen((current) => !current)} /></div>
         </div>
         {connectionDetails?.message ? <div className="terminal-security" role="status"><span>{connectionDetails.message}</span>
-          {connectionDetails.ended_at && !Number.isNaN(Date.parse(connectionDetails.ended_at)) ? <time aria-label="会话结束时间" dateTime={connectionDetails.ended_at}>{new Date(connectionDetails.ended_at).toLocaleString()}</time> : null}</div> : null}
+          {connectionDetails.ended_at && !Number.isNaN(Date.parse(connectionDetails.ended_at)) ? <time aria-label="会话结束时间" dateTime={connectionDetails.ended_at}>{formatPlatformDateTime(connectionDetails.ended_at)}</time> : null}</div> : null}
         <div className={`terminal-workspace ${assistantOpen ? '' : 'terminal-workspace--assistant-collapsed'}`}><div className="terminal-stage">{selected && ticket && ticketAsset.current === selected.id
           ? <TerminalConsole asset={selected} ticket={ticket} onStateChange={stateChanged} onOutput={collectOutput} />
           : <div className="terminal-placeholder"><TerminalSquare size={30} /><strong>选择服务器并建立 SSH 会话</strong><span>连接后终端将在当前浏览器工作台打开</span></div>}</div>

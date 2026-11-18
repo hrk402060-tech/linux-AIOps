@@ -1,14 +1,18 @@
 from datetime import datetime, timedelta, timezone
 from hashlib import sha256
+import logging
 import secrets
 from typing import Literal
 
 from pwdlib import PasswordHash
-from sqlalchemy import select, update
+from sqlalchemy import case, select, update
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from src.models.auth import AuthSession, LoginAudit, User
 from src.services import mfa
+from src.services import auth_policy
+from src.config import Settings, get_settings
 from src.services.auth_sessions import (
     list_active_sessions as list_active_sessions,
     revoke_session_by_id as revoke_session_by_id,
@@ -16,6 +20,7 @@ from src.services.auth_sessions import (
 
 password_hash = PasswordHash.recommended()
 dummy_password_hash = password_hash.hash("sentinel-dummy-password-value")
+logger = logging.getLogger(__name__)
 
 
 class AuthenticationError(Exception):
@@ -143,7 +148,9 @@ def authenticate(
     return user, raw_token
 
 
-def get_session_user(session: Session, raw_token: str) -> tuple[AuthSession, User] | None:
+def get_session_user(
+    session: Session, raw_token: str, settings: Settings | None = None,
+) -> tuple[AuthSession, User] | None:
     now = datetime.now(timezone.utc)
     item = session.scalar(
         select(AuthSession).where(AuthSession.token_hash == hash_token(raw_token))
@@ -153,10 +160,44 @@ def get_session_user(session: Session, raw_token: str) -> tuple[AuthSession, Use
     user = session.get(User, item.user_id)
     if user is None or not user.enabled:
         return None
-    if now - _as_utc(item.last_used_at) >= timedelta(minutes=5):
-        item.last_used_at = now
-        session.commit()
+    if not touch_session_activity(session, item, settings):
+        return None
     return item, user
+
+
+def touch_session_activity(
+    session: Session, item: AuthSession, settings: Settings | None = None,
+) -> bool:
+    settings = settings or get_settings()
+    policy = auth_policy.resolve(session, settings)
+    now = datetime.now(timezone.utc)
+    if (
+        item.revoked_at is not None or _as_utc(item.expires_at) <= now
+        or not auth_policy.session_is_valid(session, settings, item)
+    ):
+        return False
+    interval = min(60, max(1, policy.session_idle_timeout_seconds // 3))
+    if (now - _as_utc(item.last_used_at)).total_seconds() < interval:
+        return True
+    try:
+        # Re-check deadlines in the write so activity cannot revive an expired/revoked row.
+        result = session.execute(update(AuthSession).where(
+            AuthSession.id == item.id, AuthSession.revoked_at.is_(None),
+            AuthSession.expires_at > now,
+            AuthSession.created_at > now - timedelta(seconds=policy.session_ttl_seconds),
+            AuthSession.last_used_at > now - timedelta(seconds=policy.session_idle_timeout_seconds),
+        ).values(last_used_at=case(
+            (AuthSession.last_used_at < now, now), else_=AuthSession.last_used_at,
+        )).execution_options(synchronize_session=False))
+        if result.rowcount != 1:
+            session.rollback()
+            return False
+        session.commit()
+    except SQLAlchemyError as error:
+        session.rollback()
+        logger.error("Login activity update failed: %s", type(error).__name__)
+        raise auth_policy.AuthPolicyUnavailableError("登录会话状态更新失败，请稍后重试") from error
+    return True
 
 
 def revoke_session(session: Session, raw_token: str) -> None:

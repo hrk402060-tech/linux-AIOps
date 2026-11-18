@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Button, Descriptions, Form, Input, Modal, QRCode } from 'antd';
+import { Alert, Button, Descriptions, Form, Input, Modal, QRCode, Segmented } from 'antd';
 import { ArrowRight, CircleHelp, Eye, EyeOff, Headphones, KeyRound, Layers, LockKeyhole, UserRound } from 'lucide-react';
 
 import { ApiError } from '../api/client';
@@ -9,6 +9,8 @@ import {
 } from '../api/auth';
 import type { PetState } from './LoginCompanion';
 import { LoginPlatformScene } from './LoginPlatformScene';
+import { getIdentityOptions, loginLdap, type IdentityOptions } from '../api/identitySources';
+import { IdentityMfaGate } from './IdentityMfaGate';
 import './AccessGate.css';
 
 export function AccessGate({ onAuthenticated }: { onAuthenticated: (user: AuthUser) => void }) {
@@ -21,11 +23,31 @@ export function AccessGate({ onAuthenticated }: { onAuthenticated: (user: AuthUs
   const [errorMessage, setErrorMessage] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [identityOptions, setIdentityOptions] = useState<IdentityOptions>({ local_login_enabled: true, ldap_enabled: false, oidc_enabled: false });
+  const [loginMethod, setLoginMethod] = useState<'local' | 'ldap'>('local');
+  const [identityMfa, setIdentityMfa] = useState(() => new URLSearchParams(window.location.search).has('identity_mfa'));
   const [form] = Form.useForm();
   const loadingRef = useRef(false);
   const successTimer = useRef<number | undefined>(undefined);
+  const clearIdentityFlow = () => {
+    setIdentityMfa(false);
+    const url = new URL(window.location.href);
+    url.searchParams.delete('identity_mfa');
+    window.history.replaceState(null, '', url);
+  };
   useEffect(() => () => {
     if (successTimer.current !== undefined) window.clearTimeout(successTimer.current);
+  }, []);
+  useEffect(() => {
+    let active = true;
+    getIdentityOptions().then((options) => {
+      if (!active) return;
+      setIdentityOptions(options);
+      if (!options.local_login_enabled && options.ldap_enabled) setLoginMethod('ldap');
+    }).catch((cause: unknown) => {
+      if (active) setErrorMessage(cause instanceof Error ? cause.message : '登录方式加载失败');
+    });
+    return () => { active = false; };
   }, []);
 
   const authenticate = async ({ username, password, otp_code }: {
@@ -37,7 +59,7 @@ export function AccessGate({ onAuthenticated }: { onAuthenticated: (user: AuthUs
     setPetState('loading');
     setErrorMessage('');
     try {
-      const user = await login(username.trim(), password, otp_code);
+      const user = await (loginMethod === 'ldap' ? loginLdap : login)(username.trim(), password, otp_code);
       setPetState('success');
       successTimer.current = window.setTimeout(() => {
         setPetState('welcome');
@@ -50,6 +72,7 @@ export function AccessGate({ onAuthenticated }: { onAuthenticated: (user: AuthUs
       } else {
         if (error instanceof ApiError && error.code === 'mfa_setup_required') {
           setMfaRequired(false);
+          if (loginMethod === 'ldap') { setIdentityMfa(true); setPetState('idle'); return; }
           try {
             const setup = await startMfaEnrollment(username.trim(), password);
             setEnrollmentSetup(setup);
@@ -99,7 +122,11 @@ export function AccessGate({ onAuthenticated }: { onAuthenticated: (user: AuthUs
               <h2 id="platform-login-heading">登录工作台</h2>
               <p>欢迎回来，请使用平台账号登录</p>
             </div>
-            <Form form={form} layout="vertical" requiredMark={false} onFinish={authenticate}
+            {identityOptions.local_login_enabled && identityOptions.ldap_enabled ? <Segmented
+              aria-label="登录方式" value={loginMethod} style={{ marginBottom: 18 }} disabled={loading}
+              options={[{ value: 'local', label: '平台账号' }, { value: 'ldap', label: 'LDAP / AD' }]}
+              onChange={(value) => { setLoginMethod(value as 'local' | 'ldap'); setMfaRequired(false); form.resetFields(['password', 'otp_code']); }} /> : null}
+            {identityOptions.local_login_enabled || identityOptions.ldap_enabled ? <Form form={form} layout="vertical" requiredMark={false} onFinish={authenticate}
               onValuesChange={() => setErrorMessage('')}>
               <Form.Item name="username" label="用户名"
                 rules={[{ required: true, whitespace: true, message: '请输入用户名' }]}>
@@ -138,7 +165,12 @@ export function AccessGate({ onAuthenticated }: { onAuthenticated: (user: AuthUs
                 <span>{mfaRequired ? '验证并登录' : '登录'}</span>
                 {!loading ? <ArrowRight size={18} aria-hidden="true" /> : null}
               </Button>
-            </Form>
+            </Form> : null}
+            {identityOptions.oidc_enabled ? <Button block style={{ marginTop: 12 }} href="/api/v1/auth/identity/oidc/start">
+              通过统一身份登录
+            </Button> : null}
+            {!identityOptions.local_login_enabled && !identityOptions.ldap_enabled && errorMessage
+              ? <p className="pl-error" role="alert">{errorMessage}</p> : null}
             <div className="pl-auth-bottom">
               <span><KeyRound size={14} aria-hidden="true" />统一身份认证</span>
               <button className="pl-contact" type="button" onClick={() => setHelpOpen(true)}>
@@ -157,6 +189,9 @@ export function AccessGate({ onAuthenticated }: { onAuthenticated: (user: AuthUs
         footer={<Button type="primary" onClick={() => setHelpOpen(false)}>知道了</Button>}>
         <p className="pl-help-text">账号开通、密码重置或二次验证问题，请联系平台管理员。</p>
       </Modal>
+      {identityMfa ? <IdentityMfaGate onAuthenticated={(user) => {
+        clearIdentityFlow(); onAuthenticated(user);
+      }} onCancel={clearIdentityFlow} /> : null}
       <Modal title="首次绑定 MFA" open={enrollmentSetup !== null} footer={null}
         onCancel={() => { if (!loadingRef.current) { setEnrollmentSetup(null); setEnrollmentError(''); } }}
         closable={!loading} maskClosable={!loading} keyboard={!loading} destroyOnHidden>

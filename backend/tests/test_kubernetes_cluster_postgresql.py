@@ -111,7 +111,8 @@ def test_postgres_migration_roundtrip(isolated_pg: tuple[Engine, str]) -> None:
     before = set(inspect(engine).get_table_names())
     migrate("upgrade", "head")
     added = {"kubernetes_clusters", "kubernetes_cluster_credentials",
-             "kubernetes_cluster_audits", "kubernetes_connection_tests", "kubernetes_collection_runs"}
+             "kubernetes_cluster_audits", "kubernetes_connection_tests", "kubernetes_collection_runs",
+             "kubernetes_resource_snapshots", "platform_data_jobs"}
     assert set(inspect(engine).get_table_names()) == before | added
     migrate("downgrade", "20261110_51")
     assert set(inspect(engine).get_table_names()) == before

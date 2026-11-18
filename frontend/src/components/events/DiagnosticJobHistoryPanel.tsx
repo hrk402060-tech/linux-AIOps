@@ -1,3 +1,4 @@
+import { formatPlatformDateTime } from '../../utils/platformPreferences';
 import { useEffect, useRef, useState } from 'react';
 import { Button, Descriptions, Empty, List, Modal, Space, Table, Typography, message } from 'antd';
 import { Eye, X } from 'lucide-react';
@@ -50,7 +51,7 @@ export function DiagnosticJobHistoryPanel({ alert, currentUser, onCancel }: {
       columns={[
         { title: '状态', width: 130, render: (_, job) => <DiagnosticJobTag job={job} /> },
         { title: '尝试', width: 75, render: (_, job) => `${job.attempt_count} / ${job.max_attempts}` },
-        { title: '下次重试', width: 160, render: (_, job) => job.next_attempt_at ? new Date(job.next_attempt_at).toLocaleString() : '-' },
+        { title: '下次重试', width: 160, render: (_, job) => job.next_attempt_at ? formatPlatformDateTime(job.next_attempt_at) : '-' },
         { title: '最近错误', width: 150, render: (_, job) => job.last_error_code ?? '-' },
         { title: '操作', width: 90, render: (_, job) => <Space size={4}>
           <Button aria-label={`查看尝试 ${job.id}`} icon={<Eye size={15} />} onClick={() => void showAttempts(job)} />
@@ -70,7 +71,7 @@ export function DiagnosticJobHistoryPanel({ alert, currentUser, onCancel }: {
       <Typography.Paragraph type="secondary">该任务最多 3 次尝试，按执行记录展示。</Typography.Paragraph>
       <List size="small" loading={attemptLoading} dataSource={attempts} locale={{ emptyText: '暂无执行尝试' }} renderItem={(item) => <List.Item>
         <List.Item.Meta title={<Space><span>尝试 {item.attempt_number ?? '-'} · {item.status}</span><span>{item.summary}</span></Space>}
-          description={<><p>{item.error_code ?? '-'} · {new Date(item.started_at).toLocaleString()}</p><pre className="redacted-payload">{JSON.stringify(item.evidence, null, 2)}</pre></>} />
+          description={<><p>{item.error_code ?? '-'} · {formatPlatformDateTime(item.started_at)}</p><pre className="redacted-payload">{JSON.stringify(item.evidence, null, 2)}</pre></>} />
       </List.Item>} />
     </Modal>
   </section>;

@@ -1,3 +1,4 @@
+import { formatPlatformDateTime } from '../../utils/platformPreferences';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Button, Modal, Segmented, Space, Spin, Table, Tag } from 'antd';
 import { ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
@@ -19,7 +20,7 @@ const outcomeLabels: Record<ConnectorReceipt['outcome'], string> = {
   reopened: '已重新打开告警', rejected: '接收被拒绝',
 };
 const loadError = '接收记录加载失败，请刷新后重试';
-const formatTime = (value: string): string => new Date(value).toLocaleString('zh-CN');
+const formatTime = (value: string): string => formatPlatformDateTime(value);
 const failureMessages: Record<string, string> = {
   signature_invalid: '签名不匹配',
   nonce_invalid: '请求随机数无效',

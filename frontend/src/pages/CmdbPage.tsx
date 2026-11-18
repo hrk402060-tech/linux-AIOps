@@ -1,3 +1,4 @@
+import { formatPlatformDateTime } from '../utils/platformPreferences';
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Button, Input, Modal, Select, Space, Table, Tag, Tooltip, message } from 'antd';
 import { Archive, Eye, Pencil, Plus, Power, PowerOff, RefreshCw, RotateCcw, Search } from 'lucide-react';
@@ -121,7 +122,7 @@ export function CmdbPage({ currentUser, initialServiceId }: { currentUser: AuthU
         { title: '服务器', render: (_, item) => <div><strong>{item.asset_name}</strong><small>{item.host}</small></div> },
         { title: '采集状态', dataIndex: 'status' },
         { title: '发现服务', render: (_, item) => item.services.length ? <Space wrap>{item.services.map((service) => <Button key={`${service.source}-${service.name}`} size="small" disabled={!canWrite} onClick={() => setDiscoveryTarget({ assetId: item.asset_id, assetName: item.asset_name, serviceName: service.name, source: service.source })}>{service.name} · {service.source === 'systemd' ? 'systemd' : '容器'}</Button>)}</Space> : '未发现' },
-        { title: '采集时间', render: (_, item) => new Date(item.observed_at).toLocaleString() },
+        { title: '采集时间', render: (_, item) => formatPlatformDateTime(item.observed_at) },
       ]} locale={{ emptyText: '暂无可用的只读采集结果' }} />
     </Modal>
     <Modal title="确认纳入业务服务" open={discoveryTarget !== null} okText="确认写入" confirmLoading={discoveryConfirming} okButtonProps={{ disabled: !discoveryApplicationId }} onOk={() => void confirmDiscovery()} onCancel={() => { setDiscoveryTarget(null); setDiscoveryApplicationId(undefined); }} destroyOnHidden>

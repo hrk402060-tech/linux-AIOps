@@ -1,3 +1,4 @@
+import { platformDateTimeOptions } from '../utils/platformPreferences';
 import { Descriptions, Drawer, Table, Tag, Timeline } from 'antd';
 
 import type { ScanReport } from '../types/report';
@@ -5,9 +6,9 @@ import type { ScanReport } from '../types/report';
 const severityLabels: Record<string, string> = { critical: '严重', high: '高危', medium: '中危', low: '低危' };
 const dispositionLabels: Record<string, string> = { open: '待处理', pending_verification: '待验证', fixed: '已修复', ignored: '已忽略', risk_accepted: '风险接受' };
 
-const formatDate = (value: string | null) => value ? new Intl.DateTimeFormat('zh-CN', {
+const formatDate = (value: string | null) => value ? new Intl.DateTimeFormat('zh-CN', platformDateTimeOptions({
   dateStyle: 'medium', timeStyle: 'short',
-}).format(new Date(value)) : '暂无';
+})).format(new Date(value)) : '暂无';
 
 export function ReportPreviewDrawer({ report, onClose }: {
   report: ScanReport | null; onClose: () => void;

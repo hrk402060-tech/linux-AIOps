@@ -73,9 +73,17 @@ vi.mock('./pages/VulnerabilitiesPage', () => ({
     <p>漏洞搜索上下文 {initialQuery ?? ''} {initialDisposition ?? 'active'}</p></>,
 }));
 vi.mock('./pages/ReportsPage', () => ({ ReportsPage: () => <p>报告测试页</p> }));
-vi.mock('./pages/SecuritySettingsPage', () => ({
-  SecuritySettingsPage: ({ currentUser }: { currentUser: typeof auth.user }) =>
-    <p>安全设置测试页 {currentUser.role}</p>,
+vi.mock('./pages/UserSecurityPage', () => ({ UserSecurityPage: () => <p>个人安全测试页</p> }));
+vi.mock('./pages/PlatformSettingsPage', () => ({
+  PlatformSettingsPage: ({ onBack, initialCategory, currentUser }: {
+    onBack: () => void; initialCategory?: string; currentUser: typeof auth.user;
+  }) => <section><p>系统设置测试页 {initialCategory} {currentUser.role}</p><button onClick={onBack}>返回工作台</button></section>,
+}));
+vi.mock('./api/system', async (original) => ({
+  ...await original<typeof import('./api/system')>(),
+  getPlatformPreferences: vi.fn(async () => ({
+    platform_name: 'Linux 智能综合运维平台', timezone: 'Asia/Shanghai', display_density: 'comfortable', default_page: 'dashboard',
+  })),
 }));
 vi.mock('./pages/EventsPage', () => ({
   EventsPage: ({ onOpenTerminal, initialAssetId, initialTab, initialAlertId }: {
@@ -103,15 +111,15 @@ afterEach(() => {
 });
 
 describe('使用文档独立页面', () => {
-  it.each(['user-security', 'security-settings'])('security_navigation: 旧新入口 %s 都进入统一安全设置', async (page) => {
+  it('security_navigation: 个人安全入口只打开个人绑定页', async () => {
+    const page = 'user-security';
     window.history.replaceState({}, '', `/?page=${page}`);
     auth.getCurrentUser.mockResolvedValue({ ...auth.user, role: 'operator' });
     render(<App />);
-    expect(await screen.findByText('安全设置测试页 operator')).toBeVisible();
-    expect(document.querySelector('.topbar-context strong')).toHaveTextContent('安全设置');
-    expect(screen.queryByRole('menuitem', { name: '个人安全' })).not.toBeInTheDocument();
+    expect(await screen.findByText('个人安全测试页')).toBeVisible();
+    expect(document.querySelector('.topbar-context strong')).toHaveTextContent('个人安全');
     await userEvent.click(screen.getByRole('button', { name: '用户菜单' }));
-    expect(screen.getByRole('menuitem', { name: '安全设置' })).toHaveClass('ant-dropdown-menu-item');
+    expect(screen.getByRole('menuitem', { name: '个人安全' })).toHaveClass('ant-dropdown-menu-item');
   });
 
   it('登录后展示完整文档，不挂载主侧栏或终端，相关功能另开安全标签', async () => {
@@ -168,6 +176,19 @@ describe('使用文档独立页面', () => {
 });
 
 describe('App navigation authentication boundary', () => {
+  it('settings_return: preserves filters, selected host and detail tab when returning', async () => {
+    render(<ConfigProvider theme={{ token: { motion: false } }}><App /></ConfigProvider>);
+    await userEvent.click(await screen.findByRole('button', { name: '搜索资产跳转' }));
+    const input = await screen.findByRole('textbox', { name: '测试资产查询' });
+    await userEvent.clear(input); await userEvent.type(input, 'host-filter');
+    await userEvent.click(screen.getByRole('button', { name: '打开系统设置' }));
+    expect(await screen.findByText('系统设置测试页 basic admin')).toBeVisible();
+    expect(input).not.toBeVisible();
+    await userEvent.click(screen.getByRole('button', { name: '返回工作台' }));
+    expect(input).toBeVisible();
+    expect(input).toHaveValue('host-filter');
+    expect(screen.getByText('资产搜索上下文 asset-search 192.0.2.42')).toBeVisible();
+  }, 15_000);
   it('alert_target: forwards the exact service alert and its asset into the existing alert page', async () => {
     window.history.replaceState({}, '', '/?page=observability');
     render(<ConfigProvider theme={{ token: { motion: false } }}><App /></ConfigProvider>);

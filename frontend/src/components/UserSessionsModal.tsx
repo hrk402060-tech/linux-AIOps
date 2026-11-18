@@ -1,3 +1,4 @@
+import { formatPlatformDateTime } from '../utils/platformPreferences';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Button, Grid, Modal, Space, Spin, Table, Tag, message } from 'antd';
 import { ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
@@ -5,7 +6,7 @@ import { revokeUserSessions, type AuthSession, type AuthUser } from '../api/auth
 import { logoutRevokedSession, useUserSessions } from '../hooks/useUserSessions';
 
 const roleLabels = { admin: '管理员', operator: '操作员', auditor: '审计员' };
-const sessionTime = (value: string) => new Date(value).toLocaleString('zh-CN');
+const sessionTime = (value: string) => formatPlatformDateTime(value);
 const sessionClient = (value: string | null) => value || '未提供客户端信息';
 
 function SessionStatus({ item }: { item: AuthSession }) {

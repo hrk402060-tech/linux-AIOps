@@ -29,7 +29,11 @@ from src.schemas.terminal_assistant import (
 )
 from src.services import terminal_assistant, terminal_gateway, terminal_sessions, terminal_lifecycle
 from src.services import asset_access
-from src.services.auth import get_session_user
+from src.services.ops_redaction import redact
+from src.services.platform_settings import ai_policy
+from src.services import auth_policy
+from src.config import Settings, get_settings
+from src.services.auth import get_session_user, touch_session_activity
 from src.services.ai_settings import AISettingsError, terminal_runtime_config
 from src.services.terminal_tickets import TerminalTicket
 
@@ -106,6 +110,11 @@ def analyze_terminal(
     principal: AuthPrincipal = Depends(require_admin),
 ) -> TerminalAssistantResponse:
     _require_owned_terminal(session, payload.session_id, principal)
+    policy = ai_policy(session)
+    if not policy.ops_assistant_enabled:
+        raise HTTPException(status_code=403, detail="运维助手已由管理员停用")
+    if not policy.include_terminal_output:
+        payload = payload.model_copy(update={"context": ""})
     try:
         analysis, commands = terminal_assistant.analyze(
             session,
@@ -232,7 +241,7 @@ async def _authenticate(
     raw_token = websocket.cookies.get(settings.auth_cookie_name)
     if raw_token:
         with websocket.app.state.session_factory() as session:
-            result = get_session_user(session, raw_token)
+            result = get_session_user(session, raw_token, settings)
         if result is not None:
             auth_session, user = result
             return ticket, columns, rows, TerminalAuthContext(
@@ -286,7 +295,9 @@ async def _open(
     item = session.get(TerminalSession, session_id)
     if item is None or item.status != "waiting" or item.operator != username:
         raise ValueError("Invalid terminal session")
-    _require_socket_access(session, auth_context, item.asset_id)
+    _require_socket_access(
+        session, auth_context, item.asset_id, websocket.app.state.runtime_settings,
+    )
     asset = session.get(Asset, item.asset_id)
     if (
         asset is None
@@ -302,7 +313,10 @@ async def _open(
     )
     def authorize_connection() -> None:
         with websocket.app.state.session_factory() as auth_session:
-            _require_socket_access(auth_session, auth_context, item.asset_id)
+            _require_socket_access(
+                auth_session, auth_context, item.asset_id,
+                websocket.app.state.runtime_settings,
+            )
         terminal_sessions.mark_connected(session, item)
 
     shell = await terminal_lifecycle.open_owned_shell(partial(
@@ -320,15 +334,14 @@ async def _bridge(
 ) -> str:
     started = last_activity = monotonic()
     last_authorization_check = 0.0
+    authorize = partial(
+        _authorize_socket, websocket, session_factory, auth_context, asset_id, outcome,
+    )
     while shell.is_active():
         if stop.is_set():
             return "terminated"
         if monotonic() - last_authorization_check >= 1:
-            try:
-                with session_factory() as auth_session:
-                    _require_socket_access(auth_session, auth_context, asset_id)
-            except ValueError as exc:
-                outcome.decide("revoked", str(exc))
+            if not authorize():
                 return "revoked"
             last_authorization_check = monotonic()
         status = _timeout_status(websocket, started, last_activity)
@@ -347,26 +360,42 @@ async def _bridge(
             continue
         if not isinstance(message, dict):
             raise ValueError("Invalid terminal message")
-        if message.get("type") in {"input", "resize", "approved_command"}:
-            try:
-                with session_factory() as auth_session:
-                    _require_socket_access(auth_session, auth_context, asset_id)
-            except ValueError as exc:
-                outcome.decide("revoked", str(exc))
-                return "revoked"
+        if message.get("type") in {"input", "resize", "approved_command"} and not authorize():
+            return "revoked"
         if message.get("type") == "approved_command":
             await websocket.send_json({
                 "type": "error", "code": "ai_execution_disabled",
                 "message": "AI 仅允许只读分析；请由管理员独立确认并使用人工 SSH 处理",
             })
         else:
-            traffic.bytes_in += await _handle_message(shell, message)
+            received = await _handle_message(shell, message)
+            traffic.bytes_in += received
+            if received and not authorize(touch_activity=True):
+                return "revoked"
         last_activity = monotonic()
     return "closed"
 
 
+def _authorize_socket(
+    websocket: WebSocket, session_factory: sessionmaker[Session],
+    auth_context: TerminalAuthContext, asset_id: str,
+    outcome: terminal_lifecycle.TerminalOutcome, *, touch_activity: bool = False,
+) -> bool:
+    try:
+        with session_factory() as session:
+            _require_socket_access(
+                session, auth_context, asset_id, websocket.app.state.runtime_settings,
+                touch_activity=touch_activity,
+            )
+    except ValueError as error:
+        outcome.decide("revoked", str(error))
+        return False
+    return True
+
+
 def _require_socket_access(
-    session: Session, auth_context: TerminalAuthContext, asset_id: str
+    session: Session, auth_context: TerminalAuthContext, asset_id: str,
+    settings: Settings | None = None, *, touch_activity: bool = False,
 ) -> None:
     session.expire_all()
     principal = auth_context.principal
@@ -379,6 +408,7 @@ def _require_socket_access(
             auth_session is None
             or auth_session.revoked_at is not None
             or expires_at <= datetime.now(timezone.utc)
+            or not auth_policy.session_is_valid(session, settings or get_settings(), auth_session)
         ):
             raise ValueError("登录会话已失效")
         user = session.get(User, principal.user_id)
@@ -391,6 +421,9 @@ def _require_socket_access(
         asset_access.require_asset(session, principal, asset_id, ssh=True)
     except HTTPException as exc:
         raise ValueError(str(exc.detail)) from exc
+    if touch_activity and auth_context.auth_session_id is not None:
+        if not touch_session_activity(session, auth_session, settings):
+            raise ValueError("登录会话已失效")
 
 
 async def _handle_message(
@@ -476,19 +509,27 @@ def chat_terminal_assistant(
     if principal.role != "admin" and terminal.operator != principal.username:
         raise HTTPException(status_code=403, detail="当前账号不能访问其他用户的终端助手会话")
     asset_access.require_asset(session, principal, terminal.asset_id, ssh=True)
-    history = [{"role": item.role, "content": item.content} for item in payload.history]
+    policy = ai_policy(session)
+    if not policy.ops_assistant_enabled:
+        raise HTTPException(status_code=403, detail="运维助手已由管理员停用")
+    question = redact(payload.message)[:4000]
+    context = redact(payload.context) if policy.include_terminal_output else ""
+    history = [{"role": item.role, "content": redact(item.content)[:4000]} for item in payload.history]
+    history = history[-policy.history_messages:] if policy.history_messages else []
     try:
         configuration = terminal_runtime_config(session, request.app.state.credential_vault)
-        reply, engine = terminal_assistant.chat_reply(configuration, payload.message, payload.context, history)
-        analysis_payload = TerminalAssistantRequest(session_id=payload.session_id, mode="analysis_only", question=payload.message, context=payload.context, operator=operator)
+        reply, engine = terminal_assistant.chat_reply(configuration, question, context, history)
+        reply = redact(reply)[:4000]
+        analysis_payload = TerminalAssistantRequest(session_id=payload.session_id, mode="analysis_only", question=question, context=context, operator=operator)
         analysis, commands = terminal_assistant.analyze(session, analysis_payload)
     except terminal_assistant.TerminalAssistantError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except AISettingsError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     analysis_response = TerminalAssistantResponse(id=analysis.id, terminal_session_id=analysis.terminal_session_id, mode=analysis.mode, redacted_context=analysis.redacted_context, diagnosis=analysis.diagnosis, plan=analysis.plan, validation_steps=analysis.validation_steps, operator=analysis.operator, created_at=analysis.created_at, commands=[TerminalCommandResponse.model_validate(item) for item in commands])
-    next_history = (history + [{"role": "user", "content": payload.message}, {"role": "assistant", "content": reply}])[-20:]
-    return TerminalAssistantChatResponse(conversation_id=analysis.id, engine=engine, reply=reply, analysis=analysis_response, history=[TerminalAssistantChatMessage.model_validate(item) for item in next_history])
+    next_history = history + [{"role": "user", "content": question}, {"role": "assistant", "content": reply}]
+    next_history = next_history[-policy.history_messages:] if policy.history_messages else []
+    return TerminalAssistantChatResponse(conversation_id=analysis.id, engine=redact(engine), reply=reply, analysis=analysis_response, history=[TerminalAssistantChatMessage.model_validate(item) for item in next_history])
 
 
 def _require_owned_terminal(

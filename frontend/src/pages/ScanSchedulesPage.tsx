@@ -1,3 +1,4 @@
+import { formatPlatformDateTime } from '../utils/platformPreferences';
 import { useEffect, useState } from 'react';
 import { Button, Drawer, Form, Input, InputNumber, Modal, Radio, Select, Space, Switch, Table, Tag, TimePicker, message } from 'antd';
 import { History, Plus, RefreshCw } from 'lucide-react';
@@ -7,7 +8,7 @@ import type { Asset } from '../types/asset';
 import type { ScanSchedule, ScanScheduleCreate, ScanTask } from '../types/scan-task';
 
 const types = { host_vulnerability: '主机漏洞', service_vulnerability: '服务漏洞', comprehensive: '综合扫描' };
-const format = (value: string | null) => value ? new Date(value).toLocaleString('zh-CN') : '尚未执行';
+const format = (value: string | null) => value ? formatPlatformDateTime(value) : '尚未执行';
 
 export function ScanSchedulesPage({ embedded = false }: { embedded?: boolean }) {
   const [items, setItems] = useState<ScanSchedule[]>([]);

@@ -1,3 +1,4 @@
+import { platformDateTimeOptions } from '../utils/platformPreferences';
 import { Descriptions, Drawer, Empty, Progress, Table, Tag, Timeline } from 'antd';
 
 import type { ScanStatus, ScanTask } from '../types/scan-task';
@@ -6,9 +7,9 @@ const labels: Record<ScanStatus, string> = {
   queued: '排队', scanning: '扫描中', aggregating: '汇总', completed: '完成',
   failed: '失败', cancelled: '取消',
 };
-const formatDate = (value: string) => new Intl.DateTimeFormat('zh-CN', {
+const formatDate = (value: string) => new Intl.DateTimeFormat('zh-CN', platformDateTimeOptions({
   dateStyle: 'medium', timeStyle: 'short',
-}).format(new Date(value));
+})).format(new Date(value));
 
 export function ScanTaskDetailDrawer({ task, onClose }: { task: ScanTask | null; onClose: () => void }) {
   const summary = task?.result_summary;

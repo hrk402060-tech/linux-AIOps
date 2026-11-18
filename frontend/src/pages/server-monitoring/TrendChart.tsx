@@ -1,3 +1,4 @@
+import { formatPlatformDateTime } from '../../utils/platformPreferences';
 import { useId, useState } from 'react';
 import { Empty } from 'antd';
 
@@ -40,7 +41,7 @@ export function TrendChart({ title, unit, points, series, thresholds = [], maxim
     });
     return path;
   };
-  const timeLabel = (time: number) => new Date(time).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
+  const timeLabel = (time: number) => formatPlatformDateTime(time, { hour: '2-digit', minute: '2-digit', hour12: false });
   const hasValue = valid.some((point) => series.some((item) => observed(point.values[item.key])));
   const hoverAt = (clientX: number, svg: SVGSVGElement) => {
     const box = svg.getBoundingClientRect();
@@ -84,7 +85,7 @@ export function TrendChart({ title, unit, points, series, thresholds = [], maxim
           }} onPointerDown={(event) => hoverAt(event.clientX, event.currentTarget.ownerSVGElement!)} />
       </svg>
       {active ? <div className="fleet-chart-tooltip" role="status">
-        <strong>{new Date(active.time).toLocaleString('zh-CN', { hour12: false })}</strong>
+        <strong>{formatPlatformDateTime(active.time, { hour12: false })}</strong>
         {series.map((item) => <span key={item.key}>{item.label}：{!observed(active.values[item.key]) ? '—' : `${active.values[item.key]!.toFixed(2)} ${unit}`}</span>)}
         {active.note ? <small>{active.note}</small> : null}
       </div> : null}

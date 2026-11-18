@@ -15,6 +15,7 @@ os.environ.setdefault(
 )
 os.environ.setdefault("API_ADMIN_TOKEN", "test-admin-token-with-at-least-32-characters")
 os.environ["KUBERNETES_COLLECTION_WORKERS_ENABLED"] = "false"
+os.environ["PLATFORM_DATA_WORKERS_ENABLED"] = "false"
 
 @pytest.fixture
 def client(tmp_path: Path) -> Generator[TestClient, None, None]:

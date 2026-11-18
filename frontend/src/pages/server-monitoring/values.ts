@@ -1,3 +1,4 @@
+import { formatPlatformDateTime } from '../../utils/platformPreferences';
 import type { DiskPartition, FleetAsset, NetworkInterface, ResourceKey, ResourceState } from '../../types/monitoring';
 
 export const stateLabels: Record<ResourceState, string> = {
@@ -53,7 +54,7 @@ export function rate(value: number | null): string {
 }
 export function timestamp(value?: string | null): string {
   if (!value || !Number.isFinite(Date.parse(value))) return '—';
-  return new Date(value).toLocaleString('zh-CN', { hour12: false });
+  return formatPlatformDateTime(value, { hour12: false });
 }
 export function interfaces(metrics: Record<string, unknown>): NetworkInterface[] {
   if (!Array.isArray(metrics.network_interfaces)) return [];

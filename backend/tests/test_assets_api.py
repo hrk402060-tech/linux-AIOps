@@ -33,14 +33,16 @@ def create_asset_payload(credential_id: str | None = None) -> dict[str, object]:
 def test_create_and_list_asset_with_masked_credential(client: TestClient) -> None:
     credential_id = create_credential(client)
 
-    created = client.post(
-        "/api/v1/assets", json=create_asset_payload(credential_id)
-    )
+    with patch("src.services.assets.open_client") as connect:
+        created = client.post(
+            "/api/v1/assets", json=create_asset_payload(credential_id)
+        )
 
     assert created.status_code == 201
     body = created.json()
     assert body["os_family"] == "openeuler"
-    assert body["status"] == "unknown"
+    assert body["status"] == "online"
+    connect.return_value.close.assert_called_once()
     assert body["credential"] == {
         "id": credential_id,
         "name": "Asset reader",
@@ -82,7 +84,7 @@ def test_update_and_archive_asset(client: TestClient) -> None:
     assert client.get("/api/v1/assets").json() == []
 
 
-def test_connectivity_check_updates_status_without_credentials(client: TestClient) -> None:
+def test_tcp_reachability_cannot_replace_ssh_authentication(client: TestClient) -> None:
     asset_id = client.post("/api/v1/assets", json=create_asset_payload()).json()["id"]
 
     with patch(
@@ -92,9 +94,10 @@ def test_connectivity_check_updates_status_without_credentials(client: TestClien
         response = client.post(f"/api/v1/assets/{asset_id}/check")
 
     assert response.status_code == 200
-    assert response.json()["status"] == "online"
-    assert response.json()["latency_ms"] == 12
-    check.assert_called_once_with("server.example.internal", 22, 3.0)
+    assert response.json()["status"] == "offline"
+    assert response.json()["latency_ms"] is None
+    assert response.json()["check_message"] == "未配置 SSH 凭据"
+    check.assert_not_called()
 
 
 def test_duplicate_asset_name_is_rejected(client: TestClient) -> None:

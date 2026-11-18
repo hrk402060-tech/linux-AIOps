@@ -1,3 +1,4 @@
+import { formatPlatformDateTime } from '../../utils/platformPreferences';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Button, Form, Input, Modal, Select, Space, Switch, Table, Tag, Typography, message } from 'antd';
 import { FileText, KeyRound, Plus, RefreshCw } from 'lucide-react';
@@ -209,7 +210,7 @@ export function AlertConnectorsTab({ currentUser }: { currentUser: Pick<AuthUser
     <div className="table-frame"><Table<AlertConnector> rowKey="id" loading={loading} dataSource={items} pagination={false} scroll={{ x: writable ? 1440 : 880 }} columns={[
       { title: '连接器', dataIndex: 'name', render: (value: string, item) => <div className="asset-identity"><span><KeyRound size={16} /></span><div><strong>{value}</strong><small>{sourceLabels[item.source_type] ?? item.source_type}</small></div></div> },
       { title: '接入密钥', dataIndex: 'secret_masked', render: (value: string) => <Typography.Text code>{value}</Typography.Text> },
-      { title: '最近更新', dataIndex: 'updated_at', render: (value: string) => new Date(value).toLocaleString() },
+      { title: '最近更新', dataIndex: 'updated_at', render: (value: string) => formatPlatformDateTime(value) },
       { title: '状态', dataIndex: 'status', render: (status: AlertConnector['status'], item) => writable ? <Switch aria-label={`${item.name}启用状态`} checked={status === 'active'} onChange={(value) => void toggle(item, value)} /> : <Tag color={status === 'active' ? 'green' : 'default'}>{status === 'active' ? '已启用' : '已停用'}</Tag> },
       ...runtime.columns,
       { title: '操作', align: 'right', render: (_, item) => <Space wrap>

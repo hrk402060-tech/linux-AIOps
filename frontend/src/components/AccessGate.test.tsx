@@ -5,6 +5,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { AccessGate } from './AccessGate';
 import { LoginCompanion } from './LoginCompanion';
+vi.mock('../api/identitySources', () => ({
+  getIdentityOptions: vi.fn(async () => ({ local_login_enabled: true, ldap_enabled: false, oidc_enabled: false })),
+}));
 
 vi.mock('./LoginPlatformScene', () => ({
   LoginPlatformScene: ({ state }: { state: string }) => (

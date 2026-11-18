@@ -38,7 +38,7 @@ def test_only_expected_unique_constraint_errors_allow_lock_retry(
     assert auth_policy._is_unique_violation(integrity_error(code)) is expected
 
 
-def test_first_policy_save_locks_stable_row_before_reading_policy_or_users(
+def test_first_policy_save_locks_stable_row_before_reading_policy(
     client: TestClient,
 ) -> None:
     statements: list[tuple[str, tuple[object, ...]]] = []
@@ -63,11 +63,7 @@ def test_first_policy_save_locks_stable_row_before_reading_policy_or_users(
             index for index, (_, values) in enumerate(statements)
             if auth_policy.AUTH_POLICY_KEY in values
         )
-        user_check = next(
-            index for index, (sql, _) in enumerate(statements)
-            if "count(" in sql and "users" in sql
-        )
-        assert 0 < policy_index < user_check
+        assert 0 < policy_index
         audit = session.scalar(select(CmdbChangeAudit).where(
             CmdbChangeAudit.entity_type == auth_policy.AUTH_POLICY_KEY,
         ))
@@ -164,7 +160,7 @@ def test_lock_database_failures_reject_before_policy_or_mfa_mutation(
 
 
 @pytest.mark.parametrize("existing_policy", [True, False])
-def test_user_count_failure_after_lock_returns_503_and_keeps_policy(
+def test_policy_read_failure_after_lock_returns_503_and_keeps_policy(
     client: TestClient, monkeypatch: pytest.MonkeyPatch, existing_policy: bool,
 ) -> None:
     if existing_policy:
@@ -176,32 +172,31 @@ def test_user_count_failure_after_lock_returns_503_and_keeps_policy(
         before_audits = list(session.scalars(select(CmdbChangeAudit.id)))
     original_scalar = Session.scalar
     lock_acquired = False
-    failed_count = False
+    failed_read = False
 
-    def fail_count(
+    def fail_read(
         session: Session, statement: Select[tuple[object, ...]],
         *args: object, **kwargs: object,
     ) -> object:
-        nonlocal lock_acquired, failed_count
+        nonlocal lock_acquired, failed_read
         compiled = statement.compile()
-        sql = str(compiled).lower()
         if auth_policy.AUTH_POLICY_LOCK_KEY in compiled.params.values():
             result = original_scalar(session, statement, *args, **kwargs)
             lock_acquired = result is not None
             return result
-        if "count(" in sql and "users" in sql:
+        if auth_policy.AUTH_POLICY_KEY in compiled.params.values():
             assert lock_acquired
-            failed_count = True
-            raise OperationalError("SELECT user count", {}, RuntimeError("private-db-detail"))
+            failed_read = True
+            raise OperationalError("SELECT policy", {}, RuntimeError("private-db-detail"))
         return original_scalar(session, statement, *args, **kwargs)
 
     with monkeypatch.context() as patch:
-        patch.setattr(Session, "scalar", fail_count)
+        patch.setattr(Session, "scalar", fail_read)
         response = client.put(
             "/api/v1/system/auth-policy", json=policy_payload(require_mfa=True),
         )
     assert response.status_code == 503
-    assert lock_acquired and failed_count
+    assert lock_acquired and failed_read
     assert "private-db-detail" not in response.text
     assert client.get("/api/v1/system/auth-policy").json() == before
     with client.app.state.session_factory() as session:

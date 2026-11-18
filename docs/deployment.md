@@ -1,5 +1,52 @@
 # Docker Deployment
 
+## 系统设置中心升级（候选）
+
+该版本增加 Authlib、ldap3 和 httpx 运行依赖及后台数据任务迁移
+`20261117_55`（前序为资源快照迁移 `20261117_54`）。升级需要更新后端依赖，
+不能仅覆盖源文件后用旧依赖重启。生产批准前只在隔离 Docker 中验证，
+不替换现有环境变量、配置值或数据库。
+
+Compose 为后端挂载 `platform_storage:/var/lib/linux-ops`，镜像创建的目录由
+应用用户持有，权限 0700；备份文件权限 0600。若使用额外绑定挂载，须先为
+应用用户准备同等权限的独立目录。正式升级使用完整的新镜像、迁移和静态产物；
+已有生产映射方案也必须先更新依赖，并保留既有卷和 `CREDENTIAL_MASTER_KEY`。
+
+升级后管理员通过头像左侧齿轮进入八类系统设置；账号/固定角色/资产与 SSH
+授权在“用户与授权”，个人 MFA 和恢复码在头像“个人安全”，状态和审计独立。
+已有配置按原键读取，不迁移为空值或默认值；未保存分类才使用原环境默认值。
+新保存的数据库策略优先于对应环境默认值，详情见 `docs/project.md` 的生效表。
+取消的跳板、代理、平台 SSH 默认端口/用户不提供配置。
+
+数据任务默认由后台执行，`PLATFORM_DATA_WORKERS_ENABLED=false` 仅用于隔离
+测试/暂停调度。清理预览不会删除；手动清理需 `delete`，备份/复验需 `yes`。
+清理范围目前仅监控历史，保护最新快照和告警/恢复证据。备份是有界加密逻辑
+快照，包含数据库配置与数据，不包含原凭据主密钥；恢复需另行保有对应主密钥。
+系统会读取磁盘备份并实际恢复到隔离 SQLite，验证数据摘要和外键。
+该报告不证明 PostgreSQL/MySQL 原生恢复成功，也不提供覆盖生产的恢复按钮。
+生产同引擎恢复、外部漏洞模型推理、用户组/自定义角色仍待开发。
+
+LDAP/AD 仅允许验证 TLS 的 LDAPS/StartTLS；OIDC 仅允许 HTTPS。先保存、测试
+身份源，在“用户与授权”关联身份，再以管理员完成一次真实外部登录，才允许
+关闭本地登录。现场身份源、通知接收端及模型需分别联调；协议测试不替代现场
+验收。Webhook 地址与令牌加密，改地址而不输入新令牌会清除旧令牌以避免错投。
+
+## Kubernetes 资源只读查看
+
+资源清单位于“工作台 → Kubernetes 管理 → 集群总览 → 只读查看”，使用后台
+采集快照，不直接从浏览器访问 Kubernetes API。支持 Node、Namespace、Pod、
+Deployment、StatefulSet、DaemonSet、Service 和 Warning Event 的列表筛选及
+详情查看；仅显示经过审查的状态投影，不显示原始 `spec`、环境变量、事件正文、
+Token 或 CA。未采集显示“未采集”，部分采集显示“数量未知”，不能据部分结果
+推断集群没有其他资源。
+
+新增迁移为 `20261117_54`，父级为 `20261117_53`，创建
+`kubernetes_resource_snapshots` 并按采集 run 保存有界快照。正式发布前在
+`192.168.10.17` 隔离 Docker 执行后端目标测试、前端目标测试、Ruff、
+TypeScript、Vite 构建和 PostgreSQL 迁移检查。通过后只同步本阶段白名单，执行
+`20261117_53 -> 20261117_54`，重载已有 backend/frontend；不重建 PostgreSQL，
+不修改 `deploy/.env`、Compose、业务数据或真实 Kubernetes 集群。
+
 ## Kubernetes 集群接入
 
 本阶段提供管理员集群接入、集群总览和后台采集。先执行迁移
@@ -439,7 +486,7 @@ restrict,command="/usr/bin/python3 -I /usr/local/libexec/linux_ops_readonly.py" 
 
 In the existing activity-alert page, open the diagnostic authorization tab. A real administrator session must select an enabled asset, a different dedicated identity, fixed observation scope, expiry within 90 days, exact asset-name confirmation and a reason, and attest to manual gateway installation. Create requires the dedicated private key; blank edit retains encrypted material. Responses/audits never reveal private keys. Reconfiguration and revoke use version comparison to prevent stale overwrite.
 
-Register and independently verify the asset host key before granting diagnostics. Address/key changes, expiry, disable/archive, revoke or grant revision changes block collection before further reads; there is no root/manual fallback. Collection uses a 30-second total deadline and bounded streams. Full, partial and failed outcomes are retained with trace-linked audit and administrator result notifications. Runtime evidence does not prove a root cause or recovery, and administrator notification delivery still requires configured SMTP/recipients.
+The settings center selects the SSH host-key policy. The compatibility default accepts a first key in memory; `registered_only` requires an independently registered matching key and rejects absent or changed keys before connection. Asset address changes still invalidate dedicated diagnostic grants. Expiry, disable/archive, revoke or grant revision changes block further reads; there is no root/manual fallback. Collection uses a 30-second total deadline and bounded streams. Full, partial and failed outcomes are retained with trace-linked audit and administrator result notifications. Runtime evidence does not prove a root cause or recovery, and delivery requires configured notification channels.
 
 Diagnostic API contract:
 

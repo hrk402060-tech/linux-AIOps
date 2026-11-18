@@ -116,7 +116,7 @@ def _login_entries(session: Session) -> list[dict[str, object]]:
 
 def _cmdb_entries(session: Session) -> list[dict[str, object]]:
     return [_entry(
-        f"cmdb:{item.id}", "cmdb_change", item.action, item.operator_username,
+        f"cmdb:{item.id}", "platform_setting" if item.entity_type == "platform_setting" else "cmdb_change", item.action, item.operator_username,
         f"{item.entity_type} change; trace_id={item.trace_id}",
         f"{item.entity_type}:{item.entity_id}", item.occurred_at,
     ) for item in session.scalars(select(CmdbChangeAudit))]

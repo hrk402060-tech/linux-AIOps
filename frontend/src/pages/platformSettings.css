@@ -1,0 +1,45 @@
+.platform-settings-page { width: 100%; min-width: 0; color: #303b3a; }
+.platform-settings-page .page-heading h1 { margin: 0; font-size: 23px; }
+.settings-header-actions { display: flex; align-items: center; gap: 8px; }
+.platform-settings-layout { display: grid; grid-template-columns: 204px minmax(0, 1fr); gap: 20px; }
+.platform-settings-categories { display: flex; flex-direction: column; gap: 4px; align-self: start; padding: 8px; background: #fff; border: 1px solid #e0e5e3; border-radius: 5px; }
+.platform-settings-categories button { display: flex; align-items: center; gap: 10px; min-height: 43px; padding: 8px 12px; color: #5f6a68; font: inherit; text-align: left; background: none; border: none; border-radius: 4px; cursor: pointer; }
+.platform-settings-categories button:hover { color: #126f66; background: #f4f7f6; }
+.platform-settings-categories button.is-active { color: #126f66; font-weight: 600; background: #eaf5f2; }
+.platform-settings-categories button:focus-visible { outline: 2px solid #168478; outline-offset: 1px; }
+.platform-settings-main { min-width: 0; padding: 23px 26px 28px; background: #fff; border: 1px solid #e0e5e3; border-radius: 5px; }
+.platform-settings-main h2 { margin: 0 0 10px; color: #2d3634; font-size: 19px; }
+.settings-tab-body { min-height: 360px; }
+.platform-settings-main .user-management, .platform-settings-main .ops-panel { padding: 0; border: none; box-shadow: none; }
+.platform-settings-main .ai-settings { display: grid; gap: 28px; }
+.platform-settings-main .panel-heading { padding-top: 8px; }
+.platform-settings-main .ant-alert { margin: 10px 0; }
+.platform-settings-form { max-width: 960px; padding-top: 12px; }
+.settings-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 28px; }
+.settings-form-grid .ant-form-item { min-width: 0; }
+.settings-form-grid .ant-input-number { width: 100%; }
+.platform-settings-actions { display: flex; align-items: center; gap: 12px; margin-top: 12px; padding-top: 18px; border-top: 1px solid #e7eae9; }
+.settings-section { padding-top: 22px; margin-top: 24px; border-top: 1px solid #e7eae9; }
+.settings-section h3 { margin: 0 0 14px; color: #394541; font-size: 15px; }
+.settings-result { margin-top: 14px; }
+.settings-job-result { display: grid; gap: 7px; padding: 12px 0; }
+.settings-job-result code { word-break: break-all; }
+.settings-job-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
+.settings-job-actions .ant-input { width: 140px; }
+.app-layout[data-density="compact"] .workspace { padding: 16px; }
+.app-layout[data-density="compact"] .ant-table-cell { padding-top: 8px !important; padding-bottom: 8px !important; }
+.topbar-account-actions { display: flex; align-items: center; flex: 0 0 auto; gap: 6px; margin-left: auto; padding-left: 12px; }
+.topbar-account-actions .current-user, .topbar-account-actions .settings-gear { margin-left: 0; }
+.workspace-settings-underlay[hidden] { display: none !important; }
+@media (max-width: 850px) {
+  .platform-settings-layout { grid-template-columns: 170px minmax(0, 1fr); gap: 12px; }
+  .platform-settings-main { padding: 18px; }
+  .settings-form-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 600px) {
+  .platform-settings-layout { grid-template-columns: minmax(0, 1fr); }
+  .platform-settings-categories { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .platform-settings-categories button { min-width: 0; font-size: 13px; }
+  .platform-settings-page .page-heading { align-items: center; }
+  .settings-header-actions .ant-btn { padding-inline: 8px; }
+}

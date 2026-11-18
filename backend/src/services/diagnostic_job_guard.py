@@ -1,12 +1,13 @@
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from threading import Event
 
+from sqlalchemy import update
 from sqlalchemy.orm import Session, sessionmaker
 
 from src.models.asset import Asset
 from src.models.diagnostic_job import DiagnosticJob, DiagnosticSlot
-from src.services import diagnostic_grants, diagnostic_job_access
+from src.services import diagnostic_grants, diagnostic_job_access, platform_settings
 from src.services.alert_diagnostics import DiagnosticAuthorizationRequired, DiagnosticReadInterrupted
 
 
@@ -15,6 +16,10 @@ class DiagnosticLeaseLost(RuntimeError):
 
 
 class DiagnosticCancelled(DiagnosticReadInterrupted):
+    pass
+
+
+class DiagnosticTimeout(DiagnosticReadInterrupted):
     pass
 
 
@@ -49,6 +54,9 @@ def guard(factory: sessionmaker[Session], claim: DiagnosticClaim, stop: Event | 
             raise DiagnosticLeaseLost('Diagnostic lease lost')
         if job.cancellation_requested_at is not None:
             raise DiagnosticCancelled('Diagnostic cancellation requested')
+        policy = platform_settings.task_policy(fresh)
+        if (datetime.now(timezone.utc) - utc(job.updated_at)).total_seconds() >= policy.execution_timeout_seconds:
+            raise DiagnosticTimeout("诊断任务达到配置执行时限，已停止后续只读采集")
         if stop is not None and stop.is_set():
             raise DiagnosticLeaseLost('Diagnostic worker stopping')
         asset = fresh.get(Asset, claim.asset_id)
@@ -68,3 +76,22 @@ def guard(factory: sessionmaker[Session], claim: DiagnosticClaim, stop: Event | 
             raise DiagnosticLeaseLost('Diagnostic lease expired')
         if stop is not None and stop.is_set():
             raise DiagnosticLeaseLost('Diagnostic worker stopping')
+        _renew(fresh, claim)
+
+
+def _renew(session: Session, claim: DiagnosticClaim) -> None:
+    now = datetime.now(timezone.utc)
+    expiry = now + timedelta(seconds=90)
+    changed = session.execute(update(DiagnosticJob).where(
+        DiagnosticJob.id == claim.job_id, DiagnosticJob.status == "running",
+        DiagnosticJob.lease_token == claim.token, DiagnosticJob.lease_expires_at > now,
+        DiagnosticJob.cancellation_requested_at.is_(None),
+    ).values(lease_expires_at=expiry).execution_options(synchronize_session=False)).rowcount
+    slot_changed = session.execute(update(DiagnosticSlot).where(
+        DiagnosticSlot.id == claim.slot_id, DiagnosticSlot.job_id == claim.job_id,
+        DiagnosticSlot.lease_token == claim.token, DiagnosticSlot.lease_expires_at > now,
+    ).values(lease_expires_at=expiry).execution_options(synchronize_session=False)).rowcount
+    if changed != 1 or slot_changed != 1:
+        session.rollback()
+        raise DiagnosticLeaseLost("Diagnostic renewal rejected")
+    session.commit()

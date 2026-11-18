@@ -6,6 +6,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppShell } from './AppShell';
 import type { PageKey } from '../App';
 import { getNavigationPageKey } from '../types/security-check';
+vi.mock('../api/system', () => ({
+  getPlatformPreferences: vi.fn(async () => ({
+    platform_name: 'Linux 智能综合运维平台', timezone: 'Asia/Shanghai', display_density: 'comfortable', default_page: 'dashboard',
+  })),
+}));
 
 const currentUser = {
   id: 'user-1', username: 'security-admin', display_name: '安全管理员',
@@ -24,9 +29,10 @@ const expectedPages: Record<PageKey, [string, string]> = {
   baselines: ['安全中心', '安全检查'], exposures: ['安全中心', '安全检查'],
   'credential-risks': ['安全中心', '安全检查'], findings: ['安全中心', '漏洞治理'],
   knowledge: ['安全中心', '漏洞知识库'], agent: ['安全中心', '漏洞 AI 助手'],
-  reports: ['安全中心', '安全报告'], system: ['系统管理', '系统状态'],
+  reports: ['安全中心', '安全报告'], system: ['系统管理', '平台状态'], settings: ['系统管理', '系统设置'],
+  'user-authorization': ['系统管理', '用户与授权'],
   credentials: ['系统管理', '连接凭据'], 'audit-log': ['系统管理', '审计日志'],
-  'user-security': ['系统管理', '安全设置'], 'security-settings': ['系统管理', '安全设置'],
+  'user-security': ['系统管理', '个人安全'], 'security-settings': ['系统管理', '系统设置'],
 };
 const groupEntries: Record<string, string[]> = {
   工作台: ['综合总览', '服务器监控', '服务器资产', '业务服务', 'Kubernetes 管理', '自动化任务', 'SSH 远程', 'AI 运维助手', '补丁管理'],
@@ -69,7 +75,7 @@ describe('AppShell 工作台导航', () => {
       selectedPage={page} onNavigate={onNavigate}>内容</AppShell>);
     const [group, label] = expectedPages[page];
     const entry = container.querySelector<HTMLElement>('.desktop-sider .ant-menu-item-selected');
-    if (['system', 'credentials', 'audit-log', 'user-security', 'security-settings'].includes(page)) {
+    if (['system', 'settings', 'credentials', 'audit-log', 'user-security', 'security-settings', 'user-authorization'].includes(page)) {
       expect(entry).toBeNull();
     } else {
       expect(entry).toHaveTextContent(label);
@@ -229,8 +235,10 @@ describe('AppShell 工作台导航', () => {
     expect(menu().queryAllByRole('menuitem')).toHaveLength(0);
     expect(container.querySelector('.ant-menu-item-selected')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: '用户菜单' }));
-    expect(screen.getByRole('menuitem', { name: '安全设置' })).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: '系统状态' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: '个人安全' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: '平台状态' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: '用户与授权' }) !== null).toBe(role === 'admin');
+    expect(screen.queryByRole('button', { name: '打开系统设置' }) !== null).toBe(role === 'admin');
     expect(screen.getByRole('menuitem', { name: '审计日志' })).toBeInTheDocument();
   });
 
@@ -242,25 +250,36 @@ describe('AppShell 工作台导航', () => {
     expect(screen.queryByText('安全管理员')).not.toBeInTheDocument();
   });
 
+  it('管理员可以从头像左侧齿轮打开系统设置', () => {
+    const onNavigate = vi.fn();
+    const { container } = render(<AppShell currentUser={currentUser} onLogout={vi.fn()}
+      selectedPage="dashboard" onNavigate={onNavigate}>内容</AppShell>);
+    const actions = container.querySelector('.topbar-account-actions');
+    expect(actions?.querySelector('.settings-gear')).toBeInTheDocument();
+    expect(actions?.querySelector('.current-user')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '打开系统设置' }));
+    expect(onNavigate).toHaveBeenCalledWith('settings');
+  });
+
   it('系统管理不再展示连接凭据入口，但保留旧 PageKey 兼容', () => {
     render(<AppShell currentUser={currentUser} onLogout={vi.fn()}
       selectedPage="system" onNavigate={vi.fn()}>内容</AppShell>);
     expect(menu().queryAllByRole('menuitem')).toHaveLength(0);
     fireEvent.click(screen.getByRole('button', { name: '用户菜单' }));
     expect(screen.queryByRole('menuitem', { name: '连接凭据' })).not.toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: '安全设置' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: '个人安全' })).toBeInTheDocument();
   });
 
-  it('nav_cache: 旧个人安全导航记忆统一恢复到安全设置', () => {
+  it('nav_cache: 个人安全导航记忆仍进入个人绑定页面', () => {
     localStorage.setItem('sentinel_navigation:user-1', JSON.stringify({
       activePage: 'user-security', system: 'user-security',
     }));
     render(<Harness />);
-    expect(screen.getByRole('status')).toHaveTextContent('security-settings');
+    expect(screen.getByRole('status')).toHaveTextContent('user-security');
     fireEvent.click(screen.getByRole('button', { name: '用户菜单' }));
-    expect(screen.getByRole('menuitem', { name: '安全设置' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: '个人安全' })).toBeInTheDocument();
     expect(JSON.parse(localStorage.getItem('sentinel_navigation:user-1')!))
-      .toMatchObject({ activePage: 'security-settings', system: 'security-settings' });
+      .toMatchObject({ activePage: 'user-security', system: 'user-security' });
   });
 
   it('nav_interaction: collapsed sidebar keeps the workspace switcher available', async () => {

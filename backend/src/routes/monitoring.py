@@ -26,7 +26,7 @@ def read_fleet(
 ) -> MonitoringFleetResponse:
     return MonitoringFleetResponse.model_validate(monitoring_fleet.get_fleet(
         session, asset_access.visible_asset_ids(session, principal),
-        request.app.state.runtime_settings.monitoring_interval_seconds,
+        request.app.state.platform_runtime["connection"]["collection_interval_seconds"],
     ))
 
 
@@ -43,7 +43,7 @@ def read_fleet_trends(
     try:
         result = monitoring_fleet.get_trends(
             session, selected, hours,
-            request.app.state.runtime_settings.monitoring_interval_seconds,
+            request.app.state.platform_runtime["connection"]["collection_interval_seconds"],
         )
     except monitoring_fleet.MonitoringFleetError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc

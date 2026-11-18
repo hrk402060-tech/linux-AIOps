@@ -31,7 +31,6 @@ it('loads and saves the administrator login security policy', async () => {
   expect(await screen.findByText('登录安全策略')).toBeInTheDocument();
   const threshold = await screen.findByRole('spinbutton', { name: '连续失败次数' });
   await waitFor(() => expect(threshold).toHaveValue('5'));
-  expect(screen.getByText(/新策略仅适用于后续登录/)).toBeInTheDocument();
   fireEvent.change(threshold, { target: { value: '7' } });
   fireEvent.click(screen.getByRole('button', { name: '保存登录策略' }));
 
@@ -46,6 +45,7 @@ it('loads and saves the administrator login security policy', async () => {
         require_mfa: false,
         mfa_enforcement: 'off',
         allow_user_mfa_reset: true,
+        password_min_length: 8, password_require_uppercase: false, session_idle_timeout_seconds: 43200,
       }),
     }),
   ));
@@ -64,7 +64,6 @@ it('allows forced MFA and explains that unbound users enroll at their next login
   fireEvent.click(await screen.findByText('所有启用用户强制'));
   fireEvent.click(screen.getByRole('button', { name: '保存登录策略' }));
 
-  expect(screen.getByText('未绑定用户下次登录会直接进入二维码绑定流程，绑定完成后才能进入平台。')).toBeInTheDocument();
   expect(await screen.findByText('登录安全策略已保存')).toBeInTheDocument();
   const request = fetchMock.mock.calls.find(([, init]) => init?.method === 'PUT');
   expect(request).toBeDefined();
@@ -72,6 +71,7 @@ it('allows forced MFA and explains that unbound users enroll at their next login
     login_failure_threshold: 5, lock_duration_seconds: 900,
     session_ttl_seconds: 43200, require_mfa: true,
     mfa_enforcement: 'all', allow_user_mfa_reset: true,
+    password_min_length: 8, password_require_uppercase: false, session_idle_timeout_seconds: 43200,
   });
 });
 

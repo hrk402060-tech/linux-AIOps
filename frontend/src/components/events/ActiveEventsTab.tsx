@@ -1,3 +1,4 @@
+import { formatPlatformDateTime } from '../../utils/platformPreferences';
 import { useEffect, useState } from 'react';
 import {
   Button, DatePicker, Drawer, Input, InputNumber, Modal, Select, Space, Switch, Table, Tag, message,
@@ -99,7 +100,7 @@ export function ActiveEventsTab({ currentUser, initialAssetId }: { currentUser: 
       { title: '级别', dataIndex: 'severity', render: (value: string) => <Tag color={['critical', 'high'].includes(value) ? 'red' : 'gold'}>{levels[value] ?? value}</Tag> },
       { title: '处置状态', dataIndex: 'status', render: (value: string) => statuses[value] ?? value },
       { title: '恢复状态', dataIndex: 'recovered', render: (value: boolean) => value ? '源已恢复' : '未确认恢复' },
-      { title: '时间', dataIndex: 'occurred_at', render: (value: string) => new Date(value).toLocaleString() },
+      { title: '时间', dataIndex: 'occurred_at', render: (value: string) => formatPlatformDateTime(value) },
       { title: '操作', render: (_, item) => <Space>{!readOnly ? <Button aria-label={`处置 ${item.title}`} icon={<Pencil size={16} />} onClick={() => { setTarget(item); setReason(''); setStatus('acknowledged'); }} /> : null}<Button aria-label={`审计 ${item.title}`} icon={<History size={16} />} onClick={() => void history(item)} /></Space> },
     ]} />
     <Modal title="事件处置" open={target !== null} onCancel={() => setTarget(null)} onOk={() => void save()} confirmLoading={loading} okButtonProps={{ disabled: reason.trim().length < 3 }}><p>{target?.title}</p><Select aria-label="新处置状态" value={status} options={options(statuses)} onChange={setStatus} style={{ width: '100%', marginBottom: 12 }} /><Input.TextArea aria-label="处置原因" placeholder="处置原因（至少 3 个字符）" value={reason} onChange={(event) => setReason(event.target.value)} /></Modal>

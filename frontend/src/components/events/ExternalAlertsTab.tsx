@@ -1,3 +1,4 @@
+import { formatPlatformDateTime } from '../../utils/platformPreferences';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert, Button, Descriptions, Drawer, Empty, Input, List, Modal, Select,
@@ -140,7 +141,7 @@ export function ExternalAlertsTab({ currentUser, initialAssetId, initialAlertId,
       { title: '状态', dataIndex: 'status', width: 100, render: (value: AlertStatus) => <Tag>{statusLabels[value]}</Tag> },
       { title: '只读诊断', width: 130, render: (_, item) => item.latest_job ? <DiagnosticJobTag job={item.latest_job} /> : <AnalysisTag status={item.latest_analysis?.status} errorCode={item.latest_analysis?.error_code} /> },
       { title: '置信度', width: 100, render: () => <Typography.Text type="secondary">未提供</Typography.Text> },
-      { title: '接收时间', dataIndex: 'received_at', width: 170, render: (value: string) => new Date(value).toLocaleString() },
+      { title: '接收时间', dataIndex: 'received_at', width: 170, render: (value: string) => formatPlatformDateTime(value) },
       { title: '操作', fixed: 'right', width: readOnly ? 70 : 210, render: (_, item) => <Space size={4}><Button aria-label={`查看 ${item.title}`} icon={<Eye size={16} />} onClick={() => void showDetail(item)} />{!readOnly ? <><Button aria-label={`研判 ${item.title}`} disabled={loading || !authoritative || isActiveDiagnosticJob(item.latest_job)} icon={<Brain size={16} />} onClick={() => setDiagnosticTarget({ kind: 'enqueue', alert: item })} /><Button aria-label={`推进 ${item.title}`} disabled={!nextStatus[item.status]} icon={<StepForward size={16} />} onClick={() => { setAdvanceTarget(item); setNote(''); }} /><Button aria-label={`转为故障 ${item.title}`} disabled={Boolean(item.incident_id)} icon={<TicketCheck size={16} />} onClick={() => { setIncidentTarget(item); setNote(''); }} /></> : null}</Space> },
     ]} /></div>
     <AlertDetailDrawer detail={detail} currentUser={currentUser} onClose={closeDetail}
@@ -219,9 +220,9 @@ function AlertDetailDrawer({ detail, currentUser, onClose, onUpdated, onCancelJo
       <section><Typography.Title level={5}>局限</Typography.Title><Alert type="warning" showIcon message={limitation} /></section>
       <AlertNotificationHistory key={alert.id} currentUser={currentUser} alertId={alert.id} onUpdated={onUpdated} />
       <section><Typography.Title level={5}>证据</Typography.Title><List size="small" locale={{ emptyText: '暂无证据' }} dataSource={evidence} renderItem={([label, value]) => <List.Item><strong>{label}</strong><code>{formatEvidence(value)}</code></List.Item>} /></section>
-      <section><Typography.Title level={5}>诊断历史</Typography.Title><List size="small" locale={{ emptyText: '暂无诊断历史' }} dataSource={detail.analyses} renderItem={(item) => <List.Item><List.Item.Meta title={<Space><AnalysisTag status={item.status} errorCode={item.error_code} /><span>{item.summary}</span></Space>} description={`${item.trigger_type} · ${item.operator} · ${new Date(item.started_at).toLocaleString()}`} /></List.Item>} /><Space><Button disabled={detail.analysisPage <= 1} onClick={() => onAnalysisPage(detail.analysisPage - 1)}>上一页诊断</Button><span>第 {detail.analysisPage} 页</span><Button disabled={detail.analyses.length < 20} onClick={() => onAnalysisPage(detail.analysisPage + 1)}>下一页诊断</Button></Space></section>
+      <section><Typography.Title level={5}>诊断历史</Typography.Title><List size="small" locale={{ emptyText: '暂无诊断历史' }} dataSource={detail.analyses} renderItem={(item) => <List.Item><List.Item.Meta title={<Space><AnalysisTag status={item.status} errorCode={item.error_code} /><span>{item.summary}</span></Space>} description={`${item.trigger_type} · ${item.operator} · ${formatPlatformDateTime(item.started_at)}`} /></List.Item>} /><Space><Button disabled={detail.analysisPage <= 1} onClick={() => onAnalysisPage(detail.analysisPage - 1)}>上一页诊断</Button><span>第 {detail.analysisPage} 页</span><Button disabled={detail.analyses.length < 20} onClick={() => onAnalysisPage(detail.analysisPage + 1)}>下一页诊断</Button></Space></section>
       <section><Typography.Title level={5}>脱敏载荷</Typography.Title><pre className="redacted-payload">{JSON.stringify(alert.payload, null, 2)}</pre></section>
-      <section><Typography.Title level={5}>不可变时间线</Typography.Title><Timeline items={detail.timeline.map((entry) => ({ children: <div className="timeline-entry"><strong>{timelineEventLabels[entry.event_type] ?? '其他事件'} · {timelineStatusLabels[entry.status] ?? '已记录'}</strong><span>{entry.note}</span><small>{entry.operator} · {new Date(entry.created_at).toLocaleString()}</small></div> }))} /></section>
+      <section><Typography.Title level={5}>不可变时间线</Typography.Title><Timeline items={detail.timeline.map((entry) => ({ children: <div className="timeline-entry"><strong>{timelineEventLabels[entry.event_type] ?? '其他事件'} · {timelineStatusLabels[entry.status] ?? '已记录'}</strong><span>{entry.note}</span><small>{entry.operator} · {formatPlatformDateTime(entry.created_at)}</small></div> }))} /></section>
     </div> : null}
   </Drawer>;
 }

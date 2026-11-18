@@ -16,6 +16,9 @@ class AuthPolicyUpdate(BaseModel):
     require_mfa: bool = Field(default=False, strict=True)
     mfa_enforcement: MfaEnforcement = "off"
     allow_user_mfa_reset: bool = Field(default=True, strict=True)
+    password_min_length: int = Field(default=8, ge=8, le=128, strict=True)
+    password_require_uppercase: bool = Field(default=False, strict=True)
+    session_idle_timeout_seconds: int = Field(default=43200, ge=300, le=604800, strict=True)
 
     @model_validator(mode="after")
     def normalize_legacy_mfa(self) -> "AuthPolicyUpdate":

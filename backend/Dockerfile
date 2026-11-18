@@ -26,6 +26,9 @@ COPY backend/migrations ./migrations
 COPY backend/src ./src
 COPY backend/entrypoint.sh /usr/local/bin/sentinel-entrypoint
 RUN chmod 0555 /usr/local/bin/sentinel-entrypoint \
+    && mkdir -p /var/lib/linux-ops \
+    && chown sentinel:sentinel /var/lib/linux-ops \
+    && chmod 0700 /var/lib/linux-ops \
     && chown -R sentinel:sentinel /app
 
 USER sentinel

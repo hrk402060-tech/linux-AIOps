@@ -19,6 +19,7 @@ from src.schemas.ai_agent import (
 from src.services import ai_agent as service
 from src.services.ai_providers import get_provider, provider_metadata
 from src.routes.ai_settings import router as settings_router
+from src.services.platform_settings import ai_policy
 
 router = APIRouter(prefix="/agent", tags=["ai-agent"])
 router.include_router(settings_router)
@@ -175,6 +176,8 @@ def read_workspace(
 def create_triage(
     payload: AgentTriageRequest, session: Session = Depends(get_session)
 ) -> AgentRecommendationResponse:
+    if not ai_policy(session).vulnerability_assistant_enabled:
+        raise HTTPException(status_code=403, detail="漏洞助手已由管理员停用")
     try:
         get_provider(payload.provider_id)
     except ValueError as error:

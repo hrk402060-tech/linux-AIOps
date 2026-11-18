@@ -1,6 +1,8 @@
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Body, Depends, Header, HTTPException, Request
+from pydantic import ValidationError
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import text
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -10,7 +12,10 @@ from src.config import Settings
 from src.database import get_session
 from src.models.diagnostic_job import DiagnosticJob, DiagnosticSlot
 from src.schemas.auth_policy import AuthPolicyResponse, AuthPolicyUpdate
+from src.schemas.ai_settings import TerminalAISettingsRequest
 from src.services import auth_policy
+from src.services import ai_settings, platform_settings
+from src.services import settings_repository
 
 router = APIRouter(prefix="/system", tags=["system"])
 SYSTEM_HEALTH_STALE_AFTER_SECONDS = 300
@@ -19,6 +24,7 @@ SYSTEM_HEALTH_STALE_AFTER_SECONDS = 300
 @router.get("/status")
 def read_status(request: Request, session: Session = Depends(get_session)) -> dict[str, object]:
     settings: Settings = request.app.state.runtime_settings
+    runtime = request.app.state.platform_runtime
     database_status = "ok"
     try:
         session.execute(text("SELECT 1"))
@@ -49,9 +55,9 @@ def read_status(request: Request, session: Session = Depends(get_session)) -> di
     return {
         "database_status": database_status, "database_engine": engine,
         "schema_revision": revision,
-        "monitoring_interval_seconds": settings.monitoring_interval_seconds,
+        "monitoring_interval_seconds": runtime["connection"]["collection_interval_seconds"],
         "knowledge_sync_interval_seconds": settings.knowledge_sync_interval_seconds,
-        "terminal": {"max_connections": settings.terminal_max_connections, "idle_timeout_seconds": settings.terminal_idle_timeout_seconds, "max_duration_seconds": settings.terminal_max_duration_seconds, "host_key_verification": True},
+        "terminal": {"max_connections": runtime["tasks"]["terminal_max_connections"], "idle_timeout_seconds": runtime["tasks"]["terminal_idle_timeout_seconds"], "max_duration_seconds": runtime["tasks"]["terminal_max_duration_seconds"], "host_key_verification": runtime["connection"]["host_key_policy"] == "registered_only"},
         "security": {
             "scan_read_only_default": True,
             "ai_direct_execution": False,
@@ -91,6 +97,72 @@ def update_auth_policy(
         raise HTTPException(status_code=503, detail=str(error)) from error
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+def _settings_response(request: Request, session: Session) -> dict[str, object]:
+    return {
+        "settings": platform_settings.read_all(session, request.app.state.runtime_settings),
+        "security": auth_policy.read(session, request.app.state.runtime_settings).model_dump(mode="json"),
+        "ai": ai_settings.read_terminal_settings(session).model_dump(mode="json"),
+        "revisions": {category: settings_repository.revision(session, f"settings.{category}")
+                      for category in platform_settings.VALIDATORS},
+    }
+
+
+@router.get("/settings")
+def read_settings(
+    request: Request,
+    _principal: AuthPrincipal = Depends(require_system_admin),
+    session: Session = Depends(get_session),
+) -> dict[str, object]:
+    try:
+        return _settings_response(request, session)
+    except (auth_policy.AuthPolicyUnavailableError, platform_settings.PlatformSettingsUnavailableError) as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+
+
+@router.put("/settings/{category}")
+def update_settings(
+    category: str,
+    request: Request,
+    payload: dict[str, object] = Body(...),
+    principal: AuthPrincipal = Depends(require_system_admin),
+    session: Session = Depends(get_session),
+    if_match: str | None = Header(default=None),
+) -> dict[str, object]:
+    try:
+        if category == "security":
+            auth_policy.save(
+                session, request.app.state.runtime_settings,
+                AuthPolicyUpdate.model_validate(payload), principal.username,
+            )
+        elif category == "ai":
+            ai_settings.save_terminal_settings(
+                session, request.app.state.credential_vault,
+                TerminalAISettingsRequest.model_validate(payload), principal.username,
+            )
+        else:
+            platform_settings.save_category(
+                session, request.app.state.runtime_settings, category, payload,
+                principal.username, principal.user_id, if_match,
+            )
+            platform_settings.apply_runtime(
+                request.app, platform_settings.runtime_values(
+                    session, request.app.state.runtime_settings
+                ),
+            )
+        return _settings_response(request, session)
+    except ValidationError as error:
+        raise HTTPException(status_code=422, detail="设置格式无效，请检查必填项、取值范围及固定安全策略") from error
+    except settings_repository.SettingsConflictError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    except (ValueError, ai_settings.AISettingsError) as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    except (auth_policy.AuthPolicyUnavailableError, platform_settings.PlatformSettingsUnavailableError) as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+    except SQLAlchemyError as error:
+        session.rollback()
+        raise HTTPException(status_code=503, detail="配置保存暂时失败，请保留当前填写内容后重试") from error
 
 
 def _health_snapshot(

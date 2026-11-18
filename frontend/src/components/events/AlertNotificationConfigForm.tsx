@@ -1,3 +1,4 @@
+import { formatPlatformDateTime } from '../../utils/platformPreferences';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Button, Descriptions, Form, Input, InputNumber, Select, Switch, Tag, message } from 'antd';
 import { Save } from 'lucide-react';
@@ -92,7 +93,7 @@ function ReadOnlyConfig({ config }: { config: AlertNotificationConfig }) {
       { key: 'sender', label: '发件人', children: config.sender || '未配置' },
       { key: 'recipients', label: '收件人', children: config.recipients.join('、') || '未配置' },
       { key: 'auth', label: '认证', children: config.password_configured ? '密码已配置' : '未配置密码' },
-      { key: 'updated', label: '更新时间', children: config.updated_at ? new Date(config.updated_at).toLocaleString() : '-' },
+      { key: 'updated', label: '更新时间', children: config.updated_at ? formatPlatformDateTime(config.updated_at) : '-' },
     ]} />
   </section>;
 }

@@ -284,7 +284,7 @@ def list_cleanup_audits(session: Session) -> list[AssetCleanupAudit]:
 
 
 def check_asset(
-    session: Session, asset: Asset, vault: CredentialVault, timeout: float = 3.0
+    session: Session, asset: Asset, vault: CredentialVault, timeout: float | None = None
 ) -> Asset:
     if asset.lifecycle_status != AssetLifecycleStatus.ENABLED:
         raise AssetInUseError("已停用或归档资产不能执行连通性检查")

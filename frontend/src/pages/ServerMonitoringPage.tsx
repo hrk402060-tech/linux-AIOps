@@ -1,3 +1,4 @@
+import { platformDateTimeOptions } from '../utils/platformPreferences';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Alert, Button, Empty, Input, Select, Spin, Tag, message } from 'antd';
 import { Activity, Cpu, HardDrive, MemoryStick, RefreshCw, Server } from 'lucide-react';
@@ -96,4 +97,4 @@ function ResourceTrend({ data }: { data: MonitoringData['resource_trends'] }) {
   return <div className="server-monitoring-chart"><div className="server-monitoring-legend">{series.map((item) => <span key={item.key}><i style={{ background: item.color }} />{item.label}</span>)}</div><svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="服务器资源趋势图"><line x1={pad} y1={pad} x2={width - pad} y2={pad} /><line x1={pad} y1={height / 2} x2={width - pad} y2={height / 2} /><line x1={pad} y1={height - pad} x2={width - pad} y2={height - pad} />{series.map((item) => <polyline key={item.key} points={data.map((row, index) => point(index, row[item.key])).join(' ')} style={{ stroke: item.color }} />)}</svg></div>;
 }
 function metric(asset: DashboardMonitoringAsset, key: string) { const value = asset.metrics[key]; return typeof value === 'number' ? value : null; }
-function formatTime(value: string) { return new Intl.DateTimeFormat('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(value)); }
+function formatTime(value: string) { return new Intl.DateTimeFormat('zh-CN', platformDateTimeOptions({ month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })).format(new Date(value)); }

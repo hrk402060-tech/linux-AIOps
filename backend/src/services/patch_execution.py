@@ -85,7 +85,7 @@ def _apply(
             credential.encrypted_secret, credential.nonce, credential.id,
             credential.credential_type.value, credential.key_version,
         )
-        with open_client(asset, credential, secret, timeout=6) as client:
+        with open_client(asset, credential, secret) as client:
             rpm_patch.update_package(client, finding.package_name, finding.installed_version, finding.fixed_version)
     except rpm_patch.PatchUpdateError as error:
         return ("uncertain" if error.verify_required else "blocked"), str(error)

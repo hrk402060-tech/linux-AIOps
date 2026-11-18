@@ -22,7 +22,7 @@ def read_services(
     try:
         result = observability.get_services(
             session, query, business_id, status, visible_asset_ids(session, principal),
-            request.app.state.runtime_settings.monitoring_interval_seconds,
+            request.app.state.platform_runtime["connection"]["collection_interval_seconds"],
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

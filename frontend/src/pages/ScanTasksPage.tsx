@@ -1,3 +1,4 @@
+import { platformDateTimeOptions } from '../utils/platformPreferences';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Empty, Input, message, Popconfirm, Progress, Select, Space, Table, Tag, Tooltip } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
@@ -28,9 +29,9 @@ const statusColors: Record<ScanStatus, string> = {
   failed: 'red', cancelled: 'default',
 };
 const terminal: ScanStatus[] = ['completed', 'failed', 'cancelled'];
-const formatDate = (value: string) => new Intl.DateTimeFormat('zh-CN', {
+const formatDate = (value: string) => new Intl.DateTimeFormat('zh-CN', platformDateTimeOptions({
   dateStyle: 'medium', timeStyle: 'short',
-}).format(new Date(value));
+})).format(new Date(value));
 
 export function ScanTasksPage({ currentUser = { role: 'auditor' } }: { currentUser?: Pick<AuthUser, 'role'> }) {
   const canWrite = currentUser.role === 'admin' || currentUser.role === 'operator';

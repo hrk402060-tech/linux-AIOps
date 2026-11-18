@@ -1,3 +1,4 @@
+import { formatPlatformDateTime } from '../../utils/platformPreferences';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Alert, Button, Tag, Typography, type TableColumnsType } from 'antd';
 import { List } from 'lucide-react';
@@ -68,7 +69,7 @@ export function useAlertConnectorRuntime(enabled: boolean) {
         </Typography.Text></div> : null}
       </div>) },
     { title: '最近接收', key: 'last_received_at', render: (_, connector) => renderValue(connector,
-      (item) => item.last_received_at ? new Date(item.last_received_at).toLocaleString('zh-CN') : '-') },
+      (item) => item.last_received_at ? formatPlatformDateTime(item.last_received_at) : '-') },
     { title: '接收次数', key: 'receipt_counts', render: (_, connector) => renderValue(connector,
       (item) => <span style={{ whiteSpace: 'nowrap' }}>成功 {item.success_count} / 失败 {item.failure_count}</span>) },
     { title: '接收记录', key: 'receipts', render: (_, connector) => <Button

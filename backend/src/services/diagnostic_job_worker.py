@@ -1,4 +1,5 @@
 import asyncio
+from collections.abc import Callable
 from datetime import datetime, timezone
 from functools import partial
 import logging
@@ -16,7 +17,7 @@ from src.services import (
     diagnostic_job_claims, diagnostic_job_state as state,
 )
 from src.services.crypto import CredentialVault
-from src.services.diagnostic_job_guard import DiagnosticCancelled, DiagnosticClaim, DiagnosticLeaseLost, guard, matches
+from src.services.diagnostic_job_guard import DiagnosticCancelled, DiagnosticClaim, DiagnosticLeaseLost, DiagnosticTimeout, guard, matches
 
 logger = logging.getLogger(__name__)
 SCHEDULER_STALE_AFTER_SECONDS = 10
@@ -95,6 +96,13 @@ def execute_claim(factory: sessionmaker[Session], vault: CredentialVault,
             try:
                 check()
                 alerts._collect_analysis(session, alert, analysis, vault, check, claim.grant_revision)
+            except DiagnosticTimeout as exc:
+                analysis.evidence = alert_diagnostics.sanitize_evidence({
+                    "read_only": "true", "remediation": "disabled",
+                    "execution_performed": "unknown", **exc.evidence,
+                })
+                analysis.status, analysis.error_code = "failed", "execution_timeout"
+                analysis.summary = "诊断达到配置时限，已停止后续只读采集；未执行修复。"
             except DiagnosticCancelled as exc:
                 analysis.evidence = alert_diagnostics.sanitize_evidence({
                     'read_only': 'true', 'remediation': 'disabled', 'grant_revision': claim.grant_revision,
@@ -195,13 +203,17 @@ def run_one(factory: sessionmaker[Session], vault: CredentialVault, stop: Event,
 
 async def run_scheduler(factory: sessionmaker[Session], vault: CredentialVault,
                         shutdown: asyncio.Event,
-                        health: DiagnosticSchedulerHealth | None = None) -> None:
+                        health: DiagnosticSchedulerHealth | None = None,
+                        worker_count: int | Callable[[], int] = 2) -> None:
     stop = Event()
     if health is not None:
         health.mark_started()
 
-    async def worker() -> None:
+    async def worker(identifier: int) -> None:
         while not shutdown.is_set():
+            target = worker_count() if callable(worker_count) else worker_count
+            if identifier >= max(1, min(32, target)):
+                return
             if health is not None:
                 health.mark_loop()
             try:
@@ -214,9 +226,19 @@ async def run_scheduler(factory: sessionmaker[Session], vault: CredentialVault,
                 await asyncio.wait_for(shutdown.wait(), timeout=1)
             except asyncio.TimeoutError:
                 continue
-    tasks = [asyncio.create_task(worker()) for _ in range(2)]
     try:
-        await shutdown.wait()
+        tasks: dict[int, asyncio.Task[None]] = {}
+        while not shutdown.is_set():
+            target = worker_count() if callable(worker_count) else worker_count
+            target = max(1, min(32, target))
+            for identifier in range(target):
+                if identifier not in tasks or tasks[identifier].done():
+                    tasks[identifier] = asyncio.create_task(worker(identifier))
+            try:
+                await asyncio.wait_for(shutdown.wait(), timeout=1)
+            except asyncio.TimeoutError:
+                tasks = {key: task for key, task in tasks.items() if not task.done()}
     finally:
         stop.set()
-        await asyncio.gather(*tasks)
+        if tasks:
+            await asyncio.gather(*tasks.values(), return_exceptions=True)

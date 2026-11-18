@@ -1,3 +1,4 @@
+import { formatPlatformDateTime } from '../utils/platformPreferences';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Button, Empty, Input, Modal, Space, Table, Tag } from 'antd';
 import { History, RefreshCw } from 'lucide-react';
@@ -96,7 +97,7 @@ export function AIProvidersPanel() {
         { title: '提供商', dataIndex: 'target', width: 150 },
         { title: '动作', dataIndex: 'action', width: 110, render: (value: string) => <Tag>{({ configured: '配置', validated: '校验', enabled: '启用', disabled: '停用', cleared: '清除密钥' } as Record<string, string>)[value] ?? value}</Tag> },
         { title: '操作人', dataIndex: 'operator', width: 130 }, { title: '详情', dataIndex: 'detail' },
-        { title: '时间', dataIndex: 'occurred_at', width: 180, render: (value: string) => new Date(value).toLocaleString('zh-CN') },
+        { title: '时间', dataIndex: 'occurred_at', width: 180, render: (value: string) => formatPlatformDateTime(value) },
       ]} />
     </Modal>
   </section>;

@@ -1,3 +1,4 @@
+import { formatPlatformDateTime } from '../../utils/platformPreferences';
 import { Activity, Bell, ClipboardList, Inbox, Search, UserRound } from 'lucide-react';
 import type { NotificationSummary } from '../../api/alertNotifications';
 import type { ExternalAlert } from '../../api/externalAlerts';
@@ -25,7 +26,7 @@ export function AlertWorkflow({ alert, recordCount }: { alert: ExternalAlert; re
   const previewOnly = labels !== null && typeof labels === 'object'
     && 'preview_only' in labels && ['true', true].includes(labels.preview_only as string | boolean);
   const stages = [
-    { name: '告警接收', value: '已接收', detail: new Date(alert.received_at).toLocaleString(), icon: Inbox, tone: 'complete' },
+    { name: '告警接收', value: '已接收', detail: formatPlatformDateTime(alert.received_at), icon: Inbox, tone: 'complete' },
     { name: '告警定位', value: diagnosis, detail: activeJob ? '任务未完成，不代表根因或恢复' : currentEvidence ? '证据需人工研判，不代表根因或恢复' : '专用只读授权待配置', icon: Search, tone: activeJob ? 'active' : authorizationBlocked || ['failed', 'partial'].includes(analysis?.status ?? '') ? 'blocked' : 'active' },
     { name: '管理员通知', icon: Bell, ...getNotificationStage(alert.notification_summary, analysis, Boolean(activeJob)) },
     { name: '人工处理', value: treatment, detail: '以人工处置记录为准', icon: UserRound, tone: alert.status === 'open' ? 'pending' : 'active' },

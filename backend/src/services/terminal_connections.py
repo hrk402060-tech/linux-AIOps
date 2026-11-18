@@ -15,6 +15,10 @@ class TerminalConnectionRegistry:
             self._connections[session_id] = stop
             return stop
 
+    def set_maximum(self, maximum: int) -> None:
+        with self._lock:
+            self._maximum = max(1, maximum)
+
     def release(self, session_id: str) -> None:
         with self._lock:
             self._connections.pop(session_id, None)

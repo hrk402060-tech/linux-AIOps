@@ -1,3 +1,4 @@
+import { formatPlatformDateTime } from '../utils/platformPreferences';
 import { Button, Empty, Tag } from 'antd';
 import { Bot, History, SquareTerminal, Bell } from 'lucide-react';
 import type { ObservableService, ServiceProbeEvidence } from '../api/observability';
@@ -75,5 +76,5 @@ function ProbeEvidence({ probe, serviceId, onOpen }: { probe: ServiceProbeEviden
 }
 
 export function formatEvidenceTime(value: string | null): string {
-  return value ? new Date(value).toLocaleString('zh-CN', { hour12: false }) : '无采集时间';
+  return value ? formatPlatformDateTime(value, { hour12: false }) : '无采集时间';
 }

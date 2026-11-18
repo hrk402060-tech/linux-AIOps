@@ -5,6 +5,7 @@ from sqlalchemy import engine_from_config, pool
 
 from src.config import get_settings
 from src.database import Base
+from src.models.platform_data import PlatformDataJob  # noqa: F401
 from src.models.credential import Credential  # noqa: F401
 from src.models.probes import HttpProbe, HttpProbeRun  # noqa: F401
 from src.models.incident import Incident, IncidentTicket, IncidentTimeline  # noqa: F401

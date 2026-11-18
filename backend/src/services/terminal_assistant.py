@@ -36,13 +36,14 @@ def analyze(session: Session, payload: TerminalAssistantRequest) -> tuple[Termin
         raise TerminalAssistantError("终端会话不存在")
     if terminal.status not in {"waiting", "connected"}:
         raise TerminalAssistantError("仅等待连接或已连接会话可以使用终端助手")
-    context = redact_context(payload.context)
-    decision_context = payload.question.strip() or context
+    context = _redact(payload.context)
+    decision_context = _redact(payload.question).strip() or context
     diagnosis, plan, validations, _ = _local_analysis(decision_context)
     analysis = TerminalAssistantAnalysis(
         id=str(uuid4()), terminal_session_id=terminal.id, mode="analysis_only",
-        redacted_context=context, diagnosis=diagnosis, plan=plan,
-        validation_steps=validations, operator=payload.operator.strip(),
+        redacted_context=context, diagnosis=_redact(diagnosis),
+        plan=[_redact(item) for item in plan],
+        validation_steps=[_redact(item) for item in validations], operator=payload.operator.strip(),
     )
     session.add(analysis)
     session.commit()
@@ -55,6 +56,13 @@ def redact_context(value: str) -> str:
     redacted = SECRET_PATTERNS[0].sub(lambda match: f"{match.group(1)}=[REDACTED]", redacted)
     redacted = SECRET_PATTERNS[1].sub(lambda match: f"{match.group(1)} [REDACTED]", redacted)
     return SECRET_PATTERNS[2].sub("[REDACTED PRIVATE KEY]", redacted)
+
+
+def _redact(value: str) -> str:
+    # The shared redactor imports the low-level helper above.
+    from src.services.ops_redaction import redact
+
+    return redact(value)
 
 
 def list_commands(session: Session, terminal_session_id: str) -> list[TerminalCommandAudit]:
@@ -143,17 +151,21 @@ def _local_reply(question: str, context: str, history: list[dict[str, str]]) -> 
 
 
 def chat_reply(settings: TerminalAIConfig, question: str, context: str, history: list[dict[str, str]]) -> tuple[str, str]:
-    redacted_context = redact_context(context)
-    redacted_question = redact_context(question)
+    redacted_context = _redact(context)
+    redacted_question = _redact(question)
+    redacted_history = [
+        {"role": item["role"], "content": _redact(item["content"])}
+        for item in history[-20:]
+    ]
     base_url = settings.base_url.strip().rstrip("/")
     model = settings.model.strip()
     if not settings.enabled or not base_url or not model:
-        return _local_reply(redacted_question, redacted_context, history), "local-rules（未配置真实模型）"
+        return _local_reply(redacted_question, redacted_context, redacted_history), "local-rules（未配置真实模型）"
     messages: list[dict[str, str]] = [{
         "role": "system",
         "content": "你是 Linux 智能综合运维平台的严格只读运维助手。用户问题优先于终端输出，终端输出只作为脱敏证据。你可以解答 Linux 和 Kubernetes 运维问题、定位故障并提供人工处理建议和验证步骤。你没有任何删除、修改、安装、部署或命令执行权限；不能申请权限、调用工具或将建议下发到 SSH/Kubernetes/Docker。写操作仅作为说明清楚风险的人工建议，由管理员独立确认和执行。不要泄露凭据、密钥或令牌；不得声称已检查未提供的证据、已执行、已恢复或已通知管理员。",
     }]
-    messages.extend({"role": item["role"], "content": redact_context(item["content"])} for item in history[-20:])
+    messages.extend(redacted_history)
     messages.append({"role": "user", "content": f"用户问题：{redacted_question.strip()}\n\n脱敏终端证据：\n{redacted_context}"})
     body = json.dumps({"model": model, "messages": messages, "temperature": 0.2}, ensure_ascii=False).encode()
     headers = {"Content-Type": "application/json"}
@@ -180,9 +192,9 @@ def chat_reply(settings: TerminalAIConfig, question: str, context: str, history:
         raise TerminalAssistantError("运维模型返回空回答")
     if len(reply) > 4000:
         raise TerminalAssistantError("运维模型回答超过对话长度限制，请缩短问题")
-    return reply, f"openai-compatible:{model}"
+    return _redact(reply)[:4000], f"openai-compatible:{model}"
 
 
 def local_fallback_reply(question: str, context: str, history: list[dict[str, str]]) -> tuple[str, str]:
     """Return a deterministic read-only answer when an external model is unavailable."""
-    return _local_reply(redact_context(question), redact_context(context), history), "local-rules（外部模型不可用，已降级）"
+    return _local_reply(_redact(question), _redact(context), history), "local-rules（外部模型不可用，已降级）"

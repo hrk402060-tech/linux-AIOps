@@ -1,3 +1,4 @@
+import { formatPlatformDateTime } from '../utils/platformPreferences';
 import { useEffect, useState } from 'react';
 import { Button, DatePicker, Input, Select, Space, Table, Tag, message } from 'antd';
 import { RefreshCw, Search } from 'lucide-react';
@@ -38,7 +39,7 @@ export function AuditLogPage() {
       { title: '来源', dataIndex: 'source', width: 140, render: (value: string) => <Tag>{sources[value] ?? value}</Tag> },
       { title: '动作', dataIndex: 'action', width: 150 }, { title: '对象', dataIndex: 'target' },
       { title: '详情', dataIndex: 'detail' }, { title: '操作人', dataIndex: 'operator', width: 150 },
-      { title: '时间', dataIndex: 'occurred_at', width: 180, render: (value: string) => new Date(value).toLocaleString('zh-CN') },
+      { title: '时间', dataIndex: 'occurred_at', width: 180, render: (value: string) => formatPlatformDateTime(value) },
     ]} /></div>
   </section>;
 }

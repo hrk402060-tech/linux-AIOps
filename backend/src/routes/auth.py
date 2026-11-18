@@ -13,7 +13,7 @@ from src.schemas.auth import (
 )
 from src.schemas.asset_access import UserAccessResponse, UserAccessUpdate
 from src.services import auth as service
-from src.services import auth_policy
+from src.services import auth_policy, platform_settings
 from src.services import user_management as management
 from src.services.terminal_access import stop_user_terminals
 from src.routes.auth_mfa import router as mfa_router
@@ -32,8 +32,11 @@ def login(
     validate_request_origin(request)
     settings = request.app.state.runtime_settings
     try:
+        authentication = platform_settings.read_category(session, settings, "authentication")
+        if not authentication["local_login_enabled"]:
+            raise HTTPException(status_code=403, detail="本地登录已停用，请使用已配置的外部身份源")
         policy = auth_policy.resolve(session, settings)
-    except auth_policy.AuthPolicyUnavailableError as error:
+    except (auth_policy.AuthPolicyUnavailableError, platform_settings.PlatformSettingsUnavailableError) as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
     try:
         user, raw_token = service.authenticate(
@@ -102,6 +105,7 @@ def change_own_password(
     user = _find_user(session, principal.user_id)
     raw_token = request.cookies.get(request.app.state.runtime_settings.auth_cookie_name, "")
     try:
+        auth_policy.validate_new_password(session, request.app.state.runtime_settings, payload.new_password)
         changed = service.change_own_password(
             session, user, payload.current_password, payload.new_password,
             service.hash_token(raw_token),
@@ -124,10 +128,11 @@ def list_users(
 
 @router.post("/users", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 def add_user(
-    payload: UserCreate, principal: AuthPrincipal = Depends(require_system_admin),
+    payload: UserCreate, request: Request, principal: AuthPrincipal = Depends(require_system_admin),
     session: Session = Depends(get_session),
 ) -> UserResponse:
     try:
+        auth_policy.validate_new_password(session, request.app.state.runtime_settings, payload.password)
         user = service.create_user(
             session, payload.username, payload.password, payload.role,
             payload.display_name, payload.must_change_password,
@@ -138,6 +143,8 @@ def add_user(
         management.commit(session)
     except service.UserConflictError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     return UserResponse.model_validate(user)
 
 
@@ -153,6 +160,8 @@ def change_user(
     )
     if removing:
         try:
+            from src.services.identity_config import ensure_external_administrator_remains
+            ensure_external_administrator_remains(session, user_id, changes)
             auth_policy.ensure_bound_mfa_admin_remains(
                 session, request.app.state.runtime_settings, user_id,
                 action="停用或降级",
@@ -174,6 +183,10 @@ def change_password(
     principal: AuthPrincipal = Depends(require_system_admin),
     session: Session = Depends(get_session),
 ) -> UserResponse:
+    try:
+        auth_policy.validate_new_password(session, request.app.state.runtime_settings, payload.password)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     user = management.find_user(session, user_id, locked=True)
     before = management.snapshot(user)
     service.reset_password(session, user, payload.password, payload.must_change_password, commit=False)

@@ -4,12 +4,13 @@ from uuid import uuid4
 
 from sqlalchemy import select, update
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, object_session
 
 from src.models.alert import Alert, AlertTimeline, RootCauseAnalysis
 from src.models.diagnostic_job import DiagnosticAdmission, DiagnosticJob, DiagnosticSlot
 from src.models.diagnostic_grant import DiagnosticGrant
-from src.services import alert_diagnostics, diagnostic_grants
+from src.services import alert_diagnostics, diagnostic_grants, platform_settings
+from src.services import settings_repository
 from src.services.alert_notification_ingest import enqueue_diagnosis
 
 logger = logging.getLogger(__name__)
@@ -18,9 +19,10 @@ RETRYABLE = {'timeout', 'connection_failed', 'connection_reset', 'worker_interru
 
 
 def seed(session: Session) -> None:
+    settings_repository.lock(session)
     if session.get(DiagnosticAdmission, 1) is None:
         session.add(DiagnosticAdmission(id=1, revision=0))
-    for identifier in (1, 2):
+    for identifier in range(1, 33):
         if session.get(DiagnosticSlot, identifier) is None:
             session.add(DiagnosticSlot(id=identifier))
     commit(session)
@@ -102,7 +104,9 @@ def advance(job: DiagnosticJob, analysis: RootCauseAnalysis, now: datetime) -> N
     job.last_error_code = analysis.error_code
     job.updated_at = now
     job.lease_token, job.lease_expires_at = None, None
-    if analysis.status == 'failed' and analysis.error_code in RETRYABLE and job.attempt_count < job.max_attempts:
+    session = object_session(job)
+    allow_retry = session is None or platform_settings.task_policy(session).failure_policy == "continue"
+    if allow_retry and analysis.status == 'failed' and analysis.error_code in RETRYABLE and job.attempt_count < job.max_attempts:
         job.status = 'retry_wait'
         job.next_attempt_at = now + timedelta(seconds=(10, 30)[min(job.attempt_count - 1, 1)])
     else:

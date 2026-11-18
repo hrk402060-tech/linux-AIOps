@@ -14,7 +14,7 @@ export function platformPageHref(page?: PageKey): string {
 export function requestedPlatformPage(): PageKey | null {
   const params = new URLSearchParams(window.location.search);
   if (params.get('view') === 'docs' || params.has('terminal_asset')) return null;
-  if (params.get('page') === 'user-security') return 'security-settings';
+  if (['settings', 'user-security', 'user-authorization', 'security-settings'].includes(params.get('page') ?? '')) return params.get('page') as PageKey;
   return userDocs.find((entry) => entry.page === params.get('page'))?.page ?? null;
 }
 

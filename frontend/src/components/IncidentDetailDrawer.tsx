@@ -1,3 +1,4 @@
+import { formatPlatformDateTime } from '../utils/platformPreferences';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Button, Drawer, Form, Input, Modal, Select, Space, Table, Tag, Timeline, message } from 'antd';
 import { Plus, RefreshCw } from 'lucide-react';
@@ -172,16 +173,16 @@ function IncidentContext({ incident, currentUser }: {
         <span>级别</span><strong><Tag color={colors[detail.severity]}>{severities[detail.severity]}</Tag></strong>
         <span>资产</span><strong>{detail.asset_name} · {detail.asset_id}</strong>
         <span>创建人</span><strong>{detail.operator}</strong>
-        <span>创建时间</span><strong>{new Date(detail.created_at).toLocaleString()}</strong>
-        <span>更新时间</span><strong>{new Date(detail.updated_at ?? detail.created_at).toLocaleString()}</strong>
+        <span>创建时间</span><strong>{formatPlatformDateTime(detail.created_at)}</strong>
+        <span>更新时间</span><strong>{formatPlatformDateTime(detail.updated_at ?? detail.created_at)}</strong>
         <span>SLA</span><strong><Tag color={slaColors[detail.sla_status ?? 'on_track']}>{slaLabels[detail.sla_status ?? 'on_track']}</Tag>
-          {detail.sla_due_at ? ` · 到期 ${new Date(detail.sla_due_at).toLocaleString()}` : null}</strong>
+          {detail.sla_due_at ? ` · 到期 ${formatPlatformDateTime(detail.sla_due_at)}` : null}</strong>
       </div><p>{detail.description}</p></section>
       <section className="ops-panel"><h3>关联上下文</h3>
         {linkError ? <Alert type="warning" showIcon message={linkError} /> : null}
         {!detail.alert_id ? <p>此故障未关联外部告警，暂无关联恢复验证。</p> : null}
         {alert ? <><p><strong>告警：</strong>{alert.title} · {statuses[alert.status]}</p>
-          <p><strong>接收时间：</strong>{new Date(alert.received_at).toLocaleString()}</p>
+          <p><strong>接收时间：</strong>{formatPlatformDateTime(alert.received_at)}</p>
           <p><strong>诊断：</strong>{alert.latest_analysis
             ? `${analysisLabels[alert.latest_analysis.status] ?? '未知状态'} · ${alert.latest_analysis.summary}`
             : '暂无诊断结果'}</p></> : null}
@@ -192,7 +193,7 @@ function IncidentContext({ incident, currentUser }: {
           children: <div className="timeline-entry">
             <strong>{alertTimelineLabels[entry.event_type] ?? '其他事件'} · {alertStatusLabels[entry.status] ?? entry.status}</strong>
             <span>{entry.note}</span>
-            <small>{entry.operator} · {new Date(entry.created_at).toLocaleString()}</small>
+            <small>{entry.operator} · {formatPlatformDateTime(entry.created_at)}</small>
           </div>,
         }))} /> : <p>暂无告警时间线记录。</p>}
       </section> : null}
@@ -215,7 +216,7 @@ function IncidentContext({ incident, currentUser }: {
       <section className="ops-panel"><h3>处置时间线</h3>
         <Timeline items={history.map((entry) => ({ children: <div className="timeline-entry">
           <strong>{statuses[entry.status]}</strong><span>{entry.note}</span>
-          <small>{entry.operator} · {new Date(entry.created_at).toLocaleString()}</small>
+          <small>{entry.operator} · {formatPlatformDateTime(entry.created_at)}</small>
         </div> }))} />
       </section>
       <Modal title="新建工单" open={ticketOpen} confirmLoading={ticketSubmitting} okText="创建工单" onOk={() => void submitTicket()} onCancel={() => setTicketOpen(false)} destroyOnHidden>

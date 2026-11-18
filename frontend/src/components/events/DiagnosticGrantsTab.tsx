@@ -1,3 +1,4 @@
+import { formatPlatformDateTime } from '../../utils/platformPreferences';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Button, Empty, Input, List, Modal, Segmented, Select, Space, Table, Tag, Tooltip } from 'antd';
 import { Eye, KeyRound, Plus, RefreshCw, ShieldOff, TestTube2 } from 'lucide-react';
@@ -126,7 +127,7 @@ export function DiagnosticGrantsTab({ currentUser, initialAssetId }: {
           {item.kind === 'rabbitmq' ? <div style={{ overflowWrap: 'anywhere' }}>vhost：{item.rabbitmq_config?.vhost}</div> : null}
           {item.action_ids.map((id) => <Tag key={id}>{data.catalog.find((action) => action.id === id)?.label ?? id}</Tag>)}</div> },
         { title: '状态 / 版本', width: 155, render: (_, item) => <Space direction="vertical" size={2}><Tag color={item.effective_status === 'active' ? 'green' : 'gold'}>{labels[item.effective_status] ?? item.effective_status}</Tag><span>版本 {item.revision}</span></Space> },
-        { title: '有效期', width: 175, dataIndex: 'expires_at', render: (value: string) => new Date(value).toLocaleString() },
+        { title: '有效期', width: 175, dataIndex: 'expires_at', render: (value: string) => formatPlatformDateTime(value) },
         { title: '凭据与指纹', width: 300, render: (_, item) => item.kind === 'kubernetes'
           ? <div><div>Token：{item.secret_configured ? '********' : '未配置'}</div>
             <div>CA：<TypographyFingerprint value={item.ca_fingerprint ?? '未配置'} /></div></div>
@@ -137,7 +138,7 @@ export function DiagnosticGrantsTab({ currentUser, initialAssetId }: {
           : item.kind === 'redis' || item.kind === 'rabbitmq'
             ? <div><div>密码：{item.secret_configured ? '********' : '未配置'}</div><div>CA：<TypographyFingerprint value={item.ca_fingerprint ?? '未配置'} /></div></div>
           : <div><div>私钥：{item.secret_configured ? '********' : '未配置'}</div><div>密钥：<TypographyFingerprint value={item.key_fingerprint} /></div><div>主机：<TypographyFingerprint value={item.host_fingerprint} /></div></div> },
-        { title: '更新记录', width: 160, render: (_, item) => <div>{item.operator}<div>{new Date(item.updated_at).toLocaleString()}</div></div> },
+        { title: '更新记录', width: 160, render: (_, item) => <div>{item.operator}<div>{formatPlatformDateTime(item.updated_at)}</div></div> },
         { title: '操作', width: writable ? 132 : 60, fixed: 'right', render: (_, item) => <Space size={4}>
           <Tooltip title="查看授权记录"><Button aria-label={`查看 ${item.asset_name} 授权记录`} icon={<Eye size={16} />} onClick={() => void showAudit(item)} /></Tooltip>
           {writable ? <><Tooltip title="验证只读授权"><Button aria-label={`验证 ${item.asset_name} 只读授权`} disabled={unavailable || !item.enabled} icon={<TestTube2 size={16} />} onClick={() => { setError(''); setTesting(item); }} /></Tooltip><Tooltip title="配置只读授权"><Button aria-label={`配置 ${item.asset_name} 只读授权`} disabled={unavailable || !assets.some((asset) => asset.id === item.asset_id && asset.lifecycle_status === 'enabled')} icon={<KeyRound size={16} />} onClick={() => openForm(item)} /></Tooltip>
@@ -169,7 +170,7 @@ export function DiagnosticGrantsTab({ currentUser, initialAssetId }: {
       onCancel={() => { auditGeneration.current += 1; setAudit(null); }} destroyOnHidden>
       {auditError ? <Alert type="error" showIcon message={auditError} /> : <List loading={auditLoading} dataSource={audit?.items ?? []}
         locale={{ emptyText: '暂无授权记录' }} renderItem={(item) => <List.Item><List.Item.Meta title={`${item.action} · 版本 ${item.revision}`}
-          description={<>{item.reason}<div>{item.operator} · {new Date(item.created_at).toLocaleString()}</div></>} /></List.Item>} />}
+          description={<>{item.reason}<div>{item.operator} · {formatPlatformDateTime(item.created_at)}</div></>} /></List.Item>} />}
     </Modal>
   </section>;
 }

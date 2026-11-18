@@ -1,3 +1,4 @@
+import { formatPlatformDateTime } from '../../utils/platformPreferences';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Button, Descriptions, Drawer, Empty, Input, InputNumber, List, Modal, Pagination, Segmented, Select, Space, Tag, Typography } from 'antd';
 import { Activity, Ban, Eye, RefreshCw } from 'lucide-react';
@@ -10,7 +11,7 @@ export const recoveryLabels: Record<RecoveryStatus, string> = {
   observing: '待观察', verified: '检查通过', failed: '检查失败', blocked: '验证受阻', cancelled: '已取消',
 };
 const colors: Record<RecoveryStatus, string> = { observing: 'blue', verified: 'green', failed: 'red', blocked: 'gold', cancelled: 'default' };
-const date = (value: string) => Number.isNaN(new Date(value).getTime()) ? '时间无效' : new Date(value).toLocaleString();
+const date = (value: string) => Number.isNaN(new Date(value).getTime()) ? '时间无效' : formatPlatformDateTime(value);
 type Target = { action: 'create' } | { action: 'evaluate' | 'cancel'; item: RecoveryVerification };
 const confirmations = { create: '发起恢复验证', evaluate: '核验恢复证据', cancel: '取消恢复验证' };
 const metricLabels: Record<RecoveryMetric, string> = { availability: '在线状态', cpu_percent: 'CPU 使用率',

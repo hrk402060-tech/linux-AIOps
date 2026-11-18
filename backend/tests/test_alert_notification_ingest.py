@@ -63,7 +63,7 @@ def _ingest(
 
 def test_alert_and_unauthorized_diagnosis_each_enqueue_once(client: TestClient, database_session: Session) -> None:
     connector, asset_id = _connector(client), _asset(client)
-    with patch("src.services.alerts.ssh_host_key_registry.require_registered") as key:
+    with patch("src.services.ssh_connection.open_client") as key:
         response = _ingest(client, connector, asset_id)
     assert response.status_code == 201
     key.assert_not_called()
@@ -167,7 +167,7 @@ def test_mapping_failure_notifies_and_preserves_nonce_before_corrected_ingest(
 ) -> None:
     connector = _connector(client)
     missing_id, nonce = str(uuid4()), uuid4().hex
-    with patch("src.services.alerts.ssh_host_key_registry.require_registered") as key:
+    with patch("src.services.ssh_connection.open_client") as key:
         response = _ingest(client, connector, missing_id, nonce=nonce)
     assert response.status_code == 404
     key.assert_not_called()

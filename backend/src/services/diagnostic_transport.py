@@ -8,11 +8,13 @@ from typing import Callable
 
 from cryptography.exceptions import InvalidTag
 import paramiko
+from sqlalchemy.orm import object_session
 
 from src.models.asset import Asset
 from src.models.diagnostic_grant import DiagnosticGrant
 from src.services.crypto import CredentialCryptoError, CredentialVault
-from src.services.ssh_connection import parse_private_key
+from src.services.platform_settings import connection_policy
+from src.services.ssh_connection import configured_host_key, parse_private_key
 
 PROTOCOL = 'linuxops-readonly-v1'
 MAX_BYTES = 32768
@@ -88,7 +90,14 @@ def _connect(
         deadline if callable(deadline) else authorize
     )
     _remaining(actual_deadline, actual_authorize)
+    try:
+        expected_key = configured_host_key(asset)
+    except ValueError as error:
+        raise DiagnosticTransportError("host_key_mismatch") from error
     key = _private_key(grant, vault)
+    session = object_session(asset) if isinstance(asset, Asset) else None
+    policy = connection_policy(session) if session is not None else None
+    connection_timeout = policy.connect_timeout_seconds if policy is not None else 6
     _remaining(actual_deadline, actual_authorize)
     client = paramiko.SSHClient()
     address = ipaddress.ip_address(grant.host)
@@ -100,15 +109,23 @@ def _connect(
     watchdog.daemon = True
     watchdog.start()
     try:
-        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        remaining = min(6, _remaining(actual_deadline, actual_authorize))
+        if expected_key is None:
+            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        else:
+            hostname = grant.host if grant.port == 22 else f"[{grant.host}]:{grant.port}"
+            client.get_host_keys().add(hostname, expected_key.get_name(), expected_key)
+            client.set_missing_host_key_policy(paramiko.RejectPolicy())
+        remaining = min(connection_timeout, _remaining(actual_deadline, actual_authorize))
         connection.settimeout(remaining)
         connection.connect((str(address), grant.port))
-        remaining = min(6, _remaining(actual_deadline, actual_authorize))
+        remaining = min(connection_timeout, _remaining(actual_deadline, actual_authorize))
         client.connect(hostname=grant.host, port=grant.port, username=grant.username, pkey=key,
                        timeout=remaining, banner_timeout=remaining, auth_timeout=remaining,
                        allow_agent=False, look_for_keys=False, sock=connection)
         _remaining(actual_deadline, actual_authorize)
+        transport = client.get_transport()
+        if transport is not None and policy is not None:
+            transport.set_keepalive(policy.heartbeat_seconds)
         return client
     except Exception:
         connection.close()

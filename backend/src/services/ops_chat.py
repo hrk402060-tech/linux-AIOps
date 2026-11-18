@@ -14,6 +14,7 @@ from src.services import ops_conversations as conversations, terminal_assistant
 from src.services.ai_settings import AISettingsError, terminal_runtime_config
 from src.services.crypto import CredentialVault
 from src.services.ops_redaction import redact
+from src.services.platform_settings import ai_policy
 
 logger = logging.getLogger(__name__)
 MODEL_ERROR = "运维模型请求失败，请检查 AI 配置或稍后重试"
@@ -83,15 +84,19 @@ def _history(session: Session, conversation_id: str) -> list[dict[str, str]]:
     messages = list(session.scalars(select(OpsMessage).where(
         OpsMessage.conversation_id == conversation_id, OpsMessage.status == "completed",
     ).order_by(OpsMessage.number.desc()).limit(20)))
-    return [{"role": item.role, "content": item.content} for item in reversed(messages)]
+    return [{"role": item.role, "content": redact(item.content)} for item in reversed(messages)]
 
 
 def _prepare(
     session: Session, item: OpsConversation, payload: OpsAssistantChatRequest, request_id: str,
 ) -> PendingChat:
     asset = conversations.require_enabled_asset(session, item.asset_id)
+    policy = ai_policy(session)
+    if not policy.include_asset_context:
+        asset = None
+    context = item.redacted_context if policy.include_terminal_output else ""
     sources = ["用户问题"]
-    if item.redacted_context:
+    if context:
         sources.append("用户补充的脱敏证据")
     if asset:
         sources.append(f"服务器资产：{asset.name}")
@@ -102,7 +107,8 @@ def _prepare(
     question = redact(payload.message)[:4000]
     pending = PendingChat(
         item.id, request_id, str(uuid4()), number, question,
-        _asset_context(asset, item.redacted_context), _history(session, item.id), sources,
+        _asset_context(asset, context),
+        _history(session, item.id)[-policy.history_messages:] if policy.history_messages else [], sources,
     )
     session.add(OpsMessage(
         id=pending.message_id, conversation_id=item.id, number=number,
@@ -172,6 +178,8 @@ def _redact_value(value: object) -> object:
 def chat(
     session: Session, owner: str, payload: OpsAssistantChatRequest, vault: CredentialVault,
 ) -> OpsAssistantChatResponse:
+    if not ai_policy(session).ops_assistant_enabled:
+        raise HTTPException(status_code=403, detail="运维助手已由管理员停用")
     item = (
         conversations.get_owned(session, str(payload.conversation_id), owner)
         if payload.conversation_id else conversations.create(session, owner, ConversationCreate(

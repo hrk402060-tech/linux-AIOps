@@ -1,3 +1,4 @@
+import { formatPlatformDateTime } from '../utils/platformPreferences';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Empty, Pagination, Select, Spin, Tag, Tooltip, message } from 'antd';
 import {
@@ -154,7 +155,7 @@ function FindingItem({ item, selected, disabled, onSelect }: { item: AgentFindin
 function RecommendationView({ advice }: { advice: AgentRecommendation }) {
   return <div className="recommendation-view">
     <div className="recommendation-summary"><Tag color={advice.priority === 'urgent' ? 'red' : 'gold'}>{priorityText[advice.priority]}</Tag><strong>{advice.cve_id} · {advice.asset_name}</strong><p>{advice.risk_analysis}</p></div>
-    {advice.status !== 'pending_review' ? <div className="agent-section-title"><span>审核人：<strong>{advice.reviewed_by ?? '历史记录未记载'}</strong></span><time>{advice.reviewed_at ? new Date(advice.reviewed_at).toLocaleString('zh-CN') : '审核时间未记载'}</time></div> : null}
+    {advice.status !== 'pending_review' ? <div className="agent-section-title"><span>审核人：<strong>{advice.reviewed_by ?? '历史记录未记载'}</strong></span><time>{advice.reviewed_at ? formatPlatformDateTime(advice.reviewed_at) : '审核时间未记载'}</time></div> : null}
     <div className="recommendation-columns">
       <section><h3>修复建议</h3><ol>{advice.remediation_steps.map((step) => <li key={step}>{step}</li>)}</ol></section>
       <section><h3>验证步骤</h3><ol>{advice.validation_steps.map((step) => <li key={step}>{step}</li>)}</ol></section>

@@ -25,7 +25,8 @@ import { isSecurityCheckPage } from './types/security-check';
 import { AuditLogPage } from './pages/AuditLogPage';
 import { PatchesPage } from './pages/PatchesPage';
 import { SystemPage } from './pages/SystemPage';
-import { SecuritySettingsPage } from './pages/SecuritySettingsPage';
+import { UserSecurityPage } from './pages/UserSecurityPage';
+import { SystemStatusPage } from './pages/SystemStatusPage';
 import { AutomationPage } from './pages/AutomationPage';
 import { CmdbPage } from './pages/CmdbPage';
 import { ObservabilityPage } from './pages/ObservabilityPage';
@@ -33,16 +34,18 @@ import { ProbesPage } from './pages/ProbesPage';
 import { IncidentsPage } from './pages/IncidentsPage';
 import { OperationsAssistantPage } from './pages/OperationsAssistantPage';
 import { KubernetesManagementPage } from './pages/KubernetesManagementPage';
+import { PlatformSettingsPage } from './pages/PlatformSettingsPage';
 import { UserDocsPage } from './pages/UserDocsPage';
 import { openTerminalTab } from './utils/terminalNavigation';
 import { requestedPlatformPage } from './utils/userDocsNavigation';
 
-export type PageKey = 'dashboard' | 'server-monitoring' | 'cmdb' | 'terminal' | 'observability' | 'probes' | 'assets' | 'scans' | 'schedules' | 'baselines' | 'exposures' | 'credential-risks' | 'findings' | 'incidents' | 'reports' | 'audit-log' | 'patches' | 'credentials' | 'knowledge' | 'agent' | 'alerts' | 'system' | 'automation' | 'ops-assistant' | 'user-security' | 'security-settings' | 'kubernetes-clusters';
+export type PageKey = 'dashboard' | 'server-monitoring' | 'cmdb' | 'terminal' | 'observability' | 'probes' | 'assets' | 'scans' | 'schedules' | 'baselines' | 'exposures' | 'credential-risks' | 'findings' | 'incidents' | 'reports' | 'audit-log' | 'patches' | 'credentials' | 'knowledge' | 'agent' | 'alerts' | 'system' | 'settings' | 'user-authorization' | 'automation' | 'ops-assistant' | 'user-security' | 'security-settings' | 'kubernetes-clusters';
 
 export default function App() {
   const [monitorPreview, setMonitorPreview] = useState(() => import.meta.env.VITE_SERVER_MONITOR_PREVIEW === 'true'
     && new URLSearchParams(window.location.search).get('view') === 'server-monitoring-preview');
   const [page, setPage] = useState<PageKey>(() => requestedPlatformPage() ?? 'dashboard');
+  const [settingsReturnPage, setSettingsReturnPage] = useState<PageKey>('dashboard');
   const [findingAssetId, setFindingAssetId] = useState<string | null>(null);
   const [terminalAssetId, setTerminalAssetId] = useState<string | null>(null);
   const [searchTarget, setSearchTarget] = useState<SearchTarget | null>(null);
@@ -53,6 +56,7 @@ export default function App() {
   const [terminalNotice, terminalNoticeHolder] = notification.useNotification();
   const resetScopedState = useCallback(() => {
     setPage('dashboard');
+    setSettingsReturnPage('dashboard');
     setFindingAssetId(null);
     setTerminalAssetId(null);
     setSearchTarget(null);
@@ -64,19 +68,22 @@ export default function App() {
   const scopeKey = `${currentUser?.id ?? ''}:${currentUser?.role ?? ''}:${currentUser?.access_revision ?? 0}`;
   const standaloneTerminalAssetId = new URLSearchParams(window.location.search).get('terminal_asset');
   const navigate = (nextPage: PageKey) => {
+    if (['settings', 'security-settings'].includes(nextPage) && !['settings', 'security-settings'].includes(page)) setSettingsReturnPage(page);
     if (monitorPreview) {
       setMonitorPreview(false);
       const url = new URL(window.location.href);
       url.searchParams.delete('view');
       window.history.replaceState(null, '', url);
     }
-    setSearchTarget(null);
-    setServiceProbeContext(undefined);
-    setServiceAlertContext(undefined);
-    setServiceAssistantContext(undefined);
-    if (nextPage !== 'findings' || searchTarget?.page === 'findings') setFindingAssetId(null);
-    if (nextPage !== 'terminal') setTerminalAssetId(null);
-    setPage(nextPage === 'user-security' ? 'security-settings' : nextPage);
+    if (!['settings', 'security-settings'].includes(nextPage)) {
+      setSearchTarget(null);
+      setServiceProbeContext(undefined);
+      setServiceAlertContext(undefined);
+      setServiceAssistantContext(undefined);
+      if (nextPage !== 'findings' || searchTarget?.page === 'findings') setFindingAssetId(null);
+      if (nextPage !== 'terminal') setTerminalAssetId(null);
+    }
+    setPage(nextPage);
   };
   const navigateToSearchResult = (target: SearchTarget) => {
     navigate(target.page);
@@ -148,44 +155,51 @@ export default function App() {
   if (standaloneTerminalAssetId) {
     return <TerminalPage key={scopeKey} initialAssetId={standaloneTerminalAssetId} standalone />;
   }
+  const settingsOpen = page === 'settings' || page === 'security-settings';
+  const contentPage = settingsOpen ? settingsReturnPage : page;
   return (
     <AppShell key={scopeKey} currentUser={currentUser} onLogout={() => void signOut()} selectedPage={page}
       onNavigate={navigate} onSearchNavigate={navigateToSearchResult}>
       {terminalNoticeHolder}
-      {page === 'dashboard' ? <DashboardPage onNavigate={navigate} onViewFindings={viewAssetFindings} onOpenTerminal={openAssetTerminal} />
-        : page === 'server-monitoring' ? <ServerMonitoringPreviewPage key={scopeKey} canManage={currentUser.role !== 'auditor'} />
-        : page === 'cmdb' ? <CmdbPage currentUser={currentUser}
+      <div className="workspace-settings-underlay" hidden={settingsOpen} key={scopeKey}>
+      {contentPage === 'dashboard' ? <DashboardPage onNavigate={navigate} onViewFindings={viewAssetFindings} onOpenTerminal={openAssetTerminal} />
+        : contentPage === 'server-monitoring' ? <ServerMonitoringPreviewPage key={scopeKey} canManage={currentUser.role !== 'auditor'} />
+        : contentPage === 'cmdb' ? <CmdbPage currentUser={currentUser}
           key={searchTarget?.page === 'cmdb' ? `${searchTarget.serviceId}:${searchNavigationId}` : 'cmdb'}
           initialServiceId={searchTarget?.page === 'cmdb' ? searchTarget.serviceId : undefined} />
-        : page === 'system' ? <SystemPage currentUser={currentUser} onLogout={() => void signOut()} />
-        : page === 'user-security' || page === 'security-settings'
-          ? <SecuritySettingsPage currentUser={currentUser} onLogout={() => void signOut()} />
-        : page === 'patches' ? <PatchesPage />
-        : page === 'automation' ? <AutomationPage onNavigate={navigate} />
-        : page === 'audit-log' ? <AuditLogPage />
-        : isSecurityCheckPage(page) ? <SecurityChecksPage activeKey={page} onNavigate={navigate} />
-        : page === 'alerts' ? <EventsPage currentUser={currentUser} initialAssetId={serviceAlertContext?.assetId}
+        : contentPage === 'system' ? <SystemStatusPage />
+        : contentPage === 'user-authorization' ? <SystemPage currentUser={currentUser} onLogout={() => void signOut()} usersOnly />
+        : contentPage === 'user-security' ? <UserSecurityPage onLogout={() => void signOut()} />
+        : contentPage === 'patches' ? <PatchesPage />
+        : contentPage === 'automation' ? <AutomationPage onNavigate={navigate} />
+        : contentPage === 'audit-log' ? <AuditLogPage />
+        : isSecurityCheckPage(contentPage) ? <SecurityChecksPage activeKey={contentPage} onNavigate={navigate} />
+        : contentPage === 'alerts' ? <EventsPage currentUser={currentUser} initialAssetId={serviceAlertContext?.assetId}
           initialTab={serviceAlertContext?.tab} initialAlertId={serviceAlertContext?.alertId}
           onOpenTerminal={openAssetTerminal} onOpenIncidents={() => navigate('incidents')} />
-        : page === 'incidents' ? <IncidentsPage currentUser={currentUser} />
-        : page === 'observability' ? <ObservabilityPage onOpenProbeHistory={openServiceProbeHistory} onOpenAlerts={openServiceAlerts}
+        : contentPage === 'incidents' ? <IncidentsPage currentUser={currentUser} />
+        : contentPage === 'observability' ? <ObservabilityPage onOpenProbeHistory={openServiceProbeHistory} onOpenAlerts={openServiceAlerts}
           onOpenFindings={viewAssetFindings} onOpenTerminal={openAssetTerminal} onOpenAssistant={openServiceAssistant} />
-        : page === 'probes' ? <ProbesPage currentUser={currentUser} initialServiceId={serviceProbeContext?.serviceId} initialProbe={serviceProbeContext?.probe} />
-        : page === 'terminal' ? <TerminalPage initialAssetId={terminalAssetId} />
-        : page === 'ops-assistant' ? <OperationsAssistantPage userId={currentUser.id}
+        : contentPage === 'probes' ? <ProbesPage currentUser={currentUser} initialServiceId={serviceProbeContext?.serviceId} initialProbe={serviceProbeContext?.probe} />
+        : contentPage === 'terminal' ? <TerminalPage initialAssetId={terminalAssetId} />
+        : contentPage === 'ops-assistant' ? <OperationsAssistantPage userId={currentUser.id}
           initialAssetId={serviceAssistantContext?.assetId} initialContext={serviceAssistantContext?.context} />
-        : page === 'kubernetes-clusters' ? <KubernetesManagementPage currentUser={currentUser} />
-            : page === 'assets' ? <AssetsPage onViewFindings={viewAssetFindings} onOpenTerminal={openAssetTerminal}
+        : contentPage === 'kubernetes-clusters' ? <KubernetesManagementPage currentUser={currentUser} />
+            : contentPage === 'assets' ? <AssetsPage onViewFindings={viewAssetFindings} onOpenTerminal={openAssetTerminal}
               key={searchTarget?.page === 'assets' ? `${searchTarget.assetId}:${searchNavigationId}` : 'assets'}
               initialAssetId={searchTarget?.page === 'assets' ? searchTarget.assetId : null}
-              initialQuery={searchTarget?.page === 'assets' ? searchTarget.query : ''} /> : page === 'scans' ? <ScanTasksPage currentUser={currentUser} />
-        : page === 'findings' ? <VulnerabilitiesPage initialAssetId={findingAssetId}
+              initialQuery={searchTarget?.page === 'assets' ? searchTarget.query : ''} /> : contentPage === 'scans' ? <ScanTasksPage currentUser={currentUser} />
+        : contentPage === 'findings' ? <VulnerabilitiesPage initialAssetId={findingAssetId}
           key={`${findingAssetId ?? 'all'}:${searchTarget?.page === 'findings' ? `${searchTarget.query}:${searchNavigationId}` : ''}`}
           initialQuery={searchTarget?.page === 'findings' ? searchTarget.query : ''}
           initialDisposition={searchTarget?.page === 'findings' ? 'all' : 'active'} />
-          : page === 'reports' ? <ReportsPage />
-          : page === 'credentials' ? <CredentialsPage />
-            : page === 'knowledge' ? <KnowledgePage /> : <AIAgentPage currentUser={currentUser} />}
+          : contentPage === 'reports' ? <ReportsPage />
+          : contentPage === 'credentials' ? <CredentialsPage />
+            : contentPage === 'knowledge' ? <KnowledgePage /> : <AIAgentPage currentUser={currentUser} />}
+      </div>
+      {settingsOpen ? <PlatformSettingsPage currentUser={currentUser}
+        initialCategory={page === 'security-settings' ? 'security' : 'basic'}
+        onBack={() => setPage(settingsReturnPage)} /> : null}
     </AppShell>
   );
 }

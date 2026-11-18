@@ -1,3 +1,4 @@
+import { formatPlatformDateTime } from '../utils/platformPreferences';
 import { useEffect, useRef, useState } from 'react';
 import { Button, Input, Select, Spin, Tag, message } from 'antd';
 import { Archive, ArchiveRestore, Bot, CheckCircle2, CircleAlert, ClipboardCheck, Send, ShieldCheck } from 'lucide-react';
@@ -105,7 +106,7 @@ function OperationsAssistantWorkspace({ initialAssetId, initialContext }: Pick<P
 function MessageTurn({ turn }: { turn: OpsAssistantMessage }) {
   return <article className={`operations-assistant-message ${turn.role} ${turn.status}`}><span className="operations-assistant-message-role">{turn.role === 'user' ? '你' : <><Bot size={14} /> AI 运维助手</>}</span>
     {turn.role === 'user' ? <><p>{turn.content}</p>{turn.status === 'failed' ? <small className="operations-assistant-message-error">回答失败：{turn.error_message ?? '请求失败'}</small> : turn.status === 'pending' ? <small>正在等待回答</small> : null}</> : <AssistantAnswer turn={turn} />}
-    <time className="operations-assistant-message-time" dateTime={turn.created_at}>{new Date(turn.created_at).toLocaleString('zh-CN')}</time></article>;
+    <time className="operations-assistant-message-time" dateTime={turn.created_at}>{formatPlatformDateTime(turn.created_at)}</time></article>;
 }
 
 function AssistantAnswer({ turn }: { turn: OpsAssistantMessage }) {
