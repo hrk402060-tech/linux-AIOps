@@ -3,8 +3,8 @@ import { Alert, Button, Input, Pagination, Tag, Tooltip } from 'antd';
 import { ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
 import { kubernetesRequestError } from '../api/kubernetes';
 import {
-  decideHelmApproval, getHelmApprovals, submitHelmApproval,
-  type HelmApproval, type HelmApprovalList, type HelmPreview, type HelmResource,
+  decideHelmApproval, getHelmApprovals, runHelmAdmissionRehearsal, submitHelmApproval,
+  type HelmAdmissionResult, type HelmApproval, type HelmApprovalList, type HelmPreview, type HelmResource,
 } from '../api/kubernetesChanges';
 import { formatPlatformDateTime } from '../utils/platformPreferences';
 
@@ -16,6 +16,19 @@ const statuses: Record<HelmApproval['status'], { text: string; color: string }> 
   expired: { text: '已过期', color: 'default' },
   invalidated: { text: '已失效', color: 'default' },
 };
+const admissionErrors = new Map([
+  ['identity_rejected', '测试身份校验未通过'],
+  ['upstream_unauthorized', '测试身份认证未通过'],
+  ['upstream_forbidden', '测试身份缺少所需权限'],
+  ['admission_conflict', '测试命名空间已有同名资源'],
+  ['admission_invalid', '测试集群拒绝了资源配置'],
+  ['timeout', '测试集群响应超时'],
+  ['network_error', '无法连接测试集群'],
+  ['tls_chain', '测试集群证书不受信任'],
+  ['tls_hostname', '测试集群证书与地址不匹配'],
+  ['tls_expired', '测试集群证书已过期'],
+  ['tls_error', '测试集群 TLS 连接失败'],
+]);
 
 export function HelmResources({ items }: { items: HelmResource[] }) {
   return <ul className="k8s-helm-resource-list">{items.map((item) =>
@@ -61,8 +74,70 @@ function DecisionForm({ busy, onConfirm }: { busy: boolean; onConfirm: (value: '
   </form>;
 }
 
-function ApprovalDetails({ item, busy, onConfirm }: {
-  item: HelmApproval; busy: boolean; onConfirm: (value: 'yes' | 'no') => void;
+function AdmissionResult({ result }: { result: HelmAdmissionResult }) {
+  const passed = result.status === 'passed';
+  const error = result.error_code && admissionErrors.get(result.error_code);
+  return <Alert type={passed ? 'success' : 'error'} showIcon
+    message={passed ? '准入演练通过 · 未部署' : '准入演练失败 · 未部署'}
+    description={<div>
+      {!passed && <div>{error || '准入演练未通过'}</div>}
+      <div>通过检查 {result.checked} / {result.total} · 审计编号 {result.trace_id}</div>
+    </div>} />;
+}
+
+function AdmissionRehearsal({ clusterId, approvalId, disabled }: {
+  clusterId: string; approvalId: string; disabled: boolean;
+}) {
+  const [confirmation, setConfirmation] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<HelmAdmissionResult>();
+  const [requestFailed, setRequestFailed] = useState(false);
+  const active = useRef<AbortController>();
+  const id = useId();
+  const valid = confirmation.trim() === 'yes';
+  useEffect(() => () => active.current?.abort(), []);
+
+  async function run() {
+    if (!valid || disabled || active.current) return;
+    const controller = new AbortController();
+    active.current = controller;
+    setBusy(true);
+    setResult(undefined);
+    setRequestFailed(false);
+    try {
+      const response = await runHelmAdmissionRehearsal(clusterId, approvalId, controller.signal);
+      if (!controller.signal.aborted) {
+        setConfirmation('');
+        setResult(response);
+      }
+    } catch {
+      if (!controller.signal.aborted) setRequestFailed(true);
+    } finally {
+      active.current = undefined;
+      if (!controller.signal.aborted) setBusy(false);
+    }
+  }
+
+  return <section aria-label="准入演练">
+    <form className="k8s-helm-approval-form" aria-busy={busy} onSubmit={(event) => {
+      event.preventDefault();
+      void run();
+    }}>
+      <label htmlFor={id}>确认演练</label>
+      <div className="k8s-helm-approval-actions">
+        <Input id={id} placeholder="yes" autoComplete="off" maxLength={16}
+          disabled={disabled || busy} value={confirmation} onChange={(event) => setConfirmation(event.target.value)} />
+        <Button type="primary" htmlType="submit" autoInsertSpace={false}
+          disabled={disabled || busy || !valid} loading={busy}>运行准入演练</Button>
+      </div>
+    </form>
+    {result && <AdmissionResult result={result} />}
+    {requestFailed && <Alert type="error" showIcon message="准入演练请求失败，请刷新审批记录后重试" />}
+  </section>;
+}
+
+function ApprovalDetails({ clusterId, item, busy, onConfirm }: {
+  clusterId: string; item: HelmApproval; busy: boolean; onConfirm: (value: 'yes' | 'no') => void;
 }) {
   return <section className="k8s-helm-approval-detail" aria-label="审批详情">
     <dl>
@@ -79,6 +154,8 @@ function ApprovalDetails({ item, busy, onConfirm }: {
     </dl>
     <HelmResources items={item.resources} />
     {item.can_review && item.status === 'pending' && <DecisionForm busy={busy} onConfirm={onConfirm} />}
+    {item.status === 'approved' && item.can_rehearse === true &&
+      <AdmissionRehearsal key={`${clusterId}:${item.id}`} clusterId={clusterId} approvalId={item.id} disabled={busy} />}
   </section>;
 }
 
@@ -154,7 +231,7 @@ export function KubernetesHelmApprovals({ clusterId, preview }: { clusterId: str
           <span>{item.release_name} · {item.namespace}</span>
           <Tag color={statuses[item.status].color}>{statuses[item.status].text}</Tag>
         </Button>
-        {selection === item.id && <ApprovalDetails item={item} busy={busy || loading || !!listError}
+        {selection === item.id && <ApprovalDetails clusterId={clusterId} item={item} busy={busy || loading || !!listError}
           onConfirm={(value) => { void change((signal) => decideHelmApproval(clusterId, item.id, value, signal)); }} />}
       </div>)}
       {data && data.total > PAGE_SIZE && <Pagination simple current={page} pageSize={PAGE_SIZE} total={data.total}

@@ -45,6 +45,11 @@ class Settings(BaseSettings):
     kubernetes_collection_workers_enabled: bool = True
     kubernetes_helm_trusted_charts: str = "[]"
     kubernetes_helm_binary: str = "helm"
+    kubernetes_helm_rehearsal_enabled: bool = False
+    kubernetes_helm_rehearsal_cluster_id: str = ""
+    kubernetes_helm_rehearsal_endpoint: str = ""
+    kubernetes_helm_rehearsal_namespace: str = ""
+    kubernetes_helm_rehearsal_credentials_dir: str = ""
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

@@ -54,6 +54,10 @@ class HelmPreview:
     resources: list[ResourceSummary]
 
 
+def render_chart(entry: ChartEntry, content: bytes, release: str, namespace: str, helm_bin: str) -> bytes:
+    return content if entry.manifest is not None else _render(content, release, namespace, helm_bin)
+
+
 def _catalog(raw: str) -> list[ChartEntry]:
     if not raw.strip():
         return []
@@ -91,11 +95,9 @@ def _loader() -> type[yaml.SafeLoader]:
     return Loader
 
 
-def summarize(manifest: bytes, namespace: str) -> list[ResourceSummary]:
+def load_documents(manifest: bytes) -> list[object]:
     if not manifest or len(manifest) > MAX_MANIFEST_BYTES:
         raise HelmPreviewError("Helm 渲染结果过大或为空")
-    if not NAME.fullmatch(namespace):
-        raise HelmPreviewError("命名空间格式无效")
     try:
         if any(isinstance(event, yaml.events.AliasEvent) for event in yaml.parse(manifest)):
             raise HelmPreviewError("Helm 渲染结果包含不允许的别名")
@@ -104,9 +106,15 @@ def summarize(manifest: bytes, namespace: str) -> list[ResourceSummary]:
         raise HelmPreviewError("Helm 渲染结果不是有效资源") from exc
     if len(documents) > MAX_DOCUMENTS:
         raise HelmPreviewError("Helm 渲染资源数量超过限制")
+    return documents
+
+
+def summarize(manifest: bytes, namespace: str) -> list[ResourceSummary]:
+    if not NAME.fullmatch(namespace):
+        raise HelmPreviewError("命名空间格式无效")
     result: list[ResourceSummary] = []
     seen: set[tuple[str, str, str]] = set()
-    for document in documents:
+    for document in load_documents(manifest):
         if document is None:
             continue
         if not isinstance(document, dict) or set(document) - {"apiVersion", "kind", "metadata", "spec", "data", "stringData"}:
@@ -187,5 +195,5 @@ def preview(raw: str, chart_id: str, digest: str, release: str, namespace: str, 
     if not NAME.fullmatch(release):
         raise HelmPreviewError("发布名称格式无效")
     entry, content, source_digest = verified_source(raw, chart_id, digest)
-    manifest = content if entry.manifest is not None else _render(content, release, namespace, helm_bin)
+    manifest = render_chart(entry, content, release, namespace, helm_bin)
     return HelmPreview(entry, source_digest, hashlib.sha256(manifest).hexdigest(), summarize(manifest, namespace))

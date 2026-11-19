@@ -10,6 +10,7 @@ from src.database import get_session
 from src.models.kubernetes_helm_approval import KubernetesHelmApproval
 from src.routes.kubernetes import SafeKubernetesRoute, _cluster, _error, _validate, require_real_admin
 from src.services import kubernetes_clusters, kubernetes_helm_approvals as approvals
+from src.services import kubernetes_helm_admission as admission
 from src.services.kubernetes_change_preflight import CHANGE_INPUT, Helm, Preflight, build_preflight
 from src.services.kubernetes_cluster_target_policy import KubernetesTargetPolicy
 from src.services.kubernetes_helm import HelmPreviewError, preview, public_catalog
@@ -69,7 +70,7 @@ def helm_preview(
 
 @router.get("/clusters/{cluster_id}/helm-approvals")
 def helm_approvals(
-    cluster_id: str, offset: int = Query(0, ge=0),
+    cluster_id: str, request: Request, offset: int = Query(0, ge=0),
     session: Session = Depends(get_session), principal: AuthPrincipal = Depends(require_real_admin),
 ) -> dict[str, object]:
     cluster = _cluster(session, cluster_id)
@@ -80,7 +81,12 @@ def helm_approvals(
     rows = session.scalars(query.order_by(
         KubernetesHelmApproval.submitted_at.desc(), KubernetesHelmApproval.id.desc(),
     ).offset(offset).limit(10)).all()
-    return {"items": [approvals.serialize(row, cluster, session, principal) for row in rows], "total": total}
+    settings = request.app.state.runtime_settings
+    return {"items": [
+        {**approvals.serialize(row, cluster, session, principal),
+         "can_rehearse": admission.visible(row, cluster, settings, principal, session)}
+        for row in rows
+    ], "total": total}
 
 
 @router.post("/clusters/{cluster_id}/helm-approvals", status_code=201)
@@ -103,6 +109,22 @@ def decide_helm_approval(
     payload = _validate(approvals.ApprovalDecision, body)
     try:
         return approvals.transition(session, cluster_id, approval_id, request.app.state.runtime_settings, principal, payload)
+    except kubernetes_clusters.KubernetesClusterError as error:
+        raise _error(session, error) from error
+
+
+@router.post("/clusters/{cluster_id}/helm-approvals/{approval_id}/admission-rehearsal")
+def rehearse_helm_admission(
+    cluster_id: str, approval_id: str, request: Request, body: object = Body(...),
+    session: Session = Depends(get_session), principal: AuthPrincipal = Depends(require_real_admin),
+) -> dict[str, object]:
+    payload = _validate(admission.RehearsalConfirmation, body)
+    if payload.confirmation != "yes":
+        raise HTTPException(status_code=422, detail="请输入 yes 确认演练")
+    try:
+        return admission.rehearse(
+            session, cluster_id, approval_id, request.app.state.runtime_settings, principal, str(uuid4()),
+        )
     except kubernetes_clusters.KubernetesClusterError as error:
         raise _error(session, error) from error
 

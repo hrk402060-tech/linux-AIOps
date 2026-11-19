@@ -40,9 +40,19 @@ export interface HelmApproval {
   expires_at: string;
   execution_available: false;
   can_review: boolean;
+  can_rehearse?: boolean;
 }
 
 export interface HelmApprovalList { items: HelmApproval[]; total: number }
+
+export interface HelmAdmissionResult {
+  trace_id: string;
+  status: 'passed' | 'failed';
+  execution_available: false;
+  checked: number;
+  total: number;
+  error_code: string | null;
+}
 
 export interface ChangePreflight {
   trace_id: string;
@@ -102,4 +112,12 @@ export function decideHelmApproval(
   return request(`${approvalEndpoint(clusterId)}/${encodeURIComponent(approvalId)}/decision`, {
     method: 'POST', body: JSON.stringify({ confirmation }), signal,
   }, 'Helm 审批确认失败');
+}
+
+export function runHelmAdmissionRehearsal(
+  clusterId: string, approvalId: string, signal?: AbortSignal,
+): Promise<HelmAdmissionResult> {
+  return request(`${approvalEndpoint(clusterId)}/${encodeURIComponent(approvalId)}/admission-rehearsal`, {
+    method: 'POST', body: JSON.stringify({ confirmation: 'yes' }), signal,
+  }, '准入演练请求失败', 45_000);
 }

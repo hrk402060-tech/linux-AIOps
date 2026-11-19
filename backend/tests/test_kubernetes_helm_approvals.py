@@ -26,14 +26,14 @@ def configure(client: TestClient, manifest: str = MANIFEST) -> str:
     return digest
 
 
-def prepare(client: TestClient, *, seed: bool = True) -> tuple[str, dict]:
+def prepare(client: TestClient, *, seed: bool = True, namespace: str = "demo") -> tuple[str, dict]:
     cluster = create(client)
     url = f"{BASE}/clusters/{cluster['id']}"
     if seed:
         seed_snapshot(client, url)
     response = client.post(f"{url}/helm-preview", json={
         "expected_revision": cluster["revision"], "chart_id": "demo-1", "chart_digest": configure(client),
-        "namespace": "demo", "release_name": "demo",
+        "namespace": namespace, "release_name": "demo",
     })
     assert response.status_code == 200, response.text
     assert "synthetic-value" not in response.text
@@ -74,7 +74,7 @@ def test_two_admins_decide_once_without_execution(kclient: TestClient, confirmat
     assert result["chart"] == preview["chart"] and result["resources"] == preview["resources"]
     assert "synthetic-value" not in response.text and "manifest_digest" not in result
     assert kclient.post(decision, json={"confirmation": confirmation}).status_code == 409
-    assert kclient.get(f"{url}/helm-approvals").json()["items"] == [result]
+    assert kclient.get(f"{url}/helm-approvals").json()["items"] == [{**result, "can_rehearse": False}]
     with kclient.app.state.session_factory() as session:
         assert session.scalar(select(KubernetesClusterAudit).where(
             KubernetesClusterAudit.trace_id == result["id"], KubernetesClusterAudit.outcome == expected,

@@ -5,6 +5,7 @@ import io
 import ipaddress
 import json
 import os
+import re
 import socket
 import ssl
 import tempfile
@@ -233,9 +234,24 @@ def request_json(
     return _request_json(parsed, path, budget, payload)
 
 
+def dry_run_configmap(
+    parsed: ParsedKubeconfig, namespace: str, payload: dict[str, object], budget: RequestBudget,
+) -> None:
+    if not re.fullmatch(r"helm-lab-[a-z0-9](?:[a-z0-9-]{0,52}[a-z0-9])?", namespace):
+        raise KubernetesConnectionError("path_rejected", "演练命名空间无效")
+    path = f"/api/v1/namespaces/{namespace}/configmaps?dryRun=All&fieldValidation=Strict"
+    value, _ = _request_json(parsed, path, budget, payload, admission_rehearsal=True)
+    metadata = value.get("metadata")
+    expected = payload.get("metadata")
+    if (value.get("kind") != "ConfigMap" or not isinstance(metadata, dict) or not isinstance(expected, dict)
+            or metadata.get("name") != expected.get("name") or metadata.get("namespace") != namespace):
+        raise KubernetesConnectionError("invalid_response", "准入演练结果格式无效")
+
+
 def _request_json(
     parsed: ParsedKubeconfig, path: str, budget: RequestBudget,
     payload: dict[str, object] | None = None,
+    *, admission_rehearsal: bool = False,
 ) -> tuple[dict[str, object], datetime | None]:
     connection: _PinnedHTTPSConnection | None = None
     try:
@@ -246,7 +262,7 @@ def _request_json(
         _load_client_certificate(context, parsed.client_cert_pem, parsed.client_key_pem)
         addresses = _resolve_addresses(url.hostname or "", url.port or 443, budget)
         connection = _PinnedHTTPSConnection(url.hostname or "", url.port or 443, addresses[0], budget, context)
-        return _exchange(connection, parsed, path, budget, payload)
+        return _exchange(connection, parsed, path, budget, payload, admission_rehearsal)
     except KubernetesConnectionError:
         raise
     except KubernetesTargetPolicyError as exc:
@@ -270,7 +286,7 @@ def _request_json(
 
 def _exchange(
     connection: _PinnedHTTPSConnection, parsed: ParsedKubeconfig, path: str,
-    budget: RequestBudget, payload: dict[str, object] | None,
+    budget: RequestBudget, payload: dict[str, object] | None, admission_rehearsal: bool = False,
 ) -> tuple[dict[str, object], datetime | None]:
     headers = {"Accept": "application/json", "Accept-Encoding": "identity"}
     if parsed.token:
@@ -282,6 +298,9 @@ def _exchange(
     budget.remaining()
     connection.request("GET" if payload is None else "POST", path, body=body, headers=headers)
     response = connection.getresponse()
+    if admission_rehearsal and response.status in {400, 409, 422}:
+        code = "admission_conflict" if response.status == 409 else "admission_invalid"
+        raise KubernetesConnectionError(code, "API Server 未通过资源准入检查")
     peer = connection.peer_certificate
     expiry = x509.load_der_x509_certificate(peer).not_valid_after_utc if peer else None
     _check_status(response.status, review=payload is not None)

@@ -520,4 +520,21 @@ Helm 入口只接受管理员从服务端受信目录选择的 Chart。`KUBERNET
 通过基础预检的 Helm 预览 10 分钟内可由原发起人提交审批申请。另一位已登录的管理员须在
 30 分钟内输入 `yes` 批准或 `no` 拒绝。审批详情只有受信 Chart 元数据和资源名称，不含
 kubeconfig、渲染清单或 values；申请原因不要填写密码、令牌等信息。集群配置、目标策略或
-受信 Chart 已变化时，旧预览不能提交或批准。批准仅记录人工决定；此版本没有执行、验证或回滚接口。
+受信 Chart 已变化时，旧预览不能提交或批准。批准仅记录人工决定，不直接执行。
+
+### Helm 隔离准入演练
+
+演练默认关闭，仅在独立实验集群配置。用 `KUBERNETES_HELM_REHEARSAL_CLUSTER_ID`、`KUBERNETES_HELM_REHEARSAL_ENDPOINT`
+和 `KUBERNETES_HELM_REHEARSAL_NAMESPACE` 固定资产 ID、注册时的 HTTPS 地址及单一 `helm-lab-*` 命名空间。
+端点仍须处于 Kubernetes 目标允许范围。将站点准备的 `token` 与 `ca.crt` 只读挂载给后端，
+`KUBERNETES_HELM_REHEARSAL_CREDENTIALS_DIR` 填容器内绝对路径；不要放入镜像、源码或 `.env`。
+完成隔离配置后才将 `KUBERNETES_HELM_REHEARSAL_ENABLED` 设为 `true`。
+
+使用该命名空间内名为 `linux-ops-helm-rehearsal` 的独立 ServiceAccount 和短期令牌。通过同命名空间的
+Role/RoleBinding 仅授予核心 API 组 `configmaps` 的 `create`；身份核验须可调用 `SelfSubjectReview`。
+不要授予集群管理、其他命名空间或工作负载权限，也不要复用只读采集凭据。Kubernetes 对 dry-run 与实际创建
+执行相同的权限检查，故该令牌不得用于生产或交给其他调用方。
+
+由未过期审批的发起人或复核人在审批详情输入 `yes`。演练重新校验 Chart 来源、完整渲染哈希、审批权限和目标配置，
+对最多 8 个 `v1 ConfigMap` 发送 `dryRun=All` 与 `fieldValidation=Strict`。页面返回检查数和审计编号，
+不暴露上游正文。通过只表示本次准入验证成功且未部署，不代表 Helm 发布、服务就绪或回滚可用。

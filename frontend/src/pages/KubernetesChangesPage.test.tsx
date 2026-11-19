@@ -1,11 +1,12 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getKubernetesClusters, type KubernetesCluster } from '../api/kubernetes';
 import {
   checkKubernetesChange, decideHelmApproval, getHelmApprovals, getHelmCharts, previewHelmChange,
-  submitHelmApproval, type HelmApproval,
+  runHelmAdmissionRehearsal, submitHelmApproval, type HelmAdmissionResult, type HelmApproval,
 } from '../api/kubernetesChanges';
 import { KubernetesChangesPage } from './KubernetesChangesPage';
+import { KubernetesHelmApprovals } from './KubernetesHelmApprovals';
 
 vi.mock('../api/kubernetes', async (importOriginal) => ({
   ...await importOriginal<typeof import('../api/kubernetes')>(), getKubernetesClusters: vi.fn(),
@@ -13,6 +14,7 @@ vi.mock('../api/kubernetes', async (importOriginal) => ({
 vi.mock('../api/kubernetesChanges', () => ({
   checkKubernetesChange: vi.fn(), getHelmCharts: vi.fn(), previewHelmChange: vi.fn(),
   getHelmApprovals: vi.fn(), submitHelmApproval: vi.fn(), decideHelmApproval: vi.fn(),
+  runHelmAdmissionRehearsal: vi.fn(),
 }));
 
 const target = { id: 'test-cluster', name: '测试集群', revision: 5 } as KubernetesCluster;
@@ -132,4 +134,95 @@ describe('Kubernetes change preflight', () => {
       expect(within(details).queryByRole('textbox', { name: '确认意见' })).not.toBeInTheDocument();
     },
   );
+});
+
+describe('Helm admission rehearsal', () => {
+  async function openApproval(overrides: Partial<HelmApproval>, additional: HelmApproval[] = []) {
+    vi.clearAllMocks();
+    const item: HelmApproval = { ...approval, status: 'approved', can_review: false, ...overrides };
+    vi.mocked(getHelmApprovals).mockResolvedValue({ items: [item, ...additional], total: additional.length + 1 });
+    render(<KubernetesHelmApprovals clusterId={target.id} />);
+    fireEvent.click(await screen.findByRole('button', { name: '查看审批：demo' }));
+  }
+
+  it('does not expose rehearsal on unavailable or unapproved records', async () => {
+    await openApproval({ status: 'pending', can_rehearse: true });
+    expect(screen.queryByRole('button', { name: '运行准入演练' })).not.toBeInTheDocument();
+    expect(runHelmAdmissionRehearsal).not.toHaveBeenCalled();
+  });
+
+  it('does not expose rehearsal without the server capability', async () => {
+    await openApproval({ can_rehearse: false });
+    expect(screen.queryByRole('button', { name: '运行准入演练' })).not.toBeInTheDocument();
+  });
+
+  it('requires exact confirmation and displays the non-deploying result', async () => {
+    await openApproval({ can_rehearse: true });
+    let finish: (result: HelmAdmissionResult) => void = () => undefined;
+    vi.mocked(runHelmAdmissionRehearsal).mockReturnValue(new Promise((resolve) => { finish = resolve; }));
+    const panel = screen.getByRole('region', { name: '准入演练' });
+    const input = within(panel).getByRole('textbox', { name: '确认演练' });
+    const submit = within(panel).getByRole('button', { name: '运行准入演练' });
+    fireEvent.change(input, { target: { value: 'YES' } });
+    expect(submit).toBeDisabled();
+    fireEvent.change(input, { target: { value: ' yes ' } });
+    fireEvent.click(submit);
+    fireEvent.click(submit);
+    expect(runHelmAdmissionRehearsal).toHaveBeenCalledTimes(1);
+    expect(runHelmAdmissionRehearsal).toHaveBeenCalledWith(target.id, approval.id, expect.any(AbortSignal));
+    expect(input).toBeDisabled();
+    finish({ status: 'passed', execution_available: false, checked: 1, total: 1, error_code: null, trace_id: 'lab-trace' });
+    expect(await within(panel).findByText('准入演练通过 · 未部署')).toBeVisible();
+    expect(within(panel).getByText(/lab-trace/)).toBeVisible();
+    expect(input).toHaveValue('');
+  });
+
+  it.each([
+    ['upstream_forbidden', '测试身份缺少所需权限'],
+    ['untrusted upstream content', '准入演练未通过'],
+  ])('presents rehearsal rejection using safe localized text (%s)', async (error_code, message) => {
+    await openApproval({ can_rehearse: true });
+    vi.mocked(runHelmAdmissionRehearsal).mockResolvedValue({
+      status: 'failed', execution_available: false, checked: 0, total: 1, error_code, trace_id: 'lab-trace',
+    });
+    const panel = screen.getByRole('region', { name: '准入演练' });
+    fireEvent.change(within(panel).getByRole('textbox', { name: '确认演练' }), { target: { value: 'yes' } });
+    fireEvent.click(within(panel).getByRole('button', { name: '运行准入演练' }));
+    expect(await within(panel).findByText('准入演练失败 · 未部署')).toBeVisible();
+    expect(within(panel).getByText(message)).toBeVisible();
+    expect(within(panel).queryByText(error_code)).not.toBeInTheDocument();
+  });
+
+  it('aborts on selection changes and never displays the previous approval response', async () => {
+    const other: HelmApproval = {
+      ...approval, id: 'other-approval', release_name: 'other', status: 'approved', can_rehearse: true,
+    };
+    await openApproval({ can_rehearse: true }, [other]);
+    let finish: (result: HelmAdmissionResult) => void = () => undefined;
+    vi.mocked(runHelmAdmissionRehearsal).mockReturnValue(new Promise((resolve) => { finish = resolve; }));
+    const panel = screen.getByRole('region', { name: '准入演练' });
+    fireEvent.change(within(panel).getByRole('textbox', { name: '确认演练' }), { target: { value: 'yes' } });
+    fireEvent.click(within(panel).getByRole('button', { name: '运行准入演练' }));
+    const signal = vi.mocked(runHelmAdmissionRehearsal).mock.calls[0][2];
+
+    fireEvent.click(screen.getByRole('button', { name: '查看审批：other' }));
+    expect(signal?.aborted).toBe(true);
+    await act(async () => finish({
+      status: 'passed', execution_available: false, checked: 1, total: 1, error_code: null, trace_id: 'obsolete-trace',
+    }));
+    expect(screen.queryByText(/obsolete-trace/)).not.toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: '确认演练' })).toHaveValue('');
+  });
+
+  it('does not display request error details and keeps the confirmation for retry', async () => {
+    await openApproval({ can_rehearse: true });
+    vi.mocked(runHelmAdmissionRehearsal).mockRejectedValue(new Error('private upstream metadata'));
+    const panel = screen.getByRole('region', { name: '准入演练' });
+    const input = within(panel).getByRole('textbox', { name: '确认演练' });
+    fireEvent.change(input, { target: { value: 'yes' } });
+    fireEvent.click(within(panel).getByRole('button', { name: '运行准入演练' }));
+    expect(await within(panel).findByText('准入演练请求失败，请刷新审批记录后重试')).toBeVisible();
+    expect(within(panel).queryByText('private upstream metadata')).not.toBeInTheDocument();
+    expect(input).toHaveValue('yes');
+  });
 });
