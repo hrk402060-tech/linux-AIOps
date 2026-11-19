@@ -43,6 +43,8 @@ class Settings(BaseSettings):
     kubernetes_api_allowed_cidrs: str = ""
     kubernetes_api_denied_cidrs: str = ""
     kubernetes_collection_workers_enabled: bool = True
+    kubernetes_helm_trusted_charts: str = "[]"
+    kubernetes_helm_binary: str = "helm"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

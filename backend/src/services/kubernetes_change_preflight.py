@@ -45,6 +45,7 @@ class Helm(ChangeInput):
     action: Literal["helm"]
     namespace: DnsLabel
     release_name: ReleaseName
+    chart_id: str = Field(min_length=1, max_length=100, pattern=r"^[a-z0-9][a-z0-9.-]{0,98}[a-z0-9]$")
     chart_digest: ChartDigest
 
 

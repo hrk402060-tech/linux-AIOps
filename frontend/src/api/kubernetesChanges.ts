@@ -5,7 +5,19 @@ export type ChangeParameters =
   | { action: 'upgrade'; target_version: string }
   | { action: 'backup'; namespace: string }
   | { action: 'restore'; namespace: string; backup_name: string }
-  | { action: 'helm'; namespace: string; release_name: string; chart_digest: string };
+  | { action: 'helm'; namespace: string; release_name: string; chart_id: string; chart_digest: string };
+
+export interface HelmChart {
+  id: string; name: string; version: string; digest: string;
+}
+export interface HelmCatalog { enabled: boolean; charts: HelmChart[] }
+export interface HelmPreview {
+  preflight: ChangePreflight;
+  chart: HelmChart;
+  release_name: string;
+  namespace: string;
+  resources: Array<{ api_version: string; kind: string; namespace: string; name: string }>;
+}
 
 export interface ChangePreflight {
   trace_id: string;
@@ -27,4 +39,18 @@ export function checkKubernetesChange(
   return request(`/api/v1/kubernetes/clusters/${encodeURIComponent(clusterId)}/change-preflight`, {
     method: 'POST', body: JSON.stringify({ ...change, expected_revision: revision }), signal,
   }, '集群变更预检失败');
+}
+
+export function getHelmCharts(signal?: AbortSignal): Promise<HelmCatalog> {
+  return request('/api/v1/kubernetes/helm-charts', { signal }, 'Helm Chart 目录读取失败');
+}
+
+export function previewHelmChange(
+  clusterId: string, revision: number,
+  change: Omit<Extract<ChangeParameters, { action: 'helm' }>, 'action'>,
+  signal?: AbortSignal,
+): Promise<HelmPreview> {
+  return request(`/api/v1/kubernetes/clusters/${encodeURIComponent(clusterId)}/helm-preview`, {
+    method: 'POST', body: JSON.stringify({ ...change, expected_revision: revision }), signal,
+  }, 'Helm 预览失败');
 }

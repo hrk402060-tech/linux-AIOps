@@ -30,7 +30,7 @@ def seed_snapshot(kclient: TestClient, url: str, age: int = 0) -> None:
     ("upgrade", {"target_version": "v1.32.1"}),
     ("backup", {"namespace": "payments"}),
     ("restore", {"backup_name": "payments-1", "namespace": "recovery"}),
-    ("helm", {"release_name": "payments", "namespace": "payments", "chart_digest": "sha256:" + "a" * 64}),
+    ("helm", {"release_name": "payments", "namespace": "payments", "chart_id": "demo-1", "chart_digest": "sha256:" + "a" * 64}),
 ])
 def test_preflight_is_advisory_and_audited(kclient: TestClient, action: str, parameters: dict) -> None:
     cluster = create(kclient)

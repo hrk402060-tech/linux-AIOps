@@ -2,12 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 import { Alert, Button, Form, Input, InputNumber, Pagination, Select, Space, Tag, Tooltip } from 'antd';
 import { ListChecks, RefreshCw } from 'lucide-react';
 import { getKubernetesClusters, kubernetesRequestError, type KubernetesCluster } from '../api/kubernetes';
-import { checkKubernetesChange, type ChangeParameters, type ChangePreflight } from '../api/kubernetesChanges';
+import { checkKubernetesChange, getHelmCharts, previewHelmChange, type ChangeParameters, type ChangePreflight, type HelmChart } from '../api/kubernetesChanges';
 import './kubernetesChanges.css';
 
 type Action = ChangeParameters['action'];
 type ChangeFields = { additional_nodes?: number; target_version?: string; namespace?: string;
-  backup_name?: string; release_name?: string; chart_digest?: string };
+  backup_name?: string; release_name?: string; chart_id?: string; chart_digest?: string };
 
 const PAGE_SIZE = 50;
 const actions: Array<{ value: Action; label: string }> = [
@@ -29,7 +29,7 @@ function parameters(action: Action, fields: ChangeFields): ChangeParameters {
     case 'backup': return { action, namespace };
     case 'restore': return { action, namespace, backup_name: fields.backup_name?.trim() ?? '' };
     case 'helm': return { action, namespace, release_name: fields.release_name?.trim() ?? '',
-      chart_digest: fields.chart_digest?.trim() ?? '' };
+      chart_id: fields.chart_id?.trim() ?? '', chart_digest: fields.chart_digest?.trim() ?? '' };
   }
 }
 
@@ -53,7 +53,6 @@ function ChangeInputs({ action }: { action: Action }) {
     {action === 'restore' && <TextField name="backup_name" label="备份名称" maxLength={63} pattern={labelPattern} />}
     {action === 'helm' && <>
       <TextField name="release_name" label="发布名称" maxLength={53} pattern={labelPattern} />
-      <TextField name="chart_digest" label="Chart SHA-256 摘要" maxLength={71} pattern={/^sha256:[0-9a-f]{64}$/} />
     </>}
   </>;
 }
@@ -89,6 +88,9 @@ export function KubernetesChangesPage({ initialCluster }: { initialCluster?: Kub
   const [listError, setListError] = useState('');
   const [error, setError] = useState('');
   const [result, setResult] = useState<ChangePreflight>();
+  const [helmPreview, setHelmPreview] = useState<Awaited<ReturnType<typeof previewHelmChange>>>();
+  const [helmCharts, setHelmCharts] = useState<HelmChart[]>([]);
+  const [helmEnabled, setHelmEnabled] = useState(false);
   const requestRef = useRef<AbortController>();
   const cluster = clusters.find((item) => item.id === clusterId);
 
@@ -109,7 +111,16 @@ export function KubernetesChangesPage({ initialCluster }: { initialCluster?: Kub
   }, [page, reload]);
   useEffect(() => () => requestRef.current?.abort(), []);
 
-  function clearResult() { setResult(undefined); setError(''); }
+  function clearResult() { setResult(undefined); setHelmPreview(undefined); setError(''); }
+
+  useEffect(() => {
+    if (action !== 'helm') return;
+    const controller = new AbortController();
+    getHelmCharts(controller.signal).then((catalog) => {
+      if (!controller.signal.aborted) { setHelmCharts(catalog.charts); setHelmEnabled(catalog.enabled); }
+    }).catch((reason: unknown) => { if (!controller.signal.aborted) setError(kubernetesRequestError(reason)); });
+    return () => controller.abort();
+  }, [action]);
 
   async function run(fields: ChangeFields) {
     if (!cluster || requestRef.current || loading || listError) return;
@@ -118,8 +129,15 @@ export function KubernetesChangesPage({ initialCluster }: { initialCluster?: Kub
     clearResult();
     setBusy(true);
     try {
-      const value = await checkKubernetesChange(cluster.id, cluster.revision, parameters(action, fields), controller.signal);
-      if (!controller.signal.aborted) setResult(value);
+      if (action === 'helm') {
+        const value = await previewHelmChange(cluster.id, cluster.revision,
+          { chart_id: fields.chart_id?.trim() ?? '', chart_digest: helmCharts.find((chart) => chart.id === fields.chart_id)?.digest ?? '',
+            namespace: fields.namespace?.trim() ?? '', release_name: fields.release_name?.trim() ?? '' }, controller.signal);
+        if (!controller.signal.aborted) { setHelmPreview(value); setResult(value.preflight); }
+      } else {
+        const value = await checkKubernetesChange(cluster.id, cluster.revision, parameters(action, fields), controller.signal);
+        if (!controller.signal.aborted) setResult(value);
+      }
     } catch (reason) {
       if (!controller.signal.aborted) setError(kubernetesRequestError(reason));
     } finally {
@@ -145,11 +163,25 @@ export function KubernetesChangesPage({ initialCluster }: { initialCluster?: Kub
         onChange={(value) => { clearResult(); setPage(value); }} />}
     </Space>
     <Form form={form} layout="vertical" preserve={false} disabled={busy} onValuesChange={clearResult} onFinish={run}>
-      <div className="k8s-preflight-fields" key={action}><ChangeInputs action={action} /></div>
+      <div className="k8s-preflight-fields" key={action}><ChangeInputs action={action} />{action === 'helm' && <Form.Item noStyle shouldUpdate>
+        {() => <>
+        <Form.Item name="chart_id" label="受信 Chart" rules={[{ required: true, message: '请选择受信 Chart' }]}>
+          <Select aria-label="受信 Chart" disabled={!helmEnabled} placeholder={helmEnabled ? '选择已登记版本' : '未启用受信 Chart'}
+            options={helmCharts.map((chart) => ({ label: `${chart.name} · ${chart.version}`, value: chart.id,
+              digest: chart.digest }))}
+            />
+        </Form.Item></>}
+      </Form.Item>}</div>
       <Button type="primary" htmlType="submit" icon={<ListChecks size={16} />}
         disabled={!cluster || loading || !!listError} loading={busy}>运行预检</Button>
     </Form>
     {error && <Alert type="error" showIcon message={error} />}
     {result && <PreflightResult result={result} />}
+    {helmPreview && <section className="k8s-helm-resources" aria-label="Helm 资源预览">
+      <h3>资源预览 · {helmPreview.chart.name} {helmPreview.chart.version}</h3>
+      <ul>{helmPreview.resources.map((item) => <li key={`${item.api_version}:${item.kind}:${item.namespace}:${item.name}`}>
+        <Tag>{item.kind}</Tag><span>{item.namespace}/{item.name}</span><small>{item.api_version}</small>
+      </li>)}</ul>
+    </section>}
   </section>;
 }

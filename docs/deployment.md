@@ -507,3 +507,11 @@ Diagnostic API contract:
 - Mid-collection authorization loss uses `diagnostic_authorization_interrupted`, retaining accepted evidence and attempted revision. Absence of accepted output does not prove no read was sent. Root cause, successful repair and verified recovery must never be inferred from a completed read.
 
 Migration `20261007_30` adds only the encrypted grant and append-only audit tables after `20261004_29`, with asset history protected by RESTRICT foreign keys. PM authorized production publication on October 7, 2026; schema30 and authenticated read-only endpoints are live at `http://192.168.10.17:8088/`. The gateway was tested in isolated Docker, not installed on production targets; target administrators still need to install and authorize it. No diagnostic grants or DEMO evidence were imported into production. Browser visual acceptance remains unverified due to tooling security policy.
+
+### Helm 变更预览
+
+Helm 入口只接受管理员从服务端受信目录选择的 Chart。`KUBERNETES_HELM_TRUSTED_CHARTS`
+是 JSON 数组，每项至少包含 `id`、`name`、`version`、`digest` 和 `manifest`（或绝对路径
+`chart_path`）。摘要必须是 `sha256:<64位小写十六进制>`。预览在应用服务器本地执行，
+不携带集群 kubeconfig、不访问网络，只返回允许资源的摘要；目录为空时功能保持关闭。
+预览不代表配额、对象冲突、准入策略或运行时就绪检查通过，也不会创建、更新或删除集群对象。

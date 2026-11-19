@@ -10,3 +10,9 @@
 .k8s-preflight-result dd { margin: 2px 0 0; overflow-wrap: anywhere; }
 .k8s-preflight-result ul { margin: 0; padding: 0; list-style: none; }
 .k8s-preflight-result li { display: flex; align-items: baseline; gap: 8px; padding: 8px 0; border-top: 1px solid #e5e9e7; }
+.k8s-helm-resources { border-top: 1px solid #e5e9e7; padding-top: 12px; }
+.k8s-helm-resources h3 { margin: 0 0 8px; font-size: 15px; }
+.k8s-helm-resources ul { list-style: none; margin: 0; padding: 0; }
+.k8s-helm-resources li { display: flex; align-items: center; gap: 8px; border-top: 1px solid #eef1ef; padding: 7px 0; }
+.k8s-helm-resources li span { overflow-wrap: anywhere; }
+.k8s-helm-resources li small { color: #69746f; margin-left: auto; }
