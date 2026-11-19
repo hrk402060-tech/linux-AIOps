@@ -538,3 +538,9 @@ Role/RoleBinding 仅授予核心 API 组 `configmaps` 的 `create`；身份核�
 由未过期审批的发起人或复核人在审批详情输入 `yes`。演练重新校验 Chart 来源、完整渲染哈希、审批权限和目标配置，
 对最多 8 个 `v1 ConfigMap` 发送 `dryRun=All` 与 `fieldValidation=Strict`。页面返回检查数和审计编号，
 不暴露上游正文。通过只表示本次准入验证成功且未部署，不代表 Helm 发布、服务就绪或回滚可用。
+
+隔离执行默认关闭，只有在独立实验集群另行配置 `KUBERNETES_HELM_EXECUTION_*` 后才会出现执行入口。
+执行身份 `linux-ops-helm-executor` 只允许目标命名空间内 ConfigMap 的创建、读取和删除；它不复用采集或演练令牌。
+执行前重新验证审批参与人、集群修订、Chart 摘要、目标策略和完整渲染结果。当前候选只支持最多 8 个 ConfigMap：
+创建后逐个读取验证，任一失败只删除本次已创建且已确认名称的资源，并记录回滚结果。成功、回滚和回滚失败均写入脱敏审计。
+这不是通用 Helm 发布器，不支持工作负载、Service、Secret、升级、删除已有资源或生产集群；生产保持关闭。

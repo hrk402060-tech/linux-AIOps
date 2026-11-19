@@ -11,6 +11,7 @@ from src.models.kubernetes_helm_approval import KubernetesHelmApproval
 from src.routes.kubernetes import SafeKubernetesRoute, _cluster, _error, _validate, require_real_admin
 from src.services import kubernetes_clusters, kubernetes_helm_approvals as approvals
 from src.services import kubernetes_helm_admission as admission
+from src.services import kubernetes_helm_execution as execution
 from src.services.kubernetes_change_preflight import CHANGE_INPUT, Helm, Preflight, build_preflight
 from src.services.kubernetes_cluster_target_policy import KubernetesTargetPolicy
 from src.services.kubernetes_helm import HelmPreviewError, preview, public_catalog
@@ -84,7 +85,8 @@ def helm_approvals(
     settings = request.app.state.runtime_settings
     return {"items": [
         {**approvals.serialize(row, cluster, session, principal),
-         "can_rehearse": admission.visible(row, cluster, settings, principal, session)}
+         "can_rehearse": admission.visible(row, cluster, settings, principal, session),
+         "can_execute": execution.visible(row, cluster, settings, principal, session)}
         for row in rows
     ], "total": total}
 
@@ -123,6 +125,22 @@ def rehearse_helm_admission(
         raise HTTPException(status_code=422, detail="请输入 yes 确认演练")
     try:
         return admission.rehearse(
+            session, cluster_id, approval_id, request.app.state.runtime_settings, principal, str(uuid4()),
+        )
+    except kubernetes_clusters.KubernetesClusterError as error:
+        raise _error(session, error) from error
+
+
+@router.post("/clusters/{cluster_id}/helm-approvals/{approval_id}/execute")
+def execute_helm_approval(
+    cluster_id: str, approval_id: str, request: Request, body: object = Body(...),
+    session: Session = Depends(get_session), principal: AuthPrincipal = Depends(require_real_admin),
+) -> dict[str, object]:
+    payload = _validate(execution.ExecutionConfirmation, body)
+    if payload.confirmation != "yes":
+        raise HTTPException(status_code=422, detail="请输入 yes 确认执行")
+    try:
+        return execution.execute(
             session, cluster_id, approval_id, request.app.state.runtime_settings, principal, str(uuid4()),
         )
     except kubernetes_clusters.KubernetesClusterError as error:

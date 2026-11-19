@@ -3,7 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getKubernetesClusters, type KubernetesCluster } from '../api/kubernetes';
 import {
   checkKubernetesChange, decideHelmApproval, getHelmApprovals, getHelmCharts, previewHelmChange,
-  runHelmAdmissionRehearsal, submitHelmApproval, type HelmAdmissionResult, type HelmApproval,
+  executeHelmApproval, runHelmAdmissionRehearsal, submitHelmApproval, type HelmAdmissionResult,
+  type HelmApproval,
 } from '../api/kubernetesChanges';
 import { KubernetesChangesPage } from './KubernetesChangesPage';
 import { KubernetesHelmApprovals } from './KubernetesHelmApprovals';
@@ -14,7 +15,7 @@ vi.mock('../api/kubernetes', async (importOriginal) => ({
 vi.mock('../api/kubernetesChanges', () => ({
   checkKubernetesChange: vi.fn(), getHelmCharts: vi.fn(), previewHelmChange: vi.fn(),
   getHelmApprovals: vi.fn(), submitHelmApproval: vi.fn(), decideHelmApproval: vi.fn(),
-  runHelmAdmissionRehearsal: vi.fn(),
+  runHelmAdmissionRehearsal: vi.fn(), executeHelmApproval: vi.fn(),
 }));
 
 const target = { id: 'test-cluster', name: '测试集群', revision: 5 } as KubernetesCluster;
@@ -224,5 +225,41 @@ describe('Helm admission rehearsal', () => {
     expect(await within(panel).findByText('准入演练请求失败，请刷新审批记录后重试')).toBeVisible();
     expect(within(panel).queryByText('private upstream metadata')).not.toBeInTheDocument();
     expect(input).toHaveValue('yes');
+  });
+});
+
+describe('Helm isolated execution', () => {
+  it('requires server capability and displays successful validation', async () => {
+    vi.clearAllMocks();
+    vi.mocked(getHelmApprovals).mockResolvedValue({
+      items: [{ ...approval, status: 'approved', can_review: false, can_execute: true }],
+      total: 1,
+    });
+    vi.mocked(executeHelmApproval).mockResolvedValue({
+      trace_id: 'exec-trace', status: 'succeeded', execution_available: true,
+      created: 1, validated: 1, rollback: 'not_needed', error_code: null,
+    });
+    render(<KubernetesHelmApprovals clusterId={target.id} />);
+    fireEvent.click(await screen.findByRole('button', { name: '查看审批：demo' }));
+    const panel = screen.getByRole('region', { name: '隔离执行' });
+    const input = within(panel).getByRole('textbox', { name: '确认执行' });
+    const submit = within(panel).getByRole('button', { name: '执行' });
+    expect(submit).toBeDisabled();
+    fireEvent.change(input, { target: { value: 'yes' } });
+    fireEvent.click(submit);
+    expect(await within(panel).findByText('隔离执行完成')).toBeVisible();
+    expect(within(panel).getByText(/exec-trace/)).toBeVisible();
+    expect(executeHelmApproval).toHaveBeenCalledWith(target.id, approval.id, expect.any(AbortSignal));
+  });
+
+  it('does not show execution without server capability', async () => {
+    vi.clearAllMocks();
+    vi.mocked(getHelmApprovals).mockResolvedValue({
+      items: [{ ...approval, status: 'approved', can_review: false, can_execute: false }],
+      total: 1,
+    });
+    render(<KubernetesHelmApprovals clusterId={target.id} />);
+    fireEvent.click(await screen.findByRole('button', { name: '查看审批：demo' }));
+    expect(screen.queryByRole('region', { name: '隔离执行' })).not.toBeInTheDocument();
   });
 });

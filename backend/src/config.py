@@ -50,6 +50,11 @@ class Settings(BaseSettings):
     kubernetes_helm_rehearsal_endpoint: str = ""
     kubernetes_helm_rehearsal_namespace: str = ""
     kubernetes_helm_rehearsal_credentials_dir: str = ""
+    kubernetes_helm_execution_enabled: bool = False
+    kubernetes_helm_execution_cluster_id: str = ""
+    kubernetes_helm_execution_endpoint: str = ""
+    kubernetes_helm_execution_namespace: str = ""
+    kubernetes_helm_execution_credentials_dir: str = ""
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

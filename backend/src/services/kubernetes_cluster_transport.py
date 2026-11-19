@@ -248,10 +248,45 @@ def dry_run_configmap(
         raise KubernetesConnectionError("invalid_response", "准入演练结果格式无效")
 
 
+def _resource_path(namespace: str, name: str) -> str:
+    if not re.fullmatch(r"helm-lab-[a-z0-9](?:[a-z0-9-]{0,52}[a-z0-9])?", namespace):
+        raise KubernetesConnectionError("path_rejected", "执行命名空间无效")
+    if not re.fullmatch(r"[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?", name):
+        raise KubernetesConnectionError("path_rejected", "执行资源名称无效")
+    return f"/api/v1/namespaces/{namespace}/configmaps/{name}"
+
+
+def create_configmap(
+    parsed: ParsedKubeconfig, namespace: str, payload: dict[str, object], budget: RequestBudget,
+) -> dict[str, object]:
+    path = f"/api/v1/namespaces/{namespace}/configmaps"
+    metadata = payload.get("metadata")
+    name = metadata.get("name") if isinstance(metadata, dict) else None
+    if not isinstance(name, str):
+        raise KubernetesConnectionError("path_rejected", "执行资源名称无效")
+    _resource_path(namespace, name)
+    value, _ = _request_json(parsed, path, budget, payload, method="POST", accepted_statuses={200, 201})
+    return value
+
+
+def read_configmap(
+    parsed: ParsedKubeconfig, namespace: str, name: str, budget: RequestBudget,
+) -> dict[str, object]:
+    value, _ = _request_json(parsed, _resource_path(namespace, name), budget, method="GET", accepted_statuses={200})
+    return value
+
+
+def delete_configmap(
+    parsed: ParsedKubeconfig, namespace: str, name: str, budget: RequestBudget,
+) -> None:
+    _request_json(parsed, _resource_path(namespace, name), budget, method="DELETE", accepted_statuses={200, 202, 404})
+
+
 def _request_json(
     parsed: ParsedKubeconfig, path: str, budget: RequestBudget,
     payload: dict[str, object] | None = None,
-    *, admission_rehearsal: bool = False,
+    *, admission_rehearsal: bool = False, method: str | None = None,
+    accepted_statuses: set[int] | None = None,
 ) -> tuple[dict[str, object], datetime | None]:
     connection: _PinnedHTTPSConnection | None = None
     try:
@@ -262,7 +297,7 @@ def _request_json(
         _load_client_certificate(context, parsed.client_cert_pem, parsed.client_key_pem)
         addresses = _resolve_addresses(url.hostname or "", url.port or 443, budget)
         connection = _PinnedHTTPSConnection(url.hostname or "", url.port or 443, addresses[0], budget, context)
-        return _exchange(connection, parsed, path, budget, payload, admission_rehearsal)
+        return _exchange(connection, parsed, path, budget, payload, admission_rehearsal, method, accepted_statuses)
     except KubernetesConnectionError:
         raise
     except KubernetesTargetPolicyError as exc:
@@ -287,6 +322,7 @@ def _request_json(
 def _exchange(
     connection: _PinnedHTTPSConnection, parsed: ParsedKubeconfig, path: str,
     budget: RequestBudget, payload: dict[str, object] | None, admission_rehearsal: bool = False,
+    method: str | None = None, accepted_statuses: set[int] | None = None,
 ) -> tuple[dict[str, object], datetime | None]:
     headers = {"Accept": "application/json", "Accept-Encoding": "identity"}
     if parsed.token:
@@ -296,22 +332,22 @@ def _exchange(
         body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
         headers["Content-Type"] = "application/json"
     budget.remaining()
-    connection.request("GET" if payload is None else "POST", path, body=body, headers=headers)
+    connection.request(method or ("GET" if payload is None else "POST"), path, body=body, headers=headers)
     response = connection.getresponse()
     if admission_rehearsal and response.status in {400, 409, 422}:
         code = "admission_conflict" if response.status == 409 else "admission_invalid"
         raise KubernetesConnectionError(code, "API Server 未通过资源准入检查")
     peer = connection.peer_certificate
     expiry = x509.load_der_x509_certificate(peer).not_valid_after_utc if peer else None
-    _check_status(response.status, review=payload is not None)
+    _check_status(response.status, review=payload is not None, accepted_statuses=accepted_statuses)
     value = json.loads(_read_body(response, budget))
     if not isinstance(value, dict):
         raise KubernetesConnectionError("invalid_response", "集群响应必须为 JSON 对象")
     return value, expiry
 
 
-def _check_status(status: int, review: bool = False) -> None:
-    if status in ({200, 201} if review else {200}):
+def _check_status(status: int, review: bool = False, accepted_statuses: set[int] | None = None) -> None:
+    if status in (accepted_statuses or ({200, 201} if review else {200})):
         return
     errors = {
         401: ("upstream_unauthorized", "集群身份认证失败"),

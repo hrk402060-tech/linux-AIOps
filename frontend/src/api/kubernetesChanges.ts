@@ -41,6 +41,7 @@ export interface HelmApproval {
   execution_available: false;
   can_review: boolean;
   can_rehearse?: boolean;
+  can_execute?: boolean;
 }
 
 export interface HelmApprovalList { items: HelmApproval[]; total: number }
@@ -51,6 +52,16 @@ export interface HelmAdmissionResult {
   execution_available: false;
   checked: number;
   total: number;
+  error_code: string | null;
+}
+
+export interface HelmExecutionResult {
+  trace_id: string;
+  status: 'succeeded' | 'failed' | 'rolled_back' | 'rollback_failed';
+  execution_available: true;
+  created: number;
+  validated: number;
+  rollback: 'not_needed' | 'succeeded' | 'failed';
   error_code: string | null;
 }
 
@@ -120,4 +131,12 @@ export function runHelmAdmissionRehearsal(
   return request(`${approvalEndpoint(clusterId)}/${encodeURIComponent(approvalId)}/admission-rehearsal`, {
     method: 'POST', body: JSON.stringify({ confirmation: 'yes' }), signal,
   }, '准入演练请求失败', 45_000);
+}
+
+export function executeHelmApproval(
+  clusterId: string, approvalId: string, signal?: AbortSignal,
+): Promise<HelmExecutionResult> {
+  return request(`${approvalEndpoint(clusterId)}/${encodeURIComponent(approvalId)}/execute`, {
+    method: 'POST', body: JSON.stringify({ confirmation: 'yes' }), signal,
+  }, 'Helm 隔离执行请求失败', 60_000);
 }

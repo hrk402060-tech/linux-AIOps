@@ -74,7 +74,9 @@ def test_two_admins_decide_once_without_execution(kclient: TestClient, confirmat
     assert result["chart"] == preview["chart"] and result["resources"] == preview["resources"]
     assert "synthetic-value" not in response.text and "manifest_digest" not in result
     assert kclient.post(decision, json={"confirmation": confirmation}).status_code == 409
-    assert kclient.get(f"{url}/helm-approvals").json()["items"] == [{**result, "can_rehearse": False}]
+    assert kclient.get(f"{url}/helm-approvals").json()["items"] == [
+        {**result, "can_rehearse": False, "can_execute": False},
+    ]
     with kclient.app.state.session_factory() as session:
         assert session.scalar(select(KubernetesClusterAudit).where(
             KubernetesClusterAudit.trace_id == result["id"], KubernetesClusterAudit.outcome == expected,

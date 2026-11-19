@@ -12,6 +12,7 @@ from src.models.kubernetes_cluster import KubernetesClusterAudit
 from src.models.kubernetes_helm_approval import KubernetesHelmApproval
 from src.services import kubernetes_cluster_transport as transport
 from src.services import kubernetes_helm_admission as admission
+from src.services import kubernetes_helm_execution as execution
 from src.services.kubernetes_kubeconfig import ParsedKubeconfig
 from test_kubernetes_helm_approvals import as_user, configure, prepare, submit
 
@@ -189,3 +190,70 @@ def test_transport_never_falls_back_to_live_create(monkeypatch: pytest.MonkeyPat
     with pytest.raises(transport.KubernetesConnectionError):
         transport.dry_run_configmap(identity, "sandbox?dryRun=", {}, budget)
     assert len(calls) == 1
+
+
+def _execution_url(kclient: TestClient, tmp_path: Path) -> str:
+    url = approved_request(kclient, tmp_path)
+    settings = kclient.app.state.runtime_settings
+    settings.kubernetes_helm_execution_enabled = True
+    settings.kubernetes_helm_execution_cluster_id = settings.kubernetes_helm_rehearsal_cluster_id
+    settings.kubernetes_helm_execution_endpoint = settings.kubernetes_helm_rehearsal_endpoint
+    settings.kubernetes_helm_execution_namespace = settings.kubernetes_helm_rehearsal_namespace
+    settings.kubernetes_helm_execution_credentials_dir = settings.kubernetes_helm_rehearsal_credentials_dir
+    return url.removesuffix("/admission-rehearsal") + "/execute"
+
+
+def test_execution_creates_and_validates_only_approved_resources(
+    kclient: TestClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    url = _execution_url(kclient, tmp_path)
+    created: list[str] = []
+    monkeypatch.setattr(execution.admission, "verify_identity", lambda *_args: (
+        f"system:serviceaccount:{NAMESPACE}:{execution.EXECUTOR_ACCOUNT}"
+    ))
+    def create(_i: ParsedKubeconfig, _n: str, payload: dict[str, object], _b: transport.RequestBudget) -> dict[str, object]:
+        created.append(payload["metadata"]["name"])
+        return {"kind": "ConfigMap", "metadata": {"name": "demo", "namespace": NAMESPACE}}
+    monkeypatch.setattr(execution, "create_configmap", create)
+    monkeypatch.setattr(execution, "read_configmap", lambda _i, _n, name, _b: {
+        "kind": "ConfigMap", "metadata": {"name": name, "namespace": NAMESPACE},
+    })
+    response = kclient.post(url, json={"confirmation": " yes "})
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "succeeded"
+    assert response.json()["created"] == response.json()["validated"] == 1
+    assert created == ["demo"]
+
+
+def test_execution_rolls_back_new_resources_on_validation_failure(
+    kclient: TestClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    url = _execution_url(kclient, tmp_path)
+    deleted: list[str] = []
+    monkeypatch.setattr(execution.admission, "verify_identity", lambda *_args: (
+        f"system:serviceaccount:{NAMESPACE}:{execution.EXECUTOR_ACCOUNT}"
+    ))
+    monkeypatch.setattr(execution, "create_configmap", lambda _i, _n, payload, _b: {
+        "kind": "ConfigMap", "metadata": {"name": "demo", "namespace": NAMESPACE},
+    })
+    monkeypatch.setattr(execution, "read_configmap", lambda *_args: {
+        "kind": "ConfigMap", "metadata": {"name": "wrong", "namespace": NAMESPACE},
+    })
+    monkeypatch.setattr(execution, "delete_configmap", lambda _i, _n, name, _b: deleted.append(name))
+    response = kclient.post(url, json={"confirmation": "yes"})
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "rolled_back"
+    assert response.json()["rollback"] == "succeeded"
+    assert deleted == ["demo"]
+
+
+def test_execution_identity_failure_does_not_report_rollback(
+    kclient: TestClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    url = _execution_url(kclient, tmp_path)
+    monkeypatch.setattr(execution.admission, "verify_identity", lambda *_args: "system:serviceaccount:wrong:identity")
+    monkeypatch.setattr(execution, "create_configmap", lambda *_args: pytest.fail("must not create"))
+    response = kclient.post(url, json={"confirmation": "yes"})
+    assert response.status_code == 200
+    assert response.json()["status"] == "failed"
+    assert response.json()["rollback"] == "not_needed"
