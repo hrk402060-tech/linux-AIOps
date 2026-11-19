@@ -3,6 +3,7 @@ import { Alert, Button, Form, Input, InputNumber, Pagination, Select, Space, Tag
 import { ListChecks, RefreshCw } from 'lucide-react';
 import { getKubernetesClusters, kubernetesRequestError, type KubernetesCluster } from '../api/kubernetes';
 import { checkKubernetesChange, getHelmCharts, previewHelmChange, type ChangeParameters, type ChangePreflight, type HelmChart } from '../api/kubernetesChanges';
+import { HelmResources, KubernetesHelmApprovals } from './KubernetesHelmApprovals';
 import './kubernetesChanges.css';
 
 type Action = ChangeParameters['action'];
@@ -179,9 +180,9 @@ export function KubernetesChangesPage({ initialCluster }: { initialCluster?: Kub
     {result && <PreflightResult result={result} />}
     {helmPreview && <section className="k8s-helm-resources" aria-label="Helm 资源预览">
       <h3>资源预览 · {helmPreview.chart.name} {helmPreview.chart.version}</h3>
-      <ul>{helmPreview.resources.map((item) => <li key={`${item.api_version}:${item.kind}:${item.namespace}:${item.name}`}>
-        <Tag>{item.kind}</Tag><span>{item.namespace}/{item.name}</span><small>{item.api_version}</small>
-      </li>)}</ul>
+      <HelmResources items={helmPreview.resources} />
     </section>}
+    {action === 'helm' && cluster && !listError &&
+      <KubernetesHelmApprovals key={`${cluster.id}:${cluster.revision}:${reload}`} clusterId={cluster.id} preview={helmPreview} />}
   </section>;
 }

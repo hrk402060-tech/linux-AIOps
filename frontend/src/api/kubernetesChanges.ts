@@ -11,13 +11,38 @@ export interface HelmChart {
   id: string; name: string; version: string; digest: string;
 }
 export interface HelmCatalog { enabled: boolean; charts: HelmChart[] }
+export interface HelmResource {
+  api_version: string; kind: string; namespace: string; name: string;
+}
 export interface HelmPreview {
   preflight: ChangePreflight;
   chart: HelmChart;
   release_name: string;
   namespace: string;
-  resources: Array<{ api_version: string; kind: string; namespace: string; name: string }>;
+  resources: HelmResource[];
+  preview_id: string | null;
+  preview_expires_at: string | null;
 }
+
+export interface HelmApproval {
+  id: string;
+  status: 'pending' | 'approved' | 'rejected' | 'expired' | 'invalidated';
+  cluster_revision: number;
+  chart: HelmChart;
+  resources: HelmResource[];
+  namespace: string;
+  release_name: string;
+  requested_by: string;
+  reviewed_by: string | null;
+  reason: string | null;
+  submitted_at: string | null;
+  reviewed_at: string | null;
+  expires_at: string;
+  execution_available: false;
+  can_review: boolean;
+}
+
+export interface HelmApprovalList { items: HelmApproval[]; total: number }
 
 export interface ChangePreflight {
   trace_id: string;
@@ -52,5 +77,29 @@ export function previewHelmChange(
 ): Promise<HelmPreview> {
   return request(`/api/v1/kubernetes/clusters/${encodeURIComponent(clusterId)}/helm-preview`, {
     method: 'POST', body: JSON.stringify({ ...change, expected_revision: revision }), signal,
-  }, 'Helm 预览失败');
+  }, 'Helm 预览失败', 30_000);
+}
+
+function approvalEndpoint(clusterId: string): string {
+  return `/api/v1/kubernetes/clusters/${encodeURIComponent(clusterId)}/helm-approvals`;
+}
+
+export function getHelmApprovals(clusterId: string, offset: number, signal?: AbortSignal): Promise<HelmApprovalList> {
+  return request(`${approvalEndpoint(clusterId)}?offset=${offset}`, { signal }, 'Helm 审批记录加载失败');
+}
+
+export function submitHelmApproval(
+  clusterId: string, previewId: string, reason: string, signal?: AbortSignal,
+): Promise<HelmApproval> {
+  return request(approvalEndpoint(clusterId), {
+    method: 'POST', body: JSON.stringify({ preview_id: previewId, reason }), signal,
+  }, 'Helm 审批申请失败');
+}
+
+export function decideHelmApproval(
+  clusterId: string, approvalId: string, confirmation: 'yes' | 'no', signal?: AbortSignal,
+): Promise<HelmApproval> {
+  return request(`${approvalEndpoint(clusterId)}/${encodeURIComponent(approvalId)}/decision`, {
+    method: 'POST', body: JSON.stringify({ confirmation }), signal,
+  }, 'Helm 审批确认失败');
 }

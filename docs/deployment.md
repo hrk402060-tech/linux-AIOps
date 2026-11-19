@@ -508,10 +508,16 @@ Diagnostic API contract:
 
 Migration `20261007_30` adds only the encrypted grant and append-only audit tables after `20261004_29`, with asset history protected by RESTRICT foreign keys. PM authorized production publication on October 7, 2026; schema30 and authenticated read-only endpoints are live at `http://192.168.10.17:8088/`. The gateway was tested in isolated Docker, not installed on production targets; target administrators still need to install and authorize it. No diagnostic grants or DEMO evidence were imported into production. Browser visual acceptance remains unverified due to tooling security policy.
 
-### Helm 变更预览
+### Helm 变更预览与审批
 
 Helm 入口只接受管理员从服务端受信目录选择的 Chart。`KUBERNETES_HELM_TRUSTED_CHARTS`
 是 JSON 数组，每项至少包含 `id`、`name`、`version`、`digest` 和 `manifest`（或绝对路径
-`chart_path`）。摘要必须是 `sha256:<64位小写十六进制>`。预览在应用服务器本地执行，
+`chart_path`，指向已打包且只读挂载的 Chart 文件）。摘要必须是 `sha256:<64位小写十六进制>`。预览在应用服务器本地执行，
 不携带集群 kubeconfig、不访问网络，只返回允许资源的摘要；目录为空时功能保持关闭。
 预览不代表配额、对象冲突、准入策略或运行时就绪检查通过，也不会创建、更新或删除集群对象。
+
+发布前在隔离数据库验证 Alembic 迁移 `20261119_56`，生产上线时先升级 schema 再启用新版 API。
+通过基础预检的 Helm 预览 10 分钟内可由原发起人提交审批申请。另一位已登录的管理员须在
+30 分钟内输入 `yes` 批准或 `no` 拒绝。审批详情只有受信 Chart 元数据和资源名称，不含
+kubeconfig、渲染清单或 values；申请原因不要填写密码、令牌等信息。集群配置、目标策略或
+受信 Chart 已变化时，旧预览不能提交或批准。批准仅记录人工决定；此版本没有执行、验证或回滚接口。

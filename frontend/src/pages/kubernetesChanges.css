@@ -11,8 +11,27 @@
 .k8s-preflight-result ul { margin: 0; padding: 0; list-style: none; }
 .k8s-preflight-result li { display: flex; align-items: baseline; gap: 8px; padding: 8px 0; border-top: 1px solid #e5e9e7; }
 .k8s-helm-resources { border-top: 1px solid #e5e9e7; padding-top: 12px; }
-.k8s-helm-resources h3 { margin: 0 0 8px; font-size: 15px; }
-.k8s-helm-resources ul { list-style: none; margin: 0; padding: 0; }
-.k8s-helm-resources li { display: flex; align-items: center; gap: 8px; border-top: 1px solid #eef1ef; padding: 7px 0; }
-.k8s-helm-resources li span { overflow-wrap: anywhere; }
-.k8s-helm-resources li small { color: #69746f; margin-left: auto; }
+.k8s-helm-resources h3, .k8s-helm-approval-heading h3 { margin: 0; font-size: 15px; }
+.k8s-helm-resource-list { list-style: none; margin: 8px 0 0; padding: 0; }
+.k8s-helm-resource-list li {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px; border-top: 1px solid #eef1ef; padding: 7px 0;
+}
+.k8s-helm-resource-list li span { overflow-wrap: anywhere; min-width: 0; }
+.k8s-helm-resource-list li small { color: #69746f; margin-left: auto; }
+.k8s-helm-approvals { display: grid; gap: 10px; min-width: 0; padding-top: 12px; border-top: 1px solid #e5e9e7; }
+.k8s-helm-approval-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.k8s-helm-approval-row { border-top: 1px solid #eef1ef; }
+.k8s-helm-approval-row .k8s-helm-approval-toggle {
+  display: flex; flex-wrap: wrap; justify-content: flex-start; min-height: 40px; height: auto; width: 100%;
+  white-space: normal; text-align: start; overflow-wrap: anywhere;
+}
+.k8s-helm-approval-detail { padding: 0 10px 12px; }
+.k8s-helm-approval-detail dl {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr)); gap: 8px 12px;
+}
+.k8s-helm-approval-detail dt, .k8s-helm-approval-actions > span { color: #5c6965; }
+.k8s-helm-approval-detail dd { margin: 2px 0 0; overflow-wrap: anywhere; }
+.k8s-helm-wide { grid-column: 1 / -1; }
+.k8s-helm-approval-form { display: grid; gap: 8px; max-width: 620px; padding: 8px 0; }
+.k8s-helm-approval-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.k8s-helm-approval-actions .ant-input { width: 140px; max-width: 100%; }

@@ -153,6 +153,9 @@ const fixedBackendMessages = new Set([
   '已接入集群测试只使用已保存配置',
   '集群目标允许范围未配置，请联系管理员', '集群目标策略配置无效，请联系管理员',
   'API Server 地址不在集群目标策略允许范围内',
+  '预览或审批记录不存在', '预览或审批已处理或过期', '仅发起人可提交，审批需由另一位管理员确认',
+  '集群配置或目标策略已变化，请重新预览', '受信 Chart 已变化或不可用，请重新预览',
+  '受信 Chart 已变化，请重新预览', '集群预检已失效，请刷新快照后重新预览', '发起人不再具备管理员权限',
 ]);
 
 export function kubernetesFailureMessage(code: string | null | undefined, fallback = '集群请求失败，请重试'): string {

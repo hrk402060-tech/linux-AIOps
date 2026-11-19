@@ -3,22 +3,30 @@ import subprocess
 import sys
 from collections.abc import Generator
 from concurrent.futures import ThreadPoolExecutor
+from datetime import timedelta
 from pathlib import Path
 from threading import Barrier
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import create_engine, inspect
+from fastapi import HTTPException
+from sqlalchemy import create_engine, func, inspect, select
 from sqlalchemy.engine import Engine, make_url
 from sqlalchemy.orm import Session
 
+from src.auth import AuthPrincipal
+from src.config import Settings
 from src.database import Base
 from src.main import create_app  # noqa: F401 -- register every referenced model when run alone
-from src.models.kubernetes_cluster import KubernetesCluster
+from src.models.auth import User
+from src.models.kubernetes_cluster import KubernetesCluster, KubernetesClusterAudit
+from src.models.kubernetes_helm_approval import KubernetesHelmApproval
 from src.schemas.kubernetes_cluster import KubernetesClusterPatch
 from src.services import kubernetes_clusters as store
+from src.services import kubernetes_helm_approvals as approvals
 from src.services.kubernetes_cluster_tests import consume_test, register_test
 from src.services.kubernetes_kubeconfig import KubernetesClusterError, ParsedKubeconfig
+from src.services.kubernetes_overview_jobs import db_now
 
 
 @pytest.fixture
@@ -112,7 +120,49 @@ def test_postgres_migration_roundtrip(isolated_pg: tuple[Engine, str]) -> None:
     migrate("upgrade", "head")
     added = {"kubernetes_clusters", "kubernetes_cluster_credentials",
              "kubernetes_cluster_audits", "kubernetes_connection_tests", "kubernetes_collection_runs",
-             "kubernetes_resource_snapshots", "platform_data_jobs"}
+             "kubernetes_resource_snapshots", "platform_data_jobs", "kubernetes_helm_approvals"}
     assert set(inspect(engine).get_table_names()) == before | added
     migrate("downgrade", "20261110_51")
     assert set(inspect(engine).get_table_names()) == before
+
+
+def test_postgres_helm_decision_is_atomic(
+    isolated_pg: tuple[Engine, str], monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    engine, _ = isolated_pg
+    Base.metadata.create_all(engine)
+    monkeypatch.setattr(approvals, "_validate_current", lambda *_args: None)
+    with Session(engine) as session:
+        now = db_now(session)
+        session.add_all([
+            KubernetesCluster(id="cluster", name="demo", endpoint="https://192.0.2.20:6443", context="demo"),
+            User(id="requester", username="requester", role="admin", password_hash="unused", enabled=True),
+        ])
+        session.flush()
+        session.add(KubernetesHelmApproval(
+            id="candidate", cluster_id="cluster", cluster_revision=1, credential_revision=1, policy_digest="a" * 64,
+            source_digest="b" * 64, manifest_digest="c" * 64, chart={"id": "demo"}, resources=[],
+            namespace="demo", release_name="demo", status="pending", requester_id="requester",
+            requested_by="requester", created_at=now, submitted_at=now, expires_at=now + timedelta(minutes=5),
+        ))
+        session.commit()
+    barrier = Barrier(2)
+    settings = Settings.model_construct()
+
+    def decide(username: str) -> str:
+        with Session(engine, expire_on_commit=False) as session:
+            barrier.wait(timeout=10)
+            try:
+                principal = AuthPrincipal(username, "admin", username, "session")
+                approvals.transition(session, "cluster", "candidate", settings, principal,
+                                     approvals.ApprovalDecision(confirmation="yes"))
+            except HTTPException as error:
+                assert error.status_code == 409
+                return "conflict"
+            return "approved"
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        results = list(executor.map(decide, ["first", "second"], timeout=20))
+    assert sorted(results) == ["approved", "conflict"]
+    with Session(engine) as session:
+        assert session.scalar(select(func.count()).select_from(KubernetesClusterAudit)) == 1
