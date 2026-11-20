@@ -42,6 +42,34 @@ export interface KubernetesRefresh {
   state: 'queued' | 'running';
   merged: boolean;
 }
+export type KubernetesResourceKind =
+  | 'nodes' | 'namespaces' | 'pods' | 'deployments' | 'statefulsets'
+  | 'daemonsets' | 'services' | 'events';
+export interface KubernetesResourceItem {
+  kind: string;
+  uid: string;
+  name: string;
+  namespace: string | null;
+  created_at?: string;
+  resource_version?: string;
+  [key: string]: unknown;
+}
+export interface KubernetesResourceList {
+  cluster_id: string;
+  kind: KubernetesResourceKind;
+  run_id: string | null;
+  state: KubernetesCollectionState | 'unobserved';
+  partial: boolean;
+  total: number | null;
+  items: KubernetesResourceItem[];
+}
+export interface KubernetesResourceDetail {
+  cluster_id: string;
+  kind: KubernetesResourceKind;
+  run_id: string;
+  state: KubernetesCollectionState;
+  item: KubernetesResourceItem;
+}
 const root = '/api/v1/kubernetes/clusters';
 
 export function getKubernetesOverview(id: string, signal?: AbortSignal): Promise<KubernetesOverview> {
@@ -49,4 +77,26 @@ export function getKubernetesOverview(id: string, signal?: AbortSignal): Promise
 }
 export function refreshKubernetesOverview(id: string, signal?: AbortSignal): Promise<KubernetesRefresh> {
   return request<KubernetesRefresh>(`${root}/${encodeURIComponent(id)}/refresh`, { method: 'POST', signal });
+}
+export function getKubernetesResources(
+  id: string, kind: KubernetesResourceKind,
+  params: { namespace?: string; search?: string; status?: string; offset?: number; limit?: number } = {},
+  signal?: AbortSignal,
+): Promise<KubernetesResourceList> {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== '') query.set(key, String(value));
+  }
+  const suffix = query.toString() ? `?${query.toString()}` : '';
+  return request<KubernetesResourceList>(
+    `${root}/${encodeURIComponent(id)}/resources/${encodeURIComponent(kind)}${suffix}`, { signal },
+  );
+}
+export function getKubernetesResource(
+  id: string, kind: KubernetesResourceKind, uid: string, signal?: AbortSignal,
+): Promise<KubernetesResourceDetail> {
+  return request<KubernetesResourceDetail>(
+    `${root}/${encodeURIComponent(id)}/resources/${encodeURIComponent(kind)}/${encodeURIComponent(uid)}`,
+    { signal },
+  );
 }

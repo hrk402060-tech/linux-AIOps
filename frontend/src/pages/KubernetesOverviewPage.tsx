@@ -1,10 +1,15 @@
-import { Alert, Button, Empty, Input, Progress, Select, Spin, Table, Tag, Tooltip } from 'antd';
-import { Activity, Boxes, CircleAlert, Cpu, Database, HardDrive, Layers, Network, RefreshCw, Server } from 'lucide-react';
+import { formatPlatformDateTime } from '../utils/platformPreferences';
+import { useState } from 'react';
+import { Alert, Button, Descriptions, Drawer, Empty, Input, Progress, Select, Spin, Table, Tabs, Tag, Tooltip } from 'antd';
+import { Activity, Boxes, CircleAlert, Cpu, Database, Eye, HardDrive, Layers, Network, RefreshCw, Server } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { AuthUser } from '../api/auth';
 import { kubernetesFailureMessage, type KubernetesCluster } from '../api/kubernetes';
-import type { KubernetesCollectionState, KubernetesOverview } from '../api/kubernetesOverview';
+import type {
+  KubernetesCollectionState, KubernetesOverview, KubernetesResourceItem, KubernetesResourceKind,
+} from '../api/kubernetesOverview';
 import { useKubernetesOverview } from '../hooks/useKubernetesOverview';
+import { useKubernetesResources } from '../hooks/useKubernetesResources';
 import './kubernetesOverview.css';
 
 const stateLabels: Record<KubernetesCollectionState, string> = {
@@ -15,6 +20,12 @@ const resourceLabels: Record<string, string> = {
   nodes: '节点', namespaces: '命名空间', pods: 'Pod', deployments: 'Deployment',
   statefulsets: 'StatefulSet', daemonsets: 'DaemonSet', services: 'Service', events: '事件',
 };
+const resourceKinds: Array<{ value: KubernetesResourceKind; label: string }> = [
+  { value: 'nodes', label: 'Node' }, { value: 'namespaces', label: 'Namespace' },
+  { value: 'pods', label: 'Pod' }, { value: 'deployments', label: 'Deployment' },
+  { value: 'statefulsets', label: 'StatefulSet' }, { value: 'daemonsets', label: 'DaemonSet' },
+  { value: 'services', label: 'Service' }, { value: 'events', label: 'Warning 事件' },
+];
 const stats: Array<{
   key: keyof KubernetesOverview['counts']; title: string; resource: string;
   icon: LucideIcon;
@@ -29,7 +40,7 @@ const stats: Array<{
   { key: 'warning_events', title: 'Warning 事件', resource: 'events', icon: CircleAlert },
 ];
 function date(value: string | null | undefined): string {
-  return value && Number.isFinite(Date.parse(value)) ? new Date(value).toLocaleString() : '—';
+  return value && Number.isFinite(Date.parse(value)) ? formatPlatformDateTime(value) : '—';
 }
 function numeric(value: number | null | undefined, digits = 2): string {
   return typeof value === 'number' && Number.isFinite(value) ? value.toFixed(digits) : '—';
@@ -54,12 +65,37 @@ function Usage({ title, value, detail }: { title: string; value: number | null |
     <small>{detail}</small>
   </div>;
 }
+function resourceStatus(item: KubernetesResourceItem): string {
+  if (typeof item.ready === 'boolean') return item.ready ? 'Ready' : 'NotReady';
+  for (const key of ['phase', 'reason', 'service_type']) {
+    if (typeof item[key] === 'string') return item[key] as string;
+  }
+  const ready = item.ready_replicas;
+  const desired = item.desired_replicas;
+  if (typeof ready === 'number' && typeof desired === 'number') return `${ready}/${desired} Ready`;
+  return '—';
+}
+function resourceDetailValue(value: unknown): string {
+  if (value === null || value === undefined || value === '') return '—';
+  if (typeof value === 'object') return JSON.stringify(value);
+  return String(value);
+}
 
 export function KubernetesOverviewPage({ currentUser, initialCluster, onOpenConnections }: {
   currentUser: Pick<AuthUser, 'role'>; initialCluster?: KubernetesCluster; onOpenConnections: () => void;
 }) {
   const allowed = currentUser.role === 'admin';
   const view = useKubernetesOverview(allowed, initialCluster);
+  const [resourceTab, setResourceTab] = useState('summary');
+  const [resourceKind, setResourceKind] = useState<KubernetesResourceKind>('nodes');
+  const [resourceSearch, setResourceSearch] = useState('');
+  const [resourceNamespace, setResourceNamespace] = useState('');
+  const [resourceStatusFilter, setResourceStatusFilter] = useState('');
+  const resources = useKubernetesResources(
+    view.selectedId, resourceKind,
+    { search: resourceSearch, namespace: resourceNamespace, status: resourceStatusFilter },
+    allowed && resourceTab === 'resources',
+  );
   const { data, cluster } = view;
   if (!allowed) return <Alert showIcon type="info" message="当前阶段仅管理员可查看 Kubernetes 集群总览。" />;
   const stale = data?.freshness === 'stale' || Boolean(view.error && data);
@@ -165,6 +201,69 @@ export function KubernetesOverviewPage({ currentUser, initialCluster, onOpenConn
           ]} locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={
             data?.resources.events?.state === 'complete' ? '暂无 Warning 事件' : '尚无完整事件数据'
           } /> }} /></div>
+      </section>
+      <section className="k8s-resource-browser" aria-label="集群资源清单">
+        <div className="k8s-section-heading">
+          <h2>资源清单</h2>
+          <Tabs activeKey={resourceTab} onChange={setResourceTab} items={[
+            { key: 'summary', label: '概览' },
+            { key: 'resources', label: '只读查看' },
+          ]} />
+        </div>
+        {resourceTab === 'resources' ? <>
+          <div className="k8s-resource-controls">
+            <Select aria-label="资源类型" value={resourceKind} options={resourceKinds}
+              onChange={(value: KubernetesResourceKind) => {
+                setResourceKind(value); setResourceStatusFilter('');
+              }} />
+            <Input.Search aria-label="搜索资源" placeholder="搜索名称或 UID" allowClear
+              value={resourceSearch} onChange={(event) => setResourceSearch(event.target.value)}
+              maxLength={100} />
+            <Input aria-label="命名空间筛选" placeholder="命名空间" allowClear
+              value={resourceNamespace} onChange={(event) => setResourceNamespace(event.target.value)}
+              maxLength={253} />
+            <Select aria-label="资源状态" value={resourceStatusFilter || undefined} allowClear
+              placeholder="状态筛选" onChange={(value) => setResourceStatusFilter(value)}
+              options={[
+                { value: 'Ready', label: 'Ready' }, { value: 'NotReady', label: 'NotReady' },
+                { value: 'Running', label: 'Running' }, { value: 'Pending', label: 'Pending' },
+                { value: 'Failed', label: 'Failed' }, { value: 'Active', label: 'Active' },
+              ]} />
+          </div>
+          {resources.error ? <Alert showIcon type="error" message={resources.error} /> : null}
+          {resources.data?.partial ? <Alert showIcon type="warning"
+            message="当前清单为部分采集结果，数量未知，不能据此判断集群没有其他资源。" /> : null}
+          <div className="table-frame">
+            <Table<KubernetesResourceItem> dataSource={resources.items} loading={resources.loading}
+              rowKey="uid" scroll={{ x: 760 }} pagination={false} columns={[
+                { title: '名称', dataIndex: 'name', render: (value: string) =>
+                  <span className="k8s-object">{value}</span> },
+                { title: '命名空间', dataIndex: 'namespace', render: (value: string | null) => value ?? '—' },
+                { title: '状态', render: (_, item) => resourceStatus(item) },
+                { title: '重启次数', dataIndex: 'restarts', render: (value: number | undefined) => value ?? '—' },
+                { title: '创建时间', dataIndex: 'created_at', render: date },
+                { title: '操作', fixed: 'right', width: 92, render: (_, item) =>
+                  <Button type="link" icon={<Eye size={15} />} onClick={() => resources.openDetail(item.uid)}>
+                    查看
+                  </Button> },
+              ]} locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE}
+                description={resources.loading ? '正在加载资源' : '暂无资源快照'} /> }} />
+          </div>
+          {resources.data?.total !== null && resources.data?.total !== undefined
+            ? <div className="k8s-resource-total">共 {resources.data.total} 条</div> : null}
+          <Drawer title={`${resourceKinds.find((item) => item.value === resourceKind)?.label ?? '资源'}详情`}
+            open={Boolean(resources.detail) || resources.detailLoading} onClose={resources.clearDetail}
+            loading={resources.detailLoading} width={520}>
+            {resources.detailError ? <Alert showIcon type="error" message={resources.detailError} /> : null}
+            {resources.detail?.item ? <Descriptions column={1} size="small" bordered>
+              {Object.entries(resources.detail.item).map(([key, value]) =>
+                <Descriptions.Item key={key} label={key}>{resourceDetailValue(value)}</Descriptions.Item>)}
+            </Descriptions> : null}
+          </Drawer>
+        </> : <div className="k8s-resource-summary">
+          <span>在当前采集快照中按资源类型查看只读对象。</span>
+          <Button type="link" onClick={() => setResourceTab('resources')}>打开资源清单</Button>
+        </div>}
       </section>
     </> : null}
   </section>;

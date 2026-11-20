@@ -1,3 +1,4 @@
+import re
 from collections.abc import Awaitable, Callable
 from typing import TypeVar
 from uuid import uuid4
@@ -6,14 +7,15 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, Res
 from fastapi.exceptions import RequestValidationError
 from fastapi.routing import APIRoute
 from pydantic import BaseModel, ValidationError
-from sqlalchemy.orm import Session
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from src.auth import AuthPrincipal, require_admin
 from src.database import get_session
+from src.models.auth import AuthSession
 from src.models.kubernetes_cluster import KubernetesCluster, KubernetesClusterAudit
 from src.models.kubernetes_collection import KubernetesCollectionRun
-from src.models.auth import AuthSession
+from src.models.kubernetes_resource_snapshot import KubernetesResourceSnapshot
 from src.schemas.kubernetes_cluster import (
     KubernetesClusterCreate, KubernetesClusterPatch, KubernetesClusterResponse,
     KubernetesClusterTest, KubernetesCredentialRotate,
@@ -21,6 +23,7 @@ from src.schemas.kubernetes_cluster import (
 from src.services import kubernetes_clusters as service
 from src.services.kubernetes_cluster_target_policy import KubernetesTargetPolicy
 from src.services import kubernetes_overview, kubernetes_overview_jobs
+from src.services.kubernetes_overview_collect import OBJECT_KINDS
 from src.services.auth import hash_token
 
 
@@ -39,6 +42,8 @@ class SafeKubernetesRoute(APIRoute):
 
 router = APIRouter(prefix="/kubernetes", tags=["kubernetes"], route_class=SafeKubernetesRoute)
 Schema = TypeVar("Schema", bound=BaseModel)
+RESOURCE_KINDS = frozenset(OBJECT_KINDS)
+RESOURCE_NAME = re.compile(r"^[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?$")
 
 
 def require_real_admin(
@@ -215,6 +220,128 @@ def get_overview(
     service._audit(session, cluster_id, principal.username, "overview_viewed", "accepted", str(uuid4()))
     service._commit(session)
     return result
+
+
+def _latest_resource_run(
+    session: Session, cluster: KubernetesCluster, policy: KubernetesTargetPolicy,
+) -> KubernetesCollectionRun | None:
+    rows = session.scalars(select(KubernetesCollectionRun).where(
+        KubernetesCollectionRun.cluster_id == cluster.id,
+        KubernetesCollectionRun.state.in_(("complete", "partial")),
+    ).order_by(KubernetesCollectionRun.finished_at.desc(), KubernetesCollectionRun.id.desc()).limit(100)).all()
+    for run in rows:
+        if kubernetes_overview_jobs.current_run(session, cluster, run, policy) and (
+            kubernetes_overview_jobs._requester_valid(session, run, kubernetes_overview_jobs.db_now(session))
+        ):
+            return run
+    return None
+
+
+def _resource_matches(item: dict[str, object], search: str | None, status: str | None) -> bool:
+    if search and search.casefold() not in " ".join(
+        str(item.get(key) or "") for key in ("name", "namespace", "uid", "node_name")
+    ).casefold():
+        return False
+    if not status:
+        return True
+    value = status.casefold()
+    values = {
+        str(item.get(key)).casefold()
+        for key in ("phase", "reason", "service_type", "ready", "kubelet_version")
+        if item.get(key) is not None
+    }
+    if item.get("ready") is True:
+        values.add("ready")
+    if item.get("ready") is False:
+        values.add("notready")
+    return value in values
+
+
+@router.get("/clusters/{cluster_id}/resources/{kind}")
+def list_resources(
+    cluster_id: str,
+    kind: str,
+    request: Request,
+    namespace: str | None = Query(default=None, max_length=253),
+    search: str | None = Query(default=None, max_length=100),
+    status: str | None = Query(default=None, max_length=64),
+    offset: int = Query(default=0, ge=0, le=10_000),
+    limit: int = Query(default=50, ge=1, le=100),
+    session: Session = Depends(get_session),
+    principal: AuthPrincipal = Depends(require_real_admin),
+) -> dict[str, object]:
+    if kind not in RESOURCE_KINDS:
+        raise HTTPException(status_code=404, detail="资源类型不支持")
+    if namespace is not None and not RESOURCE_NAME.fullmatch(namespace):
+        raise HTTPException(status_code=422, detail="命名空间格式无效")
+    cluster = _cluster(session, cluster_id)
+    policy = KubernetesTargetPolicy.from_settings(request.app.state.runtime_settings)
+    run = _latest_resource_run(session, cluster, policy)
+    if run is None:
+        return {
+            "cluster_id": cluster_id, "kind": kind, "run_id": None, "state": "unobserved",
+            "partial": False, "total": None, "items": [],
+        }
+    statement = select(KubernetesResourceSnapshot).where(
+        KubernetesResourceSnapshot.cluster_id == cluster_id,
+        KubernetesResourceSnapshot.run_id == run.id,
+        KubernetesResourceSnapshot.kind == kind,
+    ).order_by(KubernetesResourceSnapshot.namespace, KubernetesResourceSnapshot.name)
+    all_rows = session.scalars(statement.limit(2000)).all()
+    rows = [
+        row for row in all_rows
+        if namespace is None or row.namespace == namespace
+    ]
+    items = [
+        dict(row.projection) for row in rows
+        if _resource_matches(row.projection, search, status)
+    ]
+    summary = run.projection.get("resources", {}).get(kind, {}) if isinstance(run.projection, dict) else {}
+    exact = (
+        run.state == "complete"
+        and isinstance(summary, dict)
+        and summary.get("observed_count") == len(all_rows)
+    )
+    page = items[offset:offset + limit]
+    service._audit(session, cluster_id, principal.username, "resource_listed", "accepted", str(uuid4()))
+    service._commit(session)
+    return {
+        "cluster_id": cluster_id, "kind": kind, "run_id": run.id, "state": run.state,
+        "partial": run.state == "partial" or not exact, "total": len(items) if exact else None,
+        "items": page,
+    }
+
+
+@router.get("/clusters/{cluster_id}/resources/{kind}/{uid}")
+def get_resource(
+    cluster_id: str,
+    kind: str,
+    uid: str,
+    request: Request,
+    session: Session = Depends(get_session),
+    principal: AuthPrincipal = Depends(require_real_admin),
+) -> dict[str, object]:
+    if kind not in RESOURCE_KINDS or not 1 <= len(uid) <= 256:
+        raise HTTPException(status_code=404, detail="资源不存在")
+    cluster = _cluster(session, cluster_id)
+    policy = KubernetesTargetPolicy.from_settings(request.app.state.runtime_settings)
+    run = _latest_resource_run(session, cluster, policy)
+    if run is None:
+        raise HTTPException(status_code=404, detail="资源快照不存在")
+    row = session.scalar(select(KubernetesResourceSnapshot).where(
+        KubernetesResourceSnapshot.cluster_id == cluster_id,
+        KubernetesResourceSnapshot.run_id == run.id,
+        KubernetesResourceSnapshot.kind == kind,
+        KubernetesResourceSnapshot.uid == uid,
+    ))
+    if row is None:
+        raise HTTPException(status_code=404, detail="资源不存在")
+    service._audit(session, cluster_id, principal.username, "resource_viewed", "accepted", str(uuid4()))
+    service._commit(session)
+    return {
+        "cluster_id": cluster_id, "kind": kind, "run_id": run.id, "state": run.state,
+        "item": dict(row.projection),
+    }
 
 
 @router.post("/clusters/{cluster_id}/refresh", status_code=202)

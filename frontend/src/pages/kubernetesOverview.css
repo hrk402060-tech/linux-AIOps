@@ -31,6 +31,15 @@
 .k8s-error-list { display: grid; gap: 8px; margin-top: 14px; }
 .k8s-object { display: inline-block; max-width: 350px; overflow-wrap: anywhere; }
 .k8s-loading { display: flex; align-items: center; justify-content: center; padding: 48px 0; gap: 12px; color: #64748b; }
+.k8s-resource-browser { margin-top: 22px; }
+.k8s-resource-browser .k8s-section-heading { align-items: flex-end; }
+.k8s-resource-browser .ant-tabs { margin-left: auto; }
+.k8s-resource-controls { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
+.k8s-resource-controls > .ant-select { min-width: 150px; }
+.k8s-resource-controls > .ant-input,
+.k8s-resource-controls > .ant-input-search { width: 220px; max-width: 100%; }
+.k8s-resource-total { margin-top: 10px; color: #64748b; font-size: 12px; }
+.k8s-resource-summary { display: flex; align-items: center; gap: 8px; color: #64748b; font-size: 13px; }
 @media (max-width: 1000px) { .k8s-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 600px) {
   .k8s-controls > .ant-select, .k8s-controls > .ant-select:first-child, .k8s-controls > .ant-input-search { width: 100%; min-width: 0; }
@@ -38,4 +47,10 @@
   .k8s-stat { padding: 12px; }
   .k8s-stat > strong { font-size: 24px; }
   .k8s-usage-grid { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+  .k8s-resource-browser .k8s-section-heading { align-items: flex-start; }
+  .k8s-resource-browser .ant-tabs { margin-left: 0; width: 100%; }
+  .k8s-resource-controls > .ant-input,
+  .k8s-resource-controls > .ant-input-search,
+  .k8s-resource-controls > .ant-select { width: 100%; min-width: 0; }
+  .k8s-resource-summary { align-items: flex-start; flex-direction: column; }
 }

@@ -3,7 +3,8 @@ import { ConfigProvider } from 'antd';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getKubernetesClusters, type KubernetesCluster } from '../api/kubernetes';
 import {
-  getKubernetesOverview, refreshKubernetesOverview, type KubernetesOverview,
+  getKubernetesOverview, getKubernetesResource, getKubernetesResources,
+  refreshKubernetesOverview, type KubernetesOverview,
 } from '../api/kubernetesOverview';
 import { KubernetesOverviewPage } from './KubernetesOverviewPage';
 
@@ -14,6 +15,7 @@ vi.mock('../api/kubernetes', async (original) => ({
 vi.mock('../api/kubernetesOverview', async (original) => ({
   ...await original<typeof import('../api/kubernetesOverview')>(),
   getKubernetesOverview: vi.fn(), refreshKubernetesOverview: vi.fn(),
+  getKubernetesResources: vi.fn(), getKubernetesResource: vi.fn(),
 }));
 const cluster = {
   id: 'cluster-one', name: '生产集群', lifecycle: 'active', revision: 1,
@@ -52,6 +54,20 @@ beforeEach(() => {
   vi.mocked(getKubernetesOverview).mockResolvedValue(overview);
   vi.mocked(refreshKubernetesOverview).mockResolvedValue({
     cluster_id: cluster.id, run_id: 'run-two', state: 'queued', merged: false,
+  });
+  vi.mocked(getKubernetesResources).mockResolvedValue({
+    cluster_id: cluster.id, kind: 'nodes', run_id: 'run-one', state: 'complete',
+    partial: false, total: 1, items: [{
+      kind: 'Node', uid: 'node-one', name: 'node-a', namespace: null,
+      ready: true, kubelet_version: 'v1.31.2',
+    }],
+  });
+  vi.mocked(getKubernetesResource).mockResolvedValue({
+    cluster_id: cluster.id, kind: 'nodes', run_id: 'run-one', state: 'complete',
+    item: {
+      kind: 'Node', uid: 'node-one', name: 'node-a', namespace: null,
+      ready: true, kubelet_version: 'v1.31.2',
+    },
   });
 });
 afterEach(() => vi.useRealTimers());
@@ -165,4 +181,35 @@ describe('KubernetesOverviewPage', () => {
     expect(screen.queryByText('12.5%')).not.toBeInTheDocument();
     expect(screen.getByText('当前阶段仅管理员可查看 Kubernetes 集群总览。')).toBeInTheDocument();
   });
+
+  it('loads a selected resource kind and opens its read-only detail', async () => {
+    show();
+    await screen.findByText('12.5%');
+    fireEvent.click(screen.getByText('只读查看'));
+    expect(await screen.findByText('node-a')).toBeInTheDocument();
+    expect(getKubernetesResources).toHaveBeenCalledWith(
+      cluster.id, 'nodes', { search: '', namespace: '', status: '' }, expect.any(AbortSignal),
+    );
+    fireEvent.click(screen.getByRole('button', { name: '查看' }));
+    expect(await screen.findByText('Node详情')).toBeInTheDocument();
+    expect(getKubernetesResource).toHaveBeenCalledWith(
+      cluster.id, 'nodes', 'node-one', expect.any(AbortSignal),
+    );
+    expect(screen.getAllByText('v1.31.2').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('shows partial resource snapshots without presenting a fake total', async () => {
+    vi.mocked(getKubernetesResources).mockResolvedValue({
+      cluster_id: cluster.id, kind: 'pods', run_id: 'run-one', state: 'partial',
+      partial: true, total: null, items: [{
+        kind: 'Pod', uid: 'pod-one', name: 'web', namespace: 'default', phase: 'Running',
+      }],
+    });
+    show();
+    await screen.findByText('12.5%');
+    fireEvent.click(screen.getByText('只读查看'));
+    expect(await screen.findByText('当前清单为部分采集结果，数量未知，不能据此判断集群没有其他资源。')).toBeInTheDocument();
+    expect(screen.queryByText('共 0 条')).not.toBeInTheDocument();
+  });
+
 });

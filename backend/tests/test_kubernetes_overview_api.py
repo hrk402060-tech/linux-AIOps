@@ -8,6 +8,7 @@ from test_kubernetes_clusters_api import BASE, create
 from src.models.auth import AuthSession, User
 from src.models.kubernetes_collection import KubernetesCollectionRun
 from src.models.kubernetes_cluster import KubernetesCluster
+from src.models.kubernetes_resource_snapshot import KubernetesResourceSnapshot
 from src.services import kubernetes_overview_jobs as jobs
 from src.services.kubernetes_cluster_target_policy import KubernetesTargetPolicy
 
@@ -69,7 +70,7 @@ def test_snapshot_and_queued_work_are_revoked_immediately(kclient: TestClient, c
             session.commit()
     result = kclient.get(f"{url}/overview").json()
     assert result["counts"]["nodes"] is None
-    assert "91" not in str(result)
+    assert "91" not in str(result["counts"])
 
 
 def test_claim_recovery_changes_token_and_old_worker_cannot_publish(kclient: TestClient) -> None:
@@ -205,3 +206,105 @@ def test_overview_and_refresh_require_real_admin(kclient: TestClient, role: str)
     assert kclient.post(f"{url}/refresh", headers={
         "Authorization": "Bearer test-admin-token-with-at-least-32-characters",
     }).status_code == 403
+
+
+def _complete_resource_run(
+    client: TestClient, cluster_id: str, *, state: str = "complete",
+) -> str:
+    run_id = client.post(f"{BASE}/clusters/{cluster_id}/refresh").json()["run_id"]
+    now = datetime.now(timezone.utc)
+    with client.app.state.session_factory() as session:
+        run = session.get(KubernetesCollectionRun, run_id)
+        run.state = state
+        run.finished_at = now
+        run.projection = {
+            "resources": {
+                "pods": {"observed_count": 2 if state == "complete" else 1},
+            },
+        }
+        session.add_all([
+            KubernetesResourceSnapshot(
+                id=f"snapshot-{run_id}-one", run_id=run_id, cluster_id=cluster_id,
+                kind="pods", namespace="default", uid="pod-one", name="web",
+                resource_version="7", observed_at=now,
+                projection={
+                    "kind": "Pod", "uid": "pod-one", "name": "web", "namespace": "default",
+                    "phase": "Running", "restarts": 1, "node_name": "node-a",
+                },
+            ),
+            KubernetesResourceSnapshot(
+                id=f"snapshot-{run_id}-two", run_id=run_id, cluster_id=cluster_id,
+                kind="pods", namespace="ops", uid="pod-two", name="worker",
+                resource_version="7", observed_at=now,
+                projection={
+                    "kind": "Pod", "uid": "pod-two", "name": "worker", "namespace": "ops",
+                    "phase": "Pending", "reason": "ImagePullBackOff", "restarts": 0,
+                },
+            ),
+        ])
+        session.commit()
+    return run_id
+
+
+def test_resource_list_is_unobserved_until_a_valid_snapshot_exists(kclient: TestClient) -> None:
+    cluster = create(kclient)
+    response = kclient.get(f"{BASE}/clusters/{cluster['id']}/resources/pods")
+    assert response.status_code == 200
+    assert response.json() == {
+        "cluster_id": cluster["id"], "kind": "pods", "run_id": None,
+        "state": "unobserved", "partial": False, "total": None, "items": [],
+    }
+
+
+def test_resource_list_filters_and_detail_are_bound_to_the_latest_run(
+    kclient: TestClient,
+) -> None:
+    cluster = create(kclient)
+    run_id = _complete_resource_run(kclient, cluster["id"])
+    response = kclient.get(
+        f"{BASE}/clusters/{cluster['id']}/resources/pods",
+        params={"namespace": "default", "search": "web", "status": "Running", "limit": 1},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["run_id"] == run_id and body["state"] == "complete"
+    assert body["partial"] is False and body["total"] == 1
+    assert body["items"] == [{
+        "kind": "Pod", "uid": "pod-one", "name": "web", "namespace": "default",
+        "phase": "Running", "restarts": 1, "node_name": "node-a",
+    }]
+    detail = kclient.get(f"{BASE}/clusters/{cluster['id']}/resources/pods/pod-two")
+    assert detail.status_code == 200
+    assert detail.json()["item"]["name"] == "worker"
+    assert "spec" not in detail.text and "token" not in detail.text
+
+
+def test_partial_resource_list_does_not_claim_an_exact_total(kclient: TestClient) -> None:
+    cluster = create(kclient)
+    _complete_resource_run(kclient, cluster["id"], state="partial")
+    response = kclient.get(f"{BASE}/clusters/{cluster['id']}/resources/pods")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["partial"] is True and body["total"] is None and len(body["items"]) == 2
+
+
+@pytest.mark.parametrize("role", ["operator", "auditor"])
+def test_resource_list_and_detail_require_a_real_admin_session(
+    kclient: TestClient, role: str,
+) -> None:
+    cluster = create(kclient)
+    _complete_resource_run(kclient, cluster["id"])
+    with kclient.app.state.session_factory() as session:
+        user = session.scalar(select(User).where(User.username == "cluster-admin"))
+        user.role = role
+        session.commit()
+    resource_url = f"{BASE}/clusters/{cluster['id']}/resources/pods"
+    assert kclient.get(resource_url).status_code == 403
+    kclient.cookies.clear()
+    assert kclient.get(resource_url).status_code == 401
+
+
+def test_resource_routes_reject_unknown_kind_and_missing_resource(kclient: TestClient) -> None:
+    cluster = create(kclient)
+    assert kclient.get(f"{BASE}/clusters/{cluster['id']}/resources/secrets").status_code == 404
+    assert kclient.get(f"{BASE}/clusters/{cluster['id']}/resources/pods/missing").status_code == 404

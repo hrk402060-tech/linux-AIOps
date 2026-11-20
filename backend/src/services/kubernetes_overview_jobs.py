@@ -2,13 +2,14 @@ from datetime import datetime, timedelta, timezone
 import logging
 from uuid import uuid4
 
-from sqlalchemy import and_, func, or_, select, update
+from sqlalchemy import and_, delete, func, or_, select, update
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
 from src.models.auth import AuthSession, User
 from src.models.kubernetes_cluster import KubernetesCluster
 from src.models.kubernetes_collection import KubernetesCollectionRun
+from src.models.kubernetes_resource_snapshot import KubernetesResourceSnapshot
 from src.services.kubernetes_cluster_target_policy import KubernetesTargetPolicy
 from src.services.kubernetes_clusters import _audit, _commit
 from src.services.kubernetes_kubeconfig import KubernetesClusterError
@@ -191,6 +192,32 @@ def finalize(
         try:
             run = _validate_claim(session, claim, policy, locked=True)
             now = db_now(session)
+            snapshot_items = {}
+            if isinstance(projection, dict):
+                snapshot_items = projection.pop("resource_items", {})
+            if isinstance(snapshot_items, dict) and state in {"complete", "partial"}:
+                session.execute(delete(KubernetesResourceSnapshot).where(
+                    KubernetesResourceSnapshot.run_id == run.id,
+                ))
+                for kind, items in snapshot_items.items():
+                    if not isinstance(kind, str) or not isinstance(items, list):
+                        continue
+                    for item in items:
+                        if not isinstance(item, dict):
+                            continue
+                        uid, name = item.get("uid"), item.get("name")
+                        if not isinstance(uid, str) or not isinstance(name, str):
+                            continue
+                        namespace = item.get("namespace")
+                        namespace = namespace if isinstance(namespace, str) else None
+                        resource_version = item.get("resource_version")
+                        resource_version = resource_version if isinstance(resource_version, str) else None
+                        session.add(KubernetesResourceSnapshot(
+                            id=str(uuid4()), run_id=run.id, cluster_id=run.cluster_id,
+                            kind=kind, namespace=namespace, uid=uid, name=name,
+                            resource_version=resource_version, observed_at=now,
+                            projection=item,
+                        ))
             result = session.execute(update(KubernetesCollectionRun).where(
                 KubernetesCollectionRun.id == claim[0], KubernetesCollectionRun.state == "running",
                 KubernetesCollectionRun.lease_token == claim[1], KubernetesCollectionRun.lease_expires_at > now,
