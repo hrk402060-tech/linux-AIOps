@@ -12,7 +12,10 @@ RESOURCE_READS = (
     ("", "nodes"), ("", "namespaces"), ("", "pods"), ("", "services"), ("", "events"),
     ("apps", "deployments"), ("apps", "statefulsets"), ("apps", "daemonsets"),
 )
-ALLOWED_READS = frozenset(RESOURCE_READS + (("metrics.k8s.io", "nodes"), ("metrics.k8s.io", "pods")))
+PUBLIC_DISCOVERY_READS = frozenset({("certificates.k8s.io", "clustertrustbundles")})
+ALLOWED_READS = frozenset(
+    RESOURCE_READS + (("metrics.k8s.io", "nodes"), ("metrics.k8s.io", "pods")) + tuple(PUBLIC_DISCOVERY_READS)
+)
 REVIEW_RESOURCES = frozenset({
     ("authentication.k8s.io", "selfsubjectreviews"),
     ("authorization.k8s.io", "selfsubjectaccessreviews"),
@@ -138,7 +141,9 @@ def _validate_resource_rule(rule: object) -> None:
     for group in groups:
         for resource in resources:
             pair = (group, resource)
-            permitted = {"get", "list"} if pair in ALLOWED_READS else (
+            permitted = (
+                {"get", "list", "watch"} if pair in PUBLIC_DISCOVERY_READS else {"get", "list"}
+            ) if pair in ALLOWED_READS else (
                 {"create"} if pair in REVIEW_RESOURCES else set()
             )
             if not set(verbs) <= permitted:
@@ -152,8 +157,11 @@ def _validate_nonresource_rule(rule: object) -> None:
     paths = _string_list(rule.get("nonResourceURLs"))
     if not verbs or not paths or not set(verbs) <= {"get"}:
         raise KubernetesConnectionError("unsafe_permissions", "发现非资源写入或通配权限")
-    exact = {"/api", "/apis", "/openapi", "/version", "/version/", "/healthz", "/livez", "/readyz",
-             "/openid/v1/jwks", "/.well-known/openid-configuration"}
+    exact = {
+        "/api", "/apis", "/openapi", "/version", "/version/", "/healthz", "/livez", "/readyz",
+        "/openid/v1/jwks", "/openid/v1/jwks/", "/.well-known/openid-configuration",
+        "/.well-known/openid-configuration/",
+    }
     prefixes = ("/api/", "/apis/", "/openapi/", "/healthz/", "/livez/", "/readyz/", "/version/")
     if any(path not in exact and not path.startswith(prefixes)
            for path in paths):

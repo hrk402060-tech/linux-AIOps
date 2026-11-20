@@ -28,6 +28,8 @@ def _rules() -> dict[str, object]:
             {"apiGroups": ["apps"], "resources": ["deployments"], "verbs": ["get", "list"]},
             {"apiGroups": ["authorization.k8s.io"], "resources": ["selfsubjectaccessreviews"],
              "verbs": ["create"]},
+            {"apiGroups": ["certificates.k8s.io"], "resources": ["clustertrustbundles"],
+             "verbs": ["get", "list", "watch"]},
         ],
         "nonResourceRules": [{"verbs": ["get"], "nonResourceURLs": [
             "/api", "/apis/*", "/openapi/*", "/healthz/*", "/livez/*", "/readyz/*", "/version/*",
@@ -183,6 +185,19 @@ def test_namespace_screen_accepts_core_group_and_default_discovery(monkeypatch: 
     calls = _install_namespace_response(monkeypatch, {"metadata": {}, "items": items}, _rules())
     assert authorization.verify_namespace_rules(_parsed(), RequestBudget()) == 2
     assert calls == ["/api/v1/namespaces?limit=101", authorization.RULES_PATH, authorization.RULES_PATH]
+
+
+def test_namespace_screen_accepts_cluster_trust_bundle_public_discovery() -> None:
+    authorization._validate_resource_rule({
+        "apiGroups": ["certificates.k8s.io"],
+        "resources": ["clustertrustbundles"],
+        "verbs": ["get", "list", "watch"],
+    })
+
+
+@pytest.mark.parametrize("path", ["/openid/v1/jwks/", "/.well-known/openid-configuration/"])
+def test_nonresource_permissions_accept_discovery_trailing_slash(path: str) -> None:
+    authorization._validate_nonresource_rule({"verbs": ["get"], "nonResourceURLs": [path]})
 
 
 @pytest.mark.parametrize(
