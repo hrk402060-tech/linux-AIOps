@@ -1,7 +1,7 @@
 import { formatPlatformDateTime } from '../utils/platformPreferences';
 import { useEffect, useRef, useState } from 'react';
-import { Button, Input, Select, Spin, Tag, message } from 'antd';
-import { Archive, ArchiveRestore, Bot, CheckCircle2, CircleAlert, ClipboardCheck, Send, ShieldCheck } from 'lucide-react';
+import { Button, Input, Select, Spin, Tag, Tooltip, message } from 'antd';
+import { Archive, ArchiveRestore, Bot, CheckCircle2, CircleAlert, ClipboardCheck, Info, Send, ShieldCheck } from 'lucide-react';
 
 import { getAssets } from '../api/assets';
 import type { Asset } from '../types/asset';
@@ -55,7 +55,7 @@ function OperationsAssistantWorkspace({ initialAssetId, initialContext }: Pick<P
 
   return <section className="operations-assistant-page">{holder}
     <div className="page-heading">
-      <div><p className="eyebrow">只读诊断与排障建议</p><h1>AI 运维助手</h1></div>
+      <div><h1>AI 运维助手</h1></div>
       {assistant.active ? <Button aria-label={assistant.active.archived ? '恢复会话' : '归档会话'} icon={assistant.active.archived ? <ArchiveRestore size={16} /> : <Archive size={16} />} disabled={assistant.sending || assistant.detailLoading || assistant.locked} onClick={() => void assistant.update({ archived: !assistant.active?.archived })}>{assistant.active.archived ? '恢复会话' : '归档会话'}</Button> : null}
     </div>
     <div className="operations-assistant-layout">
@@ -79,7 +79,11 @@ function OperationsAssistantWorkspace({ initialAssetId, initialContext }: Pick<P
           </div>
           <div className="operations-assistant-context-status">
             <Tag color={assistant.assetId ? 'blue' : 'default'}>{assistant.assetId ? '已关联资产' : '通用问答'}</Tag>
-            <small>{assistant.active ? (assistant.active.archived ? '此会话已归档，仅可查看' : '服务器上下文已固定') : '连接服务器后可继续补充现场证据'}</small>
+            <Tooltip title={assistant.active
+              ? (assistant.active.archived ? '此会话已归档，仅可查看' : '服务器上下文已固定')
+              : '连接服务器后可继续补充现场证据'}>
+              <span className="operations-assistant-context-help" role="img" aria-label="查看上下文状态说明"><Info size={14} /></span>
+            </Tooltip>
           </div>
         </div>
         {assistant.error ? <div className="operations-assistant-error" role="alert">{assistant.error}</div> : null}
@@ -95,7 +99,7 @@ function OperationsAssistantWorkspace({ initialAssetId, initialContext }: Pick<P
             <Input.TextArea aria-label="向 AI 运维助手提问" maxLength={4000} value={assistant.question} onChange={(event) => assistant.setQuestion(event.target.value)} onKeyDown={(event) => {
               if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void assistant.send(); }
             }} placeholder={assistant.archived ? '归档会话不可继续提问' : '输入 Linux、Kubernetes、Docker 或监控告警问题…'} autoSize={{ minRows: 2, maxRows: 5 }} disabled={assistant.locked || assistant.archived || assistant.detailLoading || assistant.listLoading || assistant.sending} />
-            <div><small>Enter 发送，Shift + Enter 换行</small><Button type="primary" icon={<Send size={15} />} loading={assistant.sending} disabled={!canSend} onClick={() => void assistant.send()}>发送</Button></div>
+            <div><span className="operations-assistant-composer-spacer" aria-hidden="true" /><Tooltip title="Enter 发送，Shift + Enter 换行"><Button type="primary" icon={<Send size={15} />} loading={assistant.sending} disabled={!canSend} onClick={() => void assistant.send()}>发送</Button></Tooltip></div>
           </footer>
         </div>
       </main>

@@ -1,5 +1,13 @@
 # Project Context
 
+## UI 交互优先清理（二轮，2026-11-20）
+
+- AI 运维助手和安全设置页删除重复说明眉标题；上下文状态、键盘发送规则和外部告警只读边界改为 Tooltip/图标交互。
+- 保留错误、权限、安全边界、人工确认、真实数据可信度和 Kubernetes 管理员限制；不改变路由、接口、PageKey 或业务逻辑。
+- OperationsAssistant `13/13`、SecuritySettings `4/4`、Events diagnostics `3/3` 定向测试通过，TypeScript/Vite 构建通过。
+- EventsPage 组合套件仍有既有默认 5 秒超时和连接器测试夹具名称不一致，未归因于本轮改动。
+- 本轮只更新前端展示文件，发布时不修改 backend、PostgreSQL、配置或业务数据。
+
 ## Kubernetes 集群变更（二期预检）
 
 - PM 将节点扩容、版本升级、集群备份恢复、Helm 部署纳入二期；一期只读范围和凭据不变。平台 PostgreSQL/MySQL 原生容灾仍不在范围内。

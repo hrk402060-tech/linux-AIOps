@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Button, Tabs, Tag } from 'antd';
-import { ArrowLeft } from 'lucide-react';
+import { Button, Tabs, Tooltip } from 'antd';
+import { ArrowLeft, ShieldCheck } from 'lucide-react';
 import type { AuthUser } from '../api/auth';
 import type { ExternalAlert } from '../api/externalAlerts';
 import { ActiveEventsTab } from '../components/events/ActiveEventsTab';
@@ -36,8 +36,10 @@ function EventsContent({ currentUser, onOpenTerminal, onOpenIncidents, initialAs
   const alertId = configurationAlert?.id ?? initialAlertId;
   return <section className="events-page">
     <div className="page-heading">
-      <div><p className="eyebrow">统一接入 · 人工研判 · 处置留痕</p><h1>告警与智能预警</h1></div>
-      <Tag color="blue">外部告警只读接入</Tag>
+      <div><h1>告警与智能预警</h1></div>
+      <Tooltip title="外部告警仅允许只读接入，不会直接执行处置">
+        <span className="events-readonly-badge" role="img" aria-label="外部告警只读接入"><ShieldCheck size={17} /></span>
+      </Tooltip>
     </div>
     {configurationAlert && ['notifications', 'diagnostic-grants'].includes(activeTab)
       ? <Button icon={<ArrowLeft size={16} />} onClick={() => setActiveTab('external')}>返回告警</Button> : null}
