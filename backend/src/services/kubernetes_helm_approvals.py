@@ -102,7 +102,7 @@ def _validate_current(
         action="helm", expected_revision=row.cluster_revision, namespace=row.namespace,
         release_name=row.release_name, chart_id=row.chart["id"], chart_digest=row.chart["digest"],
     )
-    if build_preflight(session, cluster, policy, change, row.id).status == "blocked":
+    if build_preflight(session, cluster, policy, change, row.id, settings).status == "blocked":
         raise HTTPException(status_code=409, detail="集群预检已失效，请刷新快照后重新预览")
 
 

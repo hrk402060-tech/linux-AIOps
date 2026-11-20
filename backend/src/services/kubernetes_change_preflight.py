@@ -4,8 +4,10 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, TypeAdapter
 from sqlalchemy.orm import Session
 
+from src.config import Settings
 from src.models.kubernetes_cluster import KubernetesCluster
 from src.services.kubernetes_cluster_target_policy import KubernetesTargetPolicy
+from src.services.kubernetes_backups import restore_checks
 from src.services.kubernetes_overview import overview
 
 DnsLabel = Annotated[str, StringConstraints(pattern=r"^[a-z0-9]([a-z0-9-]*[a-z0-9])?$", max_length=63)]
@@ -126,7 +128,7 @@ def _unverified(items: list[tuple[str, str]]) -> list[Check]:
 
 def build_preflight(
     session: Session, cluster: KubernetesCluster, policy: KubernetesTargetPolicy,
-    change: Change, trace_id: str,
+    change: Change, trace_id: str, settings: Settings,
 ) -> Preflight:
     data = overview(session, cluster, policy)
     # Do not treat an older successful snapshot as current while a new attempt is pending or failed.
@@ -146,6 +148,12 @@ def build_preflight(
     ]
     version = _as_version(cluster.version, live=True)
     checks.extend(_action_checks(change, version))
+    if isinstance(change, Restore):
+        checks = [check for check in checks if check.code != "restore_evidence"]
+        checks.extend(Check(code=code, label=label, status=status)
+                     for code, label, status in restore_checks(
+                         session, cluster, change.backup_name, settings,
+                     ))
     return Preflight(
         trace_id=trace_id, cluster_id=cluster.id, cluster_revision=cluster.revision,
         action=change.action, status="blocked" if any(c.status == "blocked" for c in checks) else "requires_validation",
@@ -186,7 +194,8 @@ def change_capabilities(
         action="helm", label="Helm 部署",
         status="preview_only" if lifecycle_ready and helm_enabled else "blocked",
         reason=("仅支持受信 Chart 的预览、审批和隔离执行"
-                if lifecycle_ready and helm_enabled else "受信 Chart 或隔离执行能力未启用"),
+                if lifecycle_ready and helm_enabled else "受信 Chart 或隔离执行能力未启用"
+                if lifecycle_ready else "集群未处于已验证的可用状态"),
     ))
     return ChangeCapabilities(
         cluster_id=cluster.id, cluster_revision=cluster.revision,

@@ -43,6 +43,7 @@ class Settings(BaseSettings):
     kubernetes_api_allowed_cidrs: str = ""
     kubernetes_api_denied_cidrs: str = ""
     kubernetes_collection_workers_enabled: bool = True
+    kubernetes_backup_root: str = "/var/lib/linux-ops/kubernetes-backups"
     kubernetes_helm_trusted_charts: str = "[]"
     kubernetes_helm_binary: str = "helm"
     kubernetes_helm_rehearsal_enabled: bool = False

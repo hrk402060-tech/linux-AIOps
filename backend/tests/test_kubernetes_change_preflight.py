@@ -41,14 +41,15 @@ def test_preflight_is_advisory_and_audited(kclient: TestClient, action: str, par
     })
     assert result.status_code == 200, result.text
     body = result.json()
-    assert body["status"] == "requires_validation"
+    expected_status = "blocked" if action == "restore" else "requires_validation"
+    assert body["status"] == expected_status
     assert body["execution_available"] is False
     assert body["node_count"] == body["ready_nodes"] == 3
     assert body["action"] == action
     with kclient.app.state.session_factory() as session:
         record = session.scalar(select(KubernetesClusterAudit).where(KubernetesClusterAudit.trace_id == body["trace_id"]))
         assert record is not None and record.action == "change_preflight"
-        assert record.detail == f"{action}:requires_validation"
+        assert record.detail == f"{action}:{expected_status}"
 
 
 def test_stale_snapshot_and_skipped_minor_block_preflight(kclient: TestClient) -> None:
@@ -79,7 +80,9 @@ def test_change_capabilities_are_explicitly_preview_only(kclient: TestClient) ->
         "scale", "upgrade", "backup", "restore", "helm",
     }
     assert all(item["execution_available"] is False for item in body["actions"])
-    assert all(item["status"] == "preview_only" for item in body["actions"])
+    statuses = {item["action"]: item["status"] for item in body["actions"]}
+    assert all(statuses[action] == "preview_only" for action in {"scale", "upgrade", "backup", "restore"})
+    assert statuses["helm"] == "blocked"
     kclient.cookies.clear()
     assert kclient.get(f"{url}/change-capabilities").status_code == 401
 

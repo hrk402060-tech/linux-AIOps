@@ -41,3 +41,5 @@
 .k8s-helm-approval-form { display: grid; gap: 8px; max-width: 620px; padding: 8px 0; }
 .k8s-helm-approval-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .k8s-helm-approval-actions .ant-input { width: 140px; max-width: 100%; }
+.k8s-backup-registry { display: grid; gap: 10px; min-width: 0; padding-top: 12px; border-top: 1px solid #e5e9e7; }
+.k8s-backup-row { display: grid; gap: 6px; border-top: 1px solid #eef1ef; padding: 8px 0; overflow-wrap: anywhere; }

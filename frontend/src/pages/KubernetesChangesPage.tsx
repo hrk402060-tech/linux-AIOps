@@ -7,6 +7,7 @@ import {
   type ChangeCapabilities, type ChangeParameters, type ChangePreflight, type HelmChart,
 } from '../api/kubernetesChanges';
 import { HelmResources, KubernetesHelmApprovals } from './KubernetesHelmApprovals';
+import { KubernetesBackupRegistry } from './KubernetesBackupRegistry';
 import './kubernetesChanges.css';
 
 type Action = ChangeParameters['action'];
@@ -215,6 +216,9 @@ export function KubernetesChangesPage({ initialCluster }: { initialCluster?: Kub
     </Form>
     {error && <Alert type="error" showIcon message={error} />}
     {result && <PreflightResult result={result} />}
+    {cluster && !loading && !listError && (action === 'backup' || action === 'restore') &&
+      <KubernetesBackupRegistry key={`${cluster.id}:${cluster.revision}:${action}:${reload}`}
+        clusterId={cluster.id} revision={cluster.revision} mode={action} onChanged={clearResult} />}
     {helmPreview && <section className="k8s-helm-resources" aria-label="Helm 资源预览">
       <h3>资源预览 · {helmPreview.chart.name} {helmPreview.chart.version}</h3>
       <HelmResources items={helmPreview.resources} />

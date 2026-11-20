@@ -8,6 +8,8 @@ from sqlalchemy.orm import Session
 from src.auth import AuthPrincipal
 from src.database import get_session
 from src.models.kubernetes_helm_approval import KubernetesHelmApproval
+from src.models.kubernetes_backup import KubernetesBackupArtifact
+from src.schemas.kubernetes_backup import KubernetesBackupRegister, KubernetesBackupRestoreTarget
 from src.routes.kubernetes import SafeKubernetesRoute, _cluster, _error, _validate, require_real_admin
 from src.services import kubernetes_clusters, kubernetes_helm_approvals as approvals
 from src.services import kubernetes_helm_admission as admission
@@ -17,6 +19,7 @@ from src.services.kubernetes_change_preflight import (
 )
 from src.services.kubernetes_cluster_target_policy import KubernetesTargetPolicy
 from src.services.kubernetes_helm import HelmPreviewError, preview, public_catalog
+from src.services import kubernetes_backups as backups
 from src.services.kubernetes_overview_jobs import utc
 
 router = APIRouter(prefix="/kubernetes", tags=["kubernetes"], route_class=SafeKubernetesRoute)
@@ -45,6 +48,76 @@ def helm_charts(request: Request, principal: AuthPrincipal = Depends(require_rea
     return public_catalog(request.app.state.runtime_settings.kubernetes_helm_trusted_charts)
 
 
+@router.get("/clusters/{cluster_id}/backups")
+def list_backups(
+    cluster_id: str, offset: int = Query(0, ge=0), limit: int = Query(50, ge=1, le=100),
+    session: Session = Depends(get_session), principal: AuthPrincipal = Depends(require_real_admin),
+) -> dict[str, object]:
+    cluster = _cluster(session, cluster_id)
+    result = backups.list_artifacts(session, cluster.id, offset, limit)
+    kubernetes_clusters._audit(session, cluster.id, principal.username, "backup_listed", "accepted", str(uuid4()))
+    kubernetes_clusters._commit(session)
+    return result
+
+
+@router.post("/clusters/{cluster_id}/backups", status_code=201)
+def register_backup(
+    cluster_id: str, body: object = Body(...),
+    session: Session = Depends(get_session), principal: AuthPrincipal = Depends(require_real_admin),
+) -> dict[str, object]:
+    payload = _validate(KubernetesBackupRegister, body)
+    try:
+        artifact = backups.register(session, _cluster(session, cluster_id), payload, principal.username)
+        kubernetes_clusters._audit(
+            session, cluster_id, principal.username, "backup_registered", "accepted",
+            str(uuid4()), artifact.id,
+        )
+        kubernetes_clusters._commit(session)
+        return backups.serialize(artifact)
+    except kubernetes_clusters.KubernetesClusterError as error:
+        raise _error(session, error) from error
+
+
+@router.post("/clusters/{cluster_id}/backups/{backup_id}/verify")
+def verify_backup(
+    cluster_id: str, backup_id: str, request: Request,
+    session: Session = Depends(get_session), principal: AuthPrincipal = Depends(require_real_admin),
+) -> dict[str, object]:
+    cluster = _cluster(session, cluster_id)
+    artifact = session.get(KubernetesBackupArtifact, backup_id)
+    if artifact is None or artifact.cluster_id != cluster.id:
+        raise HTTPException(status_code=404, detail="备份产物不存在")
+    result = backups.verify(session, artifact, request.app.state.runtime_settings)
+    kubernetes_clusters._audit(
+        session, cluster.id, principal.username, "backup_verified", result.status,
+        str(uuid4()), artifact.id,
+    )
+    kubernetes_clusters._commit(session)
+    return backups.serialize(result)
+
+
+@router.put("/clusters/{cluster_id}/backups/{backup_id}/restore-target")
+def set_restore_target(
+    cluster_id: str, backup_id: str, body: object = Body(...),
+    session: Session = Depends(get_session), principal: AuthPrincipal = Depends(require_real_admin),
+) -> dict[str, object]:
+    payload = _validate(KubernetesBackupRestoreTarget, body)
+    cluster = _cluster(session, cluster_id)
+    artifact = session.get(KubernetesBackupArtifact, backup_id)
+    if artifact is None or artifact.cluster_id != cluster.id:
+        raise HTTPException(status_code=404, detail="备份产物不存在")
+    try:
+        artifact = backups.set_restore_target(session, artifact, cluster, payload)
+    except kubernetes_clusters.KubernetesClusterError as error:
+        raise _error(session, error) from error
+    kubernetes_clusters._audit(
+        session, cluster.id, principal.username, "restore_target_registered", "accepted",
+        str(uuid4()), f"{artifact.id}:{payload.target_key}",
+    )
+    kubernetes_clusters._commit(session)
+    return backups.serialize(artifact)
+
+
 @router.post("/clusters/{cluster_id}/helm-preview")
 def helm_preview(
     cluster_id: str, request: Request, body: object = Body(...),
@@ -67,7 +140,9 @@ def helm_preview(
         cluster = approvals.cluster_for_update(session, cluster_id)
         if cluster.revision != change.expected_revision:
             raise HTTPException(status_code=409, detail="集群配置已变化，请刷新后重试")
-        preflight_result = build_preflight(session, cluster, policy, change, str(uuid4()))
+        preflight_result = build_preflight(
+            session, cluster, policy, change, str(uuid4()), request.app.state.runtime_settings,
+        )
         row = (approvals.save_preview(session, cluster, change, rendered, policy, principal, preflight_result.trace_id)
                if preflight_result.status != "blocked" else None)
         preview_expires_at = utc(row.expires_at) if row else None
@@ -180,7 +255,9 @@ def preflight(
         raise HTTPException(status_code=409, detail="集群配置已变化，请刷新后重试")
     try:
         policy = KubernetesTargetPolicy.from_settings(request.app.state.runtime_settings)
-        result = build_preflight(session, cluster, policy, change, str(uuid4()))
+        result = build_preflight(
+            session, cluster, policy, change, str(uuid4()), request.app.state.runtime_settings,
+        )
         kubernetes_clusters._audit(
             session, cluster.id, principal.username, "change_preflight", result.status,
             result.trace_id, f"{change.action}:{result.status}",
