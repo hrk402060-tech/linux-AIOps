@@ -78,7 +78,7 @@ export function DashboardPreviewPage({ onNavigate, preview = true }: {
     || snapshot.service_health.summary.unavailable > 0;
   return <section className="dashboard-preview-page">{holder}
     <div className="preview-heading">
-      <div><p className="eyebrow">Linux 智能综合运维平台 / {preview ? '工作台预览' : '工作台'}</p><h1>综合总览</h1></div>
+      <div><h1>综合总览</h1></div>
       <div className="preview-heading-actions">
         <span className={`preview-health-badge ${healthNeedsAttention ? 'is-warning' : 'is-healthy'}`}><i />{healthNeedsAttention ? '需要关注' : '运行正常'}</span>
         <Tooltip title="刷新真实数据"><Button aria-label="刷新总览预览" icon={<RefreshCw size={17} />} loading={loading} onClick={() => void load()} /></Tooltip>

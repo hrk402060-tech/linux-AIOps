@@ -40,7 +40,7 @@ export function CredentialRisksPage({ embedded = false }: { embedded?: boolean }
     } catch (error) { messages.error(error instanceof Error ? error.message : '操作失败'); }
   };
   return <section className="scan-tasks-page" aria-label="弱口令评估">{holder}
-    <div className="page-heading">{!embedded ? <div><p className="eyebrow">后端内存离线策略评估</p><h1>弱口令风险</h1></div> : null}<Space><Button aria-label="刷新弱口令任务" icon={<RefreshCw size={17} />} onClick={() => void load()} /><Button type="primary" icon={<Plus size={17} />} onClick={() => setOpen(true)}>新建评估</Button></Space></div>
+    <div className="page-heading">{!embedded ? <div><h1>弱口令风险</h1></div> : null}<Space><Button aria-label="刷新弱口令任务" icon={<RefreshCw size={17} />} onClick={() => void load()} /><Button type="primary" icon={<Plus size={17} />} onClick={() => setOpen(true)}>新建评估</Button></Space></div>
     <div className="metric-band"><div><span>任务总数</span><strong>{summary.total}</strong></div><div><span>评估中</span><strong>{summary.running}</strong></div><div><span>最近风险凭据</span><strong>{summary.atRisk}</strong></div><div><span>高风险</span><strong>{summary.high}</strong></div></div>
     <div className="table-frame"><Table rowKey="id" loading={loading} dataSource={tasks} scroll={{ x: 1050 }} columns={[
       { title: '评估任务', render: (_, item: CredentialRiskTask) => <div className="asset-identity"><span><KeyRound size={17} /></span><div><strong>{item.name}</strong><small>{item.credential_snapshot.map((credential) => `${credential.name} · ${credential.username}`).join('、')}</small></div></div> },

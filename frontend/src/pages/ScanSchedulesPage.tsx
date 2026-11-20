@@ -52,7 +52,7 @@ export function ScanSchedulesPage({ embedded = false }: { embedded?: boolean }) 
     catch (error) { messages.error(error instanceof Error ? error.message : '历史加载失败'); }
   };
   return <section className="scan-tasks-page" aria-label="定时扫描">{holder}
-    <div className="page-heading">{!embedded ? <div><p className="eyebrow">只读周期检测</p><h1>定时扫描</h1></div> : null}<Space><Button aria-label="刷新计划" icon={<RefreshCw size={17} />} onClick={() => void load()} /><Button type="primary" icon={<Plus size={17} />} onClick={() => setOpen(true)}>新建计划</Button></Space></div>
+    <div className="page-heading">{!embedded ? <div><h1>定时扫描</h1></div> : null}<Space><Button aria-label="刷新计划" icon={<RefreshCw size={17} />} onClick={() => void load()} /><Button type="primary" icon={<Plus size={17} />} onClick={() => setOpen(true)}>新建计划</Button></Space></div>
     <div className="table-frame"><Table rowKey="id" loading={loading} dataSource={items} pagination={{ pageSize: 10, showSizeChanger: false }} columns={[
       { title: '计划', dataIndex: 'name' }, { title: '扫描类型', dataIndex: 'scan_type', render: (value: keyof typeof types) => types[value] },
       { title: '资产', dataIndex: 'asset_snapshot', render: (value: Array<{ name: string }>) => value.map((item) => item.name).join('、') },

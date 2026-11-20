@@ -44,7 +44,7 @@ export function ExposuresPage({ embedded = false }: { embedded?: boolean }) {
     } catch (error) { messages.error(error instanceof Error ? error.message : '操作失败'); }
   };
   return <section className="scan-tasks-page" aria-label="暴露面检测">{holder}
-    <div className="page-heading">{!embedded ? <div><p className="eyebrow">SSH 无 Agent 只读采集</p><h1>服务器暴露面</h1></div> : null}<Space><Button aria-label="刷新暴露面任务" icon={<RefreshCw size={17} />} onClick={() => void load()} /><Button type="primary" icon={<Plus size={17} />} onClick={() => setOpen(true)}>新建检测</Button></Space></div>
+    <div className="page-heading">{!embedded ? <div><h1>服务器暴露面</h1></div> : null}<Space><Button aria-label="刷新暴露面任务" icon={<RefreshCw size={17} />} onClick={() => void load()} /><Button type="primary" icon={<Plus size={17} />} onClick={() => setOpen(true)}>新建检测</Button></Space></div>
     <div className="metric-band"><div><span>任务总数</span><strong>{summary.total}</strong></div><div><span>检测中</span><strong>{summary.running}</strong></div><div><span>最近监听项</span><strong>{summary.listeners}</strong></div><div><span>潜在暴露</span><strong>{summary.potential}</strong></div></div>
     <div className="table-frame"><Table rowKey="id" loading={loading} dataSource={tasks} scroll={{ x: 1050 }} columns={[
       { title: '检测任务', render: (_, item: ExposureTask) => <div className="asset-identity"><span><Network size={17} /></span><div><strong>{item.name}</strong><small>{item.asset_snapshot.map((asset) => `${asset.name} · ${asset.host}`).join('、')}</small></div></div> },

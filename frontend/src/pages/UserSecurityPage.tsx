@@ -71,7 +71,7 @@ export function UserSecurityPage({ onLogout, embedded = false }: { onLogout: () 
 
   return <section className={embedded ? 'user-security-settings' : 'system-page'} aria-label="个人 MFA">{holder}
     {!embedded ? <div className="page-heading">
-      <div><p className="eyebrow">账号安全</p><h1>个人安全</h1></div>
+      <div><h1>个人安全</h1></div>
       {refresh}
     </div> : null}
     {loadError ? <Alert type="error" showIcon message={loadError} /> : null}

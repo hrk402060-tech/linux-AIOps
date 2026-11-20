@@ -79,7 +79,7 @@ export function PatchesPage() {
     } finally { pending.current = false; setSubmitting(false); }
   };
   return <section className="scan-tasks-page">{holder}
-    <div className="page-heading"><div><p className="eyebrow">厂商公告关联建议</p><h1>补丁与变更中心</h1></div><Button aria-label="刷新补丁建议" icon={<RefreshCw size={17} />} onClick={() => void load()} /></div>
+    <div className="page-heading"><div><h1>补丁与变更中心</h1></div><Button aria-label="刷新补丁建议" icon={<RefreshCw size={17} />} onClick={() => void load()} /></div>
     <div className="metric-band"><div><span>待人工确认</span><strong>{items.filter(canApproveAdvice).length}</strong></div><div><span>待确认高危</span><strong>{items.filter((item) => canApproveAdvice(item) && ['critical', 'high'].includes(item.severity)).length}</strong></div><div><span>支持自动更新</span><strong>{loading && !items.length ? '—' : items.filter((item) => item.execution_enabled).length}</strong></div><div><span>验证方式</span><strong>重新扫描</strong></div></div>
     <div className="table-frame"><Table rowKey="id" loading={loading} dataSource={items} scroll={{ x: 1480 }} locale={{ emptyText: <Empty description="暂无补丁建议" /> }} columns={[
       { title: '资产 / CVE', render: (_, item) => <div className="asset-identity"><span><ShieldCheck size={17} /></span><div><strong>{item.asset_name}</strong><small>{item.asset_id} · {item.cve_id}</small></div></div> },
