@@ -994,4 +994,6 @@ frontend，backend、PostgreSQL、`.env`、Compose 和业务数据未修改。�
 表达，未修改路由、PageKey、接口、权限、数据模型或业务逻辑。
 
 受影响页面回归 `36/36` 通过，TypeScript/Vite 生产构建通过，仅有既有大 chunk 警告。
-本轮构建产物待发布生产。
+GitHub `main` 提交 `9f54fa6` 已发布；仅更新 frontend 静态资源并重建 frontend，
+backend、PostgreSQL、`.env`、Compose 和业务数据未修改。两个生产入口首页返回 `200`，
+`/api/health` 返回 `{"status":"ok"}`，三个容器均 healthy。
