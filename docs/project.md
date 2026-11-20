@@ -983,4 +983,6 @@ UI：头像左侧齿轮进入独立设置页；八类目录、分类内顶部标
 PageKey、接口、权限、数据模型或交互流程。
 
 资产页定向 Vitest `18/18` 通过，TypeScript/Vite 生产构建通过。构建仍有既有大
-chunk 警告；本轮工作区改动尚未发布生产。
+chunk 警告。GitHub `main` 提交 `7106d20` 已发布；仅更新 frontend 静态资源并重建
+frontend，backend、PostgreSQL、`.env`、Compose 和业务数据未修改。两个生产入口首页
+返回 `200`，`/api/health` 返回 `{"status":"ok"}`，线上文件哈希与候选一致。
