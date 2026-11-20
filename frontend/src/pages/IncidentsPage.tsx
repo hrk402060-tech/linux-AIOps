@@ -108,7 +108,7 @@ export function IncidentsPage({ currentUser }: { currentUser: Pick<AuthUser, 'ro
   const canAdvance = note.trim().length >= 3
     && (advancingTo !== 'closed' || confirmation.trim() === '确认关闭');
   return <section className="incidents-page">{holder}
-    <div className="page-heading"><div><p className="eyebrow">人工处置 · 全程留痕</p><h1>故障与工单</h1></div><Space>{readOnly ? <Tag>审计员只读</Tag> : <Button type="primary" icon={<Plus size={16} />} onClick={() => void openCreate()}>新建故障</Button>}<Button aria-label="刷新故障" icon={<RefreshCw size={17} />} onClick={() => void load()} /></Space></div>
+    <div className="page-heading"><div><h1>故障与工单</h1></div><Space>{readOnly ? <Tag>审计员只读</Tag> : <Button type="primary" icon={<Plus size={16} />} onClick={() => void openCreate()}>新建故障</Button>}<Button aria-label="刷新故障" icon={<RefreshCw size={17} />} onClick={() => void load()} /></Space></div>
     <div className="metric-band"><div><span>当前故障</span><strong>{metrics.active}</strong></div><div><span>严重 / 高危</span><strong>{metrics.urgent}</strong></div><div><span>处理中</span><strong>{metrics.processing}</strong></div><div><span>待人工关闭</span><strong>{metrics.resolved}</strong></div><div><span>SLA 超时</span><strong>{metrics.breached}</strong></div></div>
     <Space wrap style={{ marginBottom: 14 }}>
       <Input.Search allowClear aria-label="搜索故障" placeholder="搜索标题" style={{ width: 240 }} onSearch={(value) => updateFilter('query', value.trim())} />

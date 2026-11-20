@@ -86,7 +86,7 @@ export function VulnerabilitiesPage({ initialAssetId = null, initialQuery = '', 
   ];
 
   return <section className="vulnerabilities-page">{contextHolder}
-    <div className="page-heading"><div><p className="eyebrow">证据驱动研判</p><h1>漏洞详情</h1></div></div>
+    <div className="page-heading"><div><h1>漏洞详情</h1></div></div>
     {loadError ? <Alert type="error" showIcon message="漏洞数据读取失败" description={loadError} action={<Button onClick={() => void load()}>重试</Button>} /> : null}
     <Spin spinning={loading} tip={loading ? '正在加载真实数据' : undefined}><div hidden={Boolean(loadError)} className={`vulnerabilities-data-shell${loading ? ' is-loading' : ''}`}><div className="metric-band finding-metrics">
       <div><span>当前漏洞</span><strong>{summary.critical + summary.high + summary.medium + summary.low}</strong></div>

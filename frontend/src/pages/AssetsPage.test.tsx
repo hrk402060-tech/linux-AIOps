@@ -92,7 +92,7 @@ describe('AssetsPage', () => {
     expect(within(drawer).getByLabelText('操作系统')).toBeInTheDocument();
     expect(within(drawer).getByLabelText('SSH 用户名')).toBeInTheDocument();
     expect(within(drawer).getByText('SSH 认证方式', { selector: 'label' })).toBeInTheDocument();
-    expect(within(drawer).getByText('新增资产必填；编辑时留空保留原认证')).toBeInTheDocument();
+    expect(within(drawer).queryByText('新增资产必填；编辑时留空保留原认证')).not.toBeInTheDocument();
     expect(within(drawer).getByText('密码', { selector: '.ant-select-selection-item' })).toBeInTheDocument();
     expect(within(drawer).getByLabelText('SSH 密码')).toBeInTheDocument();
     expect(within(drawer).queryByLabelText('连接凭据')).not.toBeInTheDocument();

@@ -88,7 +88,7 @@ export function CredentialsPage() {
   return (
     <section className="credentials-page">
       {contextHolder}
-      <div className="page-heading"><div><p className="eyebrow">访问控制</p><h1>凭据管理</h1></div><Button type="primary" icon={<Plus size={17} />} onClick={() => { setEditing(null); setDrawerOpen(true); }}>新建凭据</Button></div>
+      <div className="page-heading"><div><h1>凭据管理</h1></div><Button type="primary" icon={<Plus size={17} />} onClick={() => { setEditing(null); setDrawerOpen(true); }}>新建凭据</Button></div>
       <div className="metric-band">
         <div><span>凭据总数</span><strong>{items.length}</strong></div>
         <div><span>密码认证</span><strong>{passwordCount}</strong></div>

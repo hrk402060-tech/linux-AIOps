@@ -28,7 +28,7 @@ export function AuditLogPage() {
     setPage(1); setFilters((current) => { const next = { ...current }; if (value) next[key] = value; else delete next[key]; return next; });
   };
   return <section>{holder}
-    <div className="page-heading"><div><p className="eyebrow">追加式安全操作记录</p><h1>统一审计日志</h1></div><Button aria-label="刷新审计日志" icon={<RefreshCw size={17} />} onClick={() => void load()} /></div>
+    <div className="page-heading"><div><h1>统一审计日志</h1></div><Button aria-label="刷新审计日志" icon={<RefreshCw size={17} />} onClick={() => void load()} /></div>
     <Space wrap style={{ marginBottom: 16 }}>
       <Select allowClear aria-label="审计来源" placeholder="全部来源" style={{ width: 180 }} options={sourceOptions} onChange={(value) => filter('source', value)} />
       <Input allowClear aria-label="审计操作人" prefix={<Search size={16} />} placeholder="搜索操作人" style={{ width: 200 }} onPressEnter={(event) => filter('operator', event.currentTarget.value.trim())} onClear={() => filter('operator')} />
