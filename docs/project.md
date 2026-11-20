@@ -997,3 +997,15 @@ frontend，backend、PostgreSQL、`.env`、Compose 和业务数据未修改。�
 GitHub `main` 提交 `9f54fa6` 已发布；仅更新 frontend 静态资源并重建 frontend，
 backend、PostgreSQL、`.env`、Compose 和业务数据未修改。两个生产入口首页返回 `200`，
 `/api/health` 返回 `{"status":"ok"}`，三个容器均 healthy。
+
+### 2026-11-20 Kubernetes 资源只读浏览发布
+
+Kubernetes 集群总览现在包含 Node、Namespace、Pod、Deployment、StatefulSet、
+DaemonSet、Service 和 Warning Event 的只读资源查看、筛选、搜索、分页和详情抽屉。
+详情使用后端字段白名单投影，不展示 Secret、kubeconfig 或原始 spec；每次查看写入
+审计，保持原有只读权限边界。
+
+前端定向测试 `12/12` 通过；后端此前在 192.168.10.17 隔离 Docker 定向验证 `52`
+项通过。生产已同步 3 个后端运行文件和前端构建产物，仅重建 backend/frontend，
+未执行迁移，PostgreSQL、`.env`、Compose、真实 Kubernetes 集群和业务数据未修改。
+两个生产入口首页返回 `200`，`/api/health` 返回 `{"status":"ok"}`，三个容器均 healthy。
