@@ -6,7 +6,9 @@
 - 保留错误、权限、安全边界、人工确认、真实数据可信度和 Kubernetes 管理员限制；不改变路由、接口、PageKey 或业务逻辑。
 - OperationsAssistant `13/13`、SecuritySettings `4/4`、Events diagnostics `3/3` 定向测试通过，TypeScript/Vite 构建通过。
 - EventsPage 组合套件仍有既有默认 5 秒超时和连接器测试夹具名称不一致，未归因于本轮改动。
-- 本轮只更新前端展示文件，发布时不修改 backend、PostgreSQL、配置或业务数据。
+- GitHub `main` 提交 `30c9cac` 已推送；仅更新前端展示文件并发布到
+  `192.168.10.17:8088`、`192.168.110.215:8088`，backend、PostgreSQL、
+  配置和业务数据未修改；两个入口健康检查通过。
 
 ## Kubernetes 集群变更（二期预检）
 
