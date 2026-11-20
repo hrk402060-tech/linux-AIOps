@@ -117,7 +117,7 @@ export function AutomationPage({ onNavigate, currentUser }: { onNavigate: (page:
     </div>
     {errors.length ? <Alert role="alert" type="warning" showIcon
       message={`部分数据加载失败：${errors.join('、')}`}
-      description={data && tasks.length ? '可用来源继续展示；失败来源保留上次数据或显示未知，请刷新重试。' : '请刷新重试，失败来源不计为零或正常。'}
+      description={data && tasks.length ? '失败来源保留上次数据或显示“—”。' : '失败来源显示“—”。'}
       action={<Button size="small" onClick={() => void load()} loading={loading}>重试</Button>} /> : null}
     <div className="automation-metrics">
       {metrics.filter(({ key }) => showIntegrations || key !== 'integrations').map(({ key, label, count, icon: Icon }) => <div key={key} data-testid={`automation-metric-${key}`}>

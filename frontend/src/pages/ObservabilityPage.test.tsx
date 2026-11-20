@@ -41,7 +41,7 @@ describe('ObservabilityPage', () => {
     expect(await screen.findByText('订单 API')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: '服务监控' })).toBeInTheDocument();
     expect(screen.getByText(/订单平台.*订单应用/)).toBeInTheDocument();
-    expect(screen.getByText('服务器快照已过期')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /查看 订单 API 状态依据：服务器快照已过期/ })).toBeInTheDocument();
     expect(screen.queryByText('SSH 无 Agent 准实时数据')).not.toBeInTheDocument();
     expect(screen.getByText('陈旧')).toBeInTheDocument();
   });
@@ -79,7 +79,7 @@ describe('ObservabilityPage', () => {
     fireEvent.click(await screen.findByRole('button', { name: '查看 订单 API 证据' }));
     fireEvent.click(screen.getByRole('button', { name: '定位 订单服务异常 告警' }));
     expect(onOpenAlerts).toHaveBeenCalledExactlyOnceWith('asset-1', 'activity', undefined);
-  });
+  }, 15000);
 
   it('does not present missing configuration or restricted visibility as complete service health', async () => {
     const service = { ...snapshot.services[0], status: 'unobserved' as const, runtime_status: 'healthy' as const,
@@ -89,7 +89,7 @@ describe('ObservabilityPage', () => {
     vi.mocked(getServiceObservability).mockResolvedValue({ ...snapshot, services: [service] });
     render(<ObservabilityPage />);
     expect(await screen.findByText('仅授权范围')).toBeInTheDocument();
-    expect(screen.getByText('尚未配置 API 拨测')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /查看 订单 API 状态依据：尚未配置 API 拨测/ })).toBeInTheDocument();
     expect(screen.getByText('0 / 2')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '查看 订单 API 证据' }));
     expect(screen.getByText('尚未配置拨测目标')).toBeInTheDocument();

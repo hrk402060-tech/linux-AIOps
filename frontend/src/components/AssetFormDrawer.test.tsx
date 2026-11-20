@@ -26,6 +26,12 @@ function show(asset: Asset | null = null) {
 }
 
 describe('AssetFormDrawer direct SSH login', () => {
+  it('keeps the drawer focused on fields and actions without helper strips', () => {
+    const { dialog } = show();
+    expect(dialog.queryByText('默认只读')).not.toBeInTheDocument();
+    expect(dialog.queryByText('新增资产必填；编辑时留空保留原认证')).not.toBeInTheDocument();
+  });
+
   it('requires a username and secret for a new server', async () => {
     const { dialog, onSubmit } = show();
     fireEvent.click(dialog.getByRole('button', { name: /保\s*存/ }));

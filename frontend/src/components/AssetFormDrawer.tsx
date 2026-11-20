@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { Button, Drawer, Form, Input, InputNumber, Select, Space } from 'antd';
-import { Eye, KeyRound, Server } from 'lucide-react';
+import { KeyRound, Server } from 'lucide-react';
 
 import type { Asset, AssetCreate, AssetEnvironment, OsFamily } from '../types/asset';
 import { osOptions } from '../utils/assets';
@@ -45,7 +45,7 @@ export function AssetFormDrawer(props: AssetFormDrawerProps) {
   return (
     <Drawer title={asset ? '编辑资产' : '新建资产'} open={open} width={520} destroyOnClose
       onClose={() => { form.resetFields(); onClose(); }}
-      footer={<div className="drawer-footer"><span className="encryption-label"><Eye size={15} />默认只读</span><Space><Button onClick={onClose}>取消</Button><Button type="primary" loading={submitting} onClick={() => form.submit()}>保存</Button></Space></div>}>
+      footer={<div className="drawer-footer"><Space><Button onClick={onClose}>取消</Button><Button type="primary" loading={submitting} onClick={() => form.submit()}>保存</Button></Space></div>}>
       <Form form={form} layout="vertical" requiredMark="optional" onFinish={submit}>
         <Form.Item name="name" label="资产名称" rules={[{ required: true, whitespace: true, message: '请输入资产名称' }, { min: 2, max: 100 }]}>
           <Input prefix={<Server size={16} />} placeholder="例如：openEuler 核心数据库" />
@@ -64,12 +64,12 @@ export function AssetFormDrawer(props: AssetFormDrawerProps) {
             rules={[({ getFieldValue }) => ({ required: !asset || Boolean(getFieldValue('ssh_secret') || getFieldValue('ssh_credential_type')), whitespace: true, message: '请输入 SSH 用户名' }), { max: 64 }]}>
             <Input prefix={<KeyRound size={16} />} placeholder="例如：root" autoComplete="username" />
           </Form.Item>
-          <Form.Item name="ssh_credential_type" label="SSH 认证方式" required={!asset} extra="新增资产必填；编辑时留空保留原认证">
+          <Form.Item name="ssh_credential_type" label="SSH 认证方式" required={!asset}>
             <Select onChange={() => form.setFieldValue('ssh_secret', undefined)} options={[{ value: 'password', label: '密码' }, { value: 'private_key', label: '私钥' }]} />
           </Form.Item>
         </div>
         <Form.Item noStyle shouldUpdate={(prev, next) => prev.ssh_credential_type !== next.ssh_credential_type}>
-          {({ getFieldValue }) => <Form.Item name="ssh_secret" label={getFieldValue('ssh_credential_type') === 'private_key' ? 'SSH 私钥' : 'SSH 密码'} dependencies={['ssh_username', 'ssh_credential_type']} extra={asset ? '留空则保留当前认证信息' : '用于建立 SSH 远程连接，保存后仅服务端加密保存'} rules={[({ getFieldValue: read }) => ({ required: !asset || Boolean(read('ssh_username')?.trim() || read('ssh_credential_type')), message: '请输入 SSH 密码或私钥' }), { max: 16384 }]}>{getFieldValue('ssh_credential_type') === 'private_key' ? <Input.TextArea placeholder={asset ? '留空则保持原凭据' : '粘贴 SSH 私钥'} autoComplete="off" rows={5} /> : <Input.Password placeholder={asset ? '留空则保持原凭据' : '输入登录密码'} autoComplete="new-password" />}</Form.Item>}
+          {({ getFieldValue }) => <Form.Item name="ssh_secret" label={getFieldValue('ssh_credential_type') === 'private_key' ? 'SSH 私钥' : 'SSH 密码'} dependencies={['ssh_username', 'ssh_credential_type']} rules={[({ getFieldValue: read }) => ({ required: !asset || Boolean(read('ssh_username')?.trim() || read('ssh_credential_type')), message: '请输入 SSH 密码或私钥' }), { max: 16384 }]}>{getFieldValue('ssh_credential_type') === 'private_key' ? <Input.TextArea placeholder={asset ? '留空保留当前认证' : '粘贴 SSH 私钥'} autoComplete="off" rows={5} /> : <Input.Password placeholder={asset ? '留空保留当前认证' : '输入登录密码'} autoComplete="new-password" />}</Form.Item>}
         </Form.Item>
         <Form.Item name="labels" label="标签"><Select mode="tags" tokenSeparators={[',']} placeholder="输入后回车，例如 database" maxCount={20} /></Form.Item>
       </Form>

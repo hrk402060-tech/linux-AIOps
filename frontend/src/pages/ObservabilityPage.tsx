@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type Key } from 'react';
-import { Alert, Button, Empty, Input, Select, Spin, Table, Tag, message } from 'antd';
+import { Alert, Button, Empty, Input, Select, Spin, Table, Tag, Tooltip, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { ChevronDown, ChevronRight, RefreshCw, Search } from 'lucide-react';
+import { ChevronDown, ChevronRight, Info, RefreshCw, Search } from 'lucide-react';
 
 import { getServiceObservability, type ObservableService, type ServiceObservabilityResponse } from '../api/observability';
 import { ServiceMonitoringDetail, formatEvidenceTime, type ServiceMonitoringActions } from '../components/ServiceMonitoringDetail';
@@ -51,7 +51,7 @@ export function ObservabilityPage(actions: ServiceMonitoringActions = {}) {
   return <section className="observability-page">{holder}
     <div className="page-heading"><h1>服务监控</h1><Button aria-label="刷新服务监控" icon={<RefreshCw size={17} />} onClick={() => void load()} /></div>
     {error ? <Alert role="alert" type="error" message={error} action={<button type="button" className="link-button" onClick={() => void load()}>重试</button>} /> : null}
-    {!loading && !error && !data.summary.total ? <Alert type="info" showIcon message="还没有可观测服务" description="请先在业务服务创建业务、应用和服务，关联服务器并配置 API 拨测。" /> : null}
+    {!loading && !error && !data.summary.total ? <Alert type="info" showIcon message="暂无可观测服务" /> : null}
     <Spin spinning={loading} tip={loading ? '正在加载真实数据' : undefined}><div hidden={Boolean(error)} className={`observability-data-shell${loading && !hasLoaded ? ' is-loading' : ''}`}>
       <div className="metric-band observability-metrics">{([['服务总数', data.summary.total], ['健康', data.summary.healthy], ['降级', data.summary.degraded], ['不可用', data.summary.unavailable], ['未观测', data.summary.unobserved]] as const).map(([label, value]) => <div key={label}><span>{label}</span><strong>{hasLoaded ? value : '—'}</strong></div>)}</div>
       <div className="observability-toolbar"><Input allowClear placeholder="搜索服务、编码、业务或应用" value={query} onChange={(event) => setQuery(event.target.value)} onPressEnter={() => void load()} /><Select allowClear aria-label="服务监控状态" placeholder="状态" value={status} onChange={(value) => { setExpanded([]); setStatus(value); }} options={Object.entries(labels).map(([value, item]) => ({ value, label: item.label }))} /><Button aria-label="查询服务监控" icon={<Search size={17} />} onClick={() => void load()} /></div>
@@ -65,8 +65,7 @@ export function ObservabilityPage(actions: ServiceMonitoringActions = {}) {
 function serviceColumns(): ColumnsType<ObservableService> {
   return [
     { title: '服务', key: 'service', fixed: 'left', width: 230, render: (_, item) => <div className="stacked-cell"><strong>{item.service_name}</strong><small>{item.service_code} · {item.business_name} · {item.application_name}</small>{!item.scope_complete ? <Tag>仅授权范围</Tag> : null}</div> },
-    { title: '综合状态', width: 115, render: (_, item) => <div className="stacked-cell"><Tag color={labels[item.status].color}>{labels[item.status].label}</Tag><small>主机：{labels[item.runtime_status].label}</small></div> },
-    { title: '状态依据', width: 230, render: (_, item) => <ul className="service-health-reasons">{item.health_reasons.map((reason) => <li key={reason.code}>{reason.message}</li>)}</ul> },
+    { title: '综合状态', width: 150, render: (_, item) => <div className="stacked-cell"><div className="service-status-cell"><Tag color={labels[item.status].color}>{labels[item.status].label}</Tag><Tooltip title={<div>{item.health_reasons.map((reason) => <div key={reason.code}>{reason.message}</div>)}</div>}><button type="button" className="service-health-reason-trigger" aria-label={`查看 ${item.service_name} 状态依据：${item.health_reasons.map((reason) => reason.message).join('；')}`}><Info size={14} /></button></Tooltip></div><small>主机：{labels[item.runtime_status].label}</small></div> },
     { title: 'API 覆盖', width: 130, render: (_, item) => <div className="stacked-cell"><strong>{item.probe_summary.covered_api_count} / {item.probe_summary.api_count}</strong><small>{item.probe_summary.healthy} 通过 · {item.probe_summary.failed} 失败</small><small>{item.probe_summary.stale} 过期 · {item.probe_summary.unobserved} 未检查</small></div> },
     { title: '数据新鲜度', width: 125, render: (_, item) => <div className="stacked-cell"><Tag color={freshnessLabels[item.freshness].color}>{freshnessLabels[item.freshness].label}</Tag>{item.stale_assets ? <small>{item.stale_assets} 台陈旧</small> : null}</div> },
     { title: '服务器', width: 155, render: (_, item) => <div className="stacked-cell"><span>{item.online_assets} 在线 / {item.offline_assets} 离线</span><small>{item.uncollected_assets} 未观测 / {item.disabled_assets} 停用</small></div> },

@@ -1,6 +1,6 @@
 import { platformDateTimeOptions } from '../utils/platformPreferences';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Alert, Button, Empty, Input, Select, Spin, Tag, message } from 'antd';
+import { Alert, Button, Empty, Input, Select, Spin, Tag, Tooltip, message } from 'antd';
 import { Activity, Cpu, HardDrive, MemoryStick, RefreshCw, Server } from 'lucide-react';
 
 import { getMonitoringSummary, type MonitoringSummary } from '../api/monitoring';
@@ -42,8 +42,8 @@ export function ServerMonitoringPage() {
 
   return <section className="server-monitoring-page">{holder}
     <div className="page-heading">
-      <div><p className="eyebrow">工作台 / 综合总览</p><h1>服务器监控</h1><p className="page-subtitle">集中查看服务器连接状态、资源使用和采集新鲜度。</p></div>
-      <div className="page-heading-actions"><Tag color="blue">SSH 无 Agent · 准实时</Tag><Button aria-label="刷新服务器监控" icon={<RefreshCw size={16} />} loading={loading} onClick={() => void load()}>刷新</Button></div>
+      <div><p className="eyebrow">工作台 / 综合总览</p><h1>服务器监控</h1></div>
+      <div className="page-heading-actions"><Tooltip title="SSH 无 Agent，数据为准实时采集"><Tag color="blue">准实时</Tag></Tooltip><Button aria-label="刷新服务器监控" icon={<RefreshCw size={16} />} loading={loading} onClick={() => void load()}>刷新</Button></div>
     </div>
     {error ? <Alert role="alert" type="error" showIcon message="服务器监控读取失败" description={error} action={<Button onClick={() => void load()}>重试</Button>} /> : null}
     <Spin spinning={loading} tip={loading ? '正在加载监控数据' : undefined}>

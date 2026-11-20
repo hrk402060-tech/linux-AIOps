@@ -1,7 +1,9 @@
 .observability-page .service-expand { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; padding: 0; border: 0; background: transparent; color: #566373; cursor: pointer; }
 .observability-page .service-expand:hover { color: #1677ff; background: #edf4fb; }
 .observability-page .service-expand:focus-visible { outline: 2px solid #1677ff; outline-offset: 2px; }
-.observability-page .service-health-reasons { margin: 0; padding-left: 16px; font-size: 12px; line-height: 1.8; overflow-wrap: anywhere; }
+.observability-page .service-status-cell { display: flex; align-items: center; gap: 4px; }
+.observability-page .service-health-reason-trigger { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; padding: 0; color: #687686; background: transparent; border: 0; border-radius: 4px; cursor: pointer; }
+.observability-page .service-health-reason-trigger:hover, .observability-page .service-health-reason-trigger:focus-visible { color: #0d9488; background: #edf8f6; outline: 0; }
 .observability-page .service-health-detail { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; padding: 12px 8px; }
 .observability-page .service-health-detail h3 { margin: 0 0 10px; color: #263644; font-size: 14px; font-weight: 600; }
 .observability-page .service-health-assets { grid-column: 1 / -1; }

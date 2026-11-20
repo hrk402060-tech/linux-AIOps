@@ -78,7 +78,7 @@ export function DashboardPreviewPage({ onNavigate, preview = true }: {
     || snapshot.service_health.summary.unavailable > 0;
   return <section className="dashboard-preview-page">{holder}
     <div className="preview-heading">
-      <div><p className="eyebrow">Linux 智能综合运维平台 / {preview ? '工作台预览' : '工作台'}</p><h1>综合总览</h1><p>先看系统健康，再处理告警、待办与风险。</p></div>
+      <div><p className="eyebrow">Linux 智能综合运维平台 / {preview ? '工作台预览' : '工作台'}</p><h1>综合总览</h1></div>
       <div className="preview-heading-actions">
         <span className={`preview-health-badge ${healthNeedsAttention ? 'is-warning' : 'is-healthy'}`}><i />{healthNeedsAttention ? '需要关注' : '运行正常'}</span>
         <Tooltip title="刷新真实数据"><Button aria-label="刷新总览预览" icon={<RefreshCw size={17} />} loading={loading} onClick={() => void load()} /></Tooltip>
@@ -97,28 +97,28 @@ export function DashboardPreviewPage({ onNavigate, preview = true }: {
           <Kpi icon={<Database size={19} />} label="知识库" value={snapshot.knowledge.freshness} detail={`${snapshot.knowledge.healthy_source_count}/${snapshot.knowledge.source_count} 数据源正常`} tone={snapshot.knowledge.stale ? 'warning' : 'safe'} />
         </div>
         <div className="preview-main-grid">
-          <PreviewPanel title="服务运行态势" subtitle="按业务服务聚合，SSH 无 Agent 准实时采集" action={<Button type="link" onClick={() => onNavigate('observability')}>进入服务监控</Button>}>
+          <PreviewPanel title="服务运行态势" action={<Button type="link" onClick={() => onNavigate('observability')}>进入服务监控</Button>}>
             <div className="preview-health-summary"><HealthStat label="健康" value={snapshot.service_health.summary.healthy} tone="safe" /><HealthStat label="降级" value={snapshot.service_health.summary.degraded} tone="warning" /><HealthStat label="不可用" value={snapshot.service_health.summary.unavailable} tone="danger" /><HealthStat label="未观测" value={snapshot.service_health.summary.unobserved} tone="muted" /></div>
             {snapshot.service_health.services.length ? <div className="preview-service-list">{snapshot.service_health.services.slice(0, 5).map((item) => <ServiceRow item={item} key={item.service_id} />)}</div> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无服务目录数据" />}
           </PreviewPanel>
-          <PreviewPanel title="统一待办" subtitle="告警、故障和巡检事项按严重程度排序" action={<Button type="link" onClick={() => onNavigate('alerts')}>查看全部</Button>}>
+          <PreviewPanel title="统一待办" action={<Button type="link" onClick={() => onNavigate('alerts')}>查看全部</Button>}>
             {snapshot.attention_items.length ? <div className="preview-todo-list">{snapshot.attention_items.slice(0, 6).map((item) => <TodoRow item={item} onNavigate={onNavigate} key={`${item.kind}-${item.id}`} />)}</div> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无待办事项" />}
           </PreviewPanel>
-          <PreviewPanel title="CMDB 编目" subtitle="业务、应用、服务和 API 的关系总览" action={<Button type="link" onClick={() => onNavigate('cmdb')}>进入 CMDB</Button>}>
+          <PreviewPanel title="CMDB 编目" action={<Button type="link" onClick={() => onNavigate('cmdb')}>进入 CMDB</Button>}>
             <div className="preview-catalog-stats"><CatalogStat label="业务" value={snapshot.catalog.businesses} /><CatalogStat label="应用" value={snapshot.catalog.applications} /><CatalogStat label="服务" value={snapshot.catalog.services} /><CatalogStat label="API" value={snapshot.catalog.apis} /></div>
             <div className="preview-catalog-flow"><span>业务</span><i>→</i><span>应用</span><i>→</i><span>服务</span><i>→</i><span>API</span></div>
             <div className="preview-catalog-link"><strong>{snapshot.catalog.linked_assets}</strong><span>台资产已关联</span><small>{snapshot.catalog.unlinked_assets} 台待编目</small></div>
           </PreviewPanel>
         </div>
         <div className="preview-chart-grid">
-          <PreviewPanel title="资源使用趋势" subtitle="最近 24 个准实时采样"><ResourceChart data={snapshot.resource_trends} /></PreviewPanel>
-          <PreviewPanel title="漏洞风险" subtitle="按资产 + CVE 最新有效状态去重"><RiskChart data={snapshot.vulnerabilities} onNavigate={onNavigate} /></PreviewPanel>
+          <PreviewPanel title="资源使用趋势"><ResourceChart data={snapshot.resource_trends} /></PreviewPanel>
+          <PreviewPanel title="漏洞风险"><RiskChart data={snapshot.vulnerabilities} onNavigate={onNavigate} /></PreviewPanel>
         </div>
         <div className="preview-signal-grid">
-          <PreviewPanel title="活动告警" subtitle="持续超限后触发" action={<Button type="link" onClick={() => onNavigate('alerts')}>告警中心</Button>}>
+          <PreviewPanel title="活动告警" action={<Button type="link" onClick={() => onNavigate('alerts')}>告警中心</Button>}>
             {snapshot.active_alerts.length ? <div className="preview-alert-list">{snapshot.active_alerts.slice(0, 5).map((item) => <div key={`${item.asset_id}-${item.metric}`}><span className="preview-alert-icon"><AlertTriangle size={15} /></span><span><strong>{item.asset_name}</strong><small>{metricLabel(item.metric)} {item.value.toFixed(1)} / 阈值 {item.threshold.toFixed(1)}</small></span><Tag color="red">告警</Tag></div>)}</div> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无活动告警" />}
           </PreviewPanel>
-          <PreviewPanel title="扫描任务" subtitle="最近任务执行状态" action={<Button type="link" onClick={() => onNavigate('scans')}>任务列表</Button>}>
+          <PreviewPanel title="扫描任务" action={<Button type="link" onClick={() => onNavigate('scans')}>任务列表</Button>}>
             {snapshot.recent_scans.length ? <div className="preview-task-list">{snapshot.recent_scans.slice(0, 5).map((item) => <button type="button" key={item.id} onClick={() => onNavigate('scans')}><span><strong>{item.name}</strong><small>{formatTime(item.created_at)} · {item.finding_count} 个漏洞</small></span><Tag color={item.status === 'completed' ? 'green' : item.status === 'failed' ? 'red' : 'blue'}>{scanLabel(item.status)}</Tag></button>)}</div> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无扫描任务" />}
           </PreviewPanel>
         </div>
@@ -127,8 +127,8 @@ export function DashboardPreviewPage({ onNavigate, preview = true }: {
   </section>;
 }
 
-function PreviewPanel({ title, subtitle, action, children }: { title: string; subtitle: string; action?: ReactNode; children: ReactNode }) {
-  return <section className="preview-panel"><div className="preview-panel-heading"><div><strong>{title}</strong><small>{subtitle}</small></div>{action}</div>{children}</section>;
+function PreviewPanel({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
+  return <section className="preview-panel"><div className="preview-panel-heading"><strong>{title}</strong>{action}</div>{children}</section>;
 }
 function Kpi({ icon, label, value, detail, tone }: { icon: ReactNode; label: string; value: number | string; detail: string; tone: string }) {
   return <div className={`preview-kpi preview-kpi-${tone}`}><span className="preview-kpi-icon">{icon}</span><div><span>{label}</span><strong>{value}</strong><small>{detail}</small></div></div>;

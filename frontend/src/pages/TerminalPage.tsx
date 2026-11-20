@@ -1,6 +1,6 @@
 import { formatPlatformDateTime } from '../utils/platformPreferences';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Button, Empty, List, message, Select, Tag } from 'antd';
+import { Alert, Button, Empty, List, message, Select, Tag, Tooltip } from 'antd';
 import { ArrowLeft, CircleStop, Clock3, ExternalLink, PanelRightClose, PanelRightOpen, PlugZap, Server, ShieldCheck, TerminalSquare } from 'lucide-react';
 
 import { getAssets } from '../api/assets';
@@ -158,7 +158,7 @@ export function TerminalPage({ initialAssetId, standalone = false, canConnect = 
       <div className="terminal-standalone-title"><TerminalSquare size={18} /><strong>SSH 远程</strong><span>{selected ? `${selected.name} · ${selected.host}` : '选择服务器建立连接'}</span></div>
       <div className="terminal-standalone-actions"><Tag color={connectionState === '已连接' ? 'green' : 'default'}>{connectionState}</Tag><Button type="text" icon={<ArrowLeft size={16} />} onClick={returnToPlatform}>返回平台</Button></div>
     </header> : <header className="terminal-page-header">
-      <div><span className="page-eyebrow">运维 / SSH 远程</span><h1>SSH 远程</h1><p>在浏览器建立安全终端，AI 仅分析终端输出并提供只读建议。</p></div>
+      <div><h1>SSH 远程</h1></div>
       <div className="terminal-page-header-meta"><Button size="small" icon={<ArrowLeft size={15} />} disabled={switchingLocked} onClick={() => setCatalogOpen(true)}>服务器列表</Button>{selected && canConnect ? <Button size="small" icon={<ExternalLink size={15} />} href={standalonePath} target="_blank" rel="noopener noreferrer">新标签打开</Button> : null}</div>
     </header>}
     {!assetsLoading && !assetsError && assetId && !selected ? <Alert role="alert" type="warning" message="服务器不存在或当前账号无权访问，请重新选择服务器" /> : null}
@@ -187,7 +187,7 @@ export function TerminalPage({ initialAssetId, standalone = false, canConnect = 
             options={assets.map((item) => ({ value: item.id, label: item.name + ' · ' + item.host }))} />
             {canConnect ? <Button type="primary" icon={<PlugZap size={17} />} loading={connecting} disabled={!selected || assetsLoading || Boolean(assetsError) || disconnecting || connectionState === '已连接' || connectionState === '连接中'} onClick={() => void connect()}>连接</Button> : null}
             {connectionState === '已连接' || disconnecting ? <Button danger loading={disconnecting} icon={<CircleStop size={17} />} onClick={() => void disconnectCurrent()}>断开</Button> : null}</div>
-          <div className="terminal-security"><ShieldCheck size={17} /><span>凭据仅在后端解密 · 终端票据单次有效</span><Tag color={connectionState === '已连接' ? 'green' : 'default'}>{connectionState}</Tag>{canUseAssistant ? <Button type="text" icon={assistantOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />} aria-label={assistantOpen ? '收起 AI 助手' : '展开 AI 助手'} onClick={() => setAssistantOpen((current) => !current)} /> : null}</div>
+          <div className="terminal-security"><Tooltip title="凭据仅在后端解密，终端票据单次有效"><ShieldCheck size={17} /></Tooltip><Tag color={connectionState === '已连接' ? 'green' : 'default'}>{connectionState}</Tag>{canUseAssistant ? <Button type="text" icon={assistantOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />} aria-label={assistantOpen ? '收起 AI 助手' : '展开 AI 助手'} onClick={() => setAssistantOpen((current) => !current)} /> : null}</div>
         </div>
         {connectionDetails?.message ? <div className="terminal-security" role="status"><span>{connectionDetails.message}</span>
           {connectionDetails.ended_at && !Number.isNaN(Date.parse(connectionDetails.ended_at)) ? <time aria-label="会话结束时间" dateTime={connectionDetails.ended_at}>{formatPlatformDateTime(connectionDetails.ended_at)}</time> : null}</div> : null}
