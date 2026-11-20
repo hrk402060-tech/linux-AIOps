@@ -261,6 +261,14 @@ describe('AppShell 工作台导航', () => {
     expect(onNavigate).toHaveBeenCalledWith('settings');
   });
 
+  it('设置页布局隐藏全局工作台侧栏和导航入口', () => {
+    render(<AppShell currentUser={currentUser} onLogout={vi.fn()}
+      selectedPage="settings" hideNavigation onNavigate={vi.fn()}>内容</AppShell>);
+    expect(document.querySelector('.desktop-sider')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '打开导航' })).not.toBeInTheDocument();
+    expect(screen.getByText('内容')).toBeVisible();
+  });
+
   it('系统管理不再展示连接凭据入口，但保留旧 PageKey 兼容', () => {
     render(<AppShell currentUser={currentUser} onLogout={vi.fn()}
       selectedPage="system" onNavigate={vi.fn()}>内容</AppShell>);

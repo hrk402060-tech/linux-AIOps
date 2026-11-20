@@ -214,10 +214,11 @@ const pageLabels: Record<PageKey, string> = {
   'kubernetes-clusters': 'Kubernetes 管理',
 };
 
-export function AppShell({ children, currentUser, onLogout, selectedPage, onNavigate, onSearchNavigate }: {
+export function AppShell({ children, currentUser, onLogout, selectedPage, onNavigate, onSearchNavigate, hideNavigation = false }: {
   children: ReactNode; currentUser: AuthUser; onLogout: () => void;
   selectedPage: PageKey; onNavigate: (page: PageKey) => void;
   onSearchNavigate?: (target: SearchTarget) => void;
+  hideNavigation?: boolean;
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
@@ -252,9 +253,9 @@ export function AppShell({ children, currentUser, onLogout, selectedPage, onNavi
   };
   return (
     <ConfigProvider componentSize={platform.display_density === 'compact' ? 'small' : 'middle'}>
-    <Layout data-density={platform.display_density} className={`app-layout${collapsed ? ' sidebar-collapsed' : ''}`}>
-      <Sider width={232} collapsedWidth={72} collapsed={collapsed} trigger={null} className="desktop-sider"><Navigation available={available} platformName={platform.platform_name} collapsed={collapsed} selectedPage={selectedPage} onNavigate={onNavigate} onSwitchWorkspace={switchWorkspace} /><Tooltip title={collapsed ? '展开侧栏' : '收起侧栏'}><Button className="sidebar-collapse" type="text" aria-label={collapsed ? '展开侧栏' : '收起侧栏'} icon={collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />} onClick={() => setCollapsed((value) => !value)} /></Tooltip></Sider>
-      <Drawer
+    <Layout data-density={platform.display_density} className={`app-layout${collapsed ? ' sidebar-collapsed' : ''}${hideNavigation ? ' app-layout-settings' : ''}`}>
+      {!hideNavigation ? <Sider width={232} collapsedWidth={72} collapsed={collapsed} trigger={null} className="desktop-sider"><Navigation available={available} platformName={platform.platform_name} collapsed={collapsed} selectedPage={selectedPage} onNavigate={onNavigate} onSwitchWorkspace={switchWorkspace} /><Tooltip title={collapsed ? '展开侧栏' : '收起侧栏'}><Button className="sidebar-collapse" type="text" aria-label={collapsed ? '展开侧栏' : '收起侧栏'} icon={collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />} onClick={() => setCollapsed((value) => !value)} /></Tooltip></Sider> : null}
+      {!hideNavigation ? <Drawer
         className="mobile-navigation"
         placement="left"
         open={mobileOpen}
@@ -263,10 +264,10 @@ export function AppShell({ children, currentUser, onLogout, selectedPage, onNavi
         closable={false}
       >
         <Navigation available={available} platformName={platform.platform_name} selectedPage={selectedPage} onNavigate={(page) => { onNavigate(page); setMobileOpen(false); }} onSwitchWorkspace={switchWorkspace} />
-      </Drawer>
+      </Drawer> : null}
       <Layout>
         <Header className="topbar">
-          <Tooltip title="打开导航">
+          {!hideNavigation ? <Tooltip title="打开导航">
             <Button
               className="mobile-menu-button"
               type="text"
@@ -274,7 +275,7 @@ export function AppShell({ children, currentUser, onLogout, selectedPage, onNavi
               aria-label="打开导航"
               onClick={() => setMobileOpen(true)}
             />
-          </Tooltip>
+          </Tooltip> : null}
           <div className="topbar-context"><span>{activeWorkspace.label}</span><strong>{pageLabels[selectedPage]}</strong></div>
           {!isPolicyManaged(currentUser) ? <GlobalSearch key={currentUser.id} onNavigate={onNavigate} onSearchNavigate={onSearchNavigate} /> : null}
           <div className="topbar-account-actions">

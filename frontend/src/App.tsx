@@ -175,6 +175,7 @@ export default function App() {
   const contentPage = settingsOpen ? permittedPage(settingsReturnPage) : page;
   return (
     <AppShell key={scopeKey} currentUser={currentUser} onLogout={() => void signOut()} selectedPage={page}
+      hideNavigation={settingsOpen}
       onNavigate={navigate} onSearchNavigate={navigateToSearchResult}>
       {terminalNoticeHolder}
       <div className="workspace-settings-underlay" hidden={settingsOpen} key={scopeKey}>
