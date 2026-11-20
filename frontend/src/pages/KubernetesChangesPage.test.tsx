@@ -2,7 +2,8 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getKubernetesClusters, type KubernetesCluster } from '../api/kubernetes';
 import {
-  checkKubernetesChange, decideHelmApproval, getHelmApprovals, getHelmCharts, previewHelmChange,
+  checkKubernetesChange, decideHelmApproval, getHelmApprovals, getHelmCharts, getKubernetesChangeCapabilities,
+  previewHelmChange,
   executeHelmApproval, runHelmAdmissionRehearsal, submitHelmApproval, type HelmAdmissionResult,
   type HelmApproval,
 } from '../api/kubernetesChanges';
@@ -13,7 +14,8 @@ vi.mock('../api/kubernetes', async (importOriginal) => ({
   ...await importOriginal<typeof import('../api/kubernetes')>(), getKubernetesClusters: vi.fn(),
 }));
 vi.mock('../api/kubernetesChanges', () => ({
-  checkKubernetesChange: vi.fn(), getHelmCharts: vi.fn(), previewHelmChange: vi.fn(),
+  checkKubernetesChange: vi.fn(), getHelmCharts: vi.fn(), getKubernetesChangeCapabilities: vi.fn(),
+  previewHelmChange: vi.fn(),
   getHelmApprovals: vi.fn(), submitHelmApproval: vi.fn(), decideHelmApproval: vi.fn(),
   runHelmAdmissionRehearsal: vi.fn(), executeHelmApproval: vi.fn(),
 }));
@@ -32,7 +34,7 @@ async function openHelmPage() {
   render(<KubernetesChangesPage initialCluster={target} />);
   await waitFor(() => expect(screen.getByRole('button', { name: '运行预检' })).toBeEnabled());
   fireEvent.mouseDown(screen.getByRole('combobox', { name: '变更类型' }));
-  fireEvent.click(await screen.findByText('Helm 部署'));
+  fireEvent.click((await screen.findAllByText('Helm 部署')).at(-1)!);
 }
 
 describe('Kubernetes change preflight', () => {
@@ -40,7 +42,25 @@ describe('Kubernetes change preflight', () => {
     vi.clearAllMocks();
     vi.mocked(getKubernetesClusters).mockResolvedValue({ items: [target], total: 1 });
     vi.mocked(getHelmCharts).mockResolvedValue({ enabled: true, charts: [chart] });
+    vi.mocked(getKubernetesChangeCapabilities).mockResolvedValue({
+      cluster_id: target.id, cluster_revision: 5, snapshot_freshness: 'fresh',
+      observed_at: '2026-11-20T00:00:00Z', node_count: 3, ready_nodes: 3,
+      actions: [
+        { action: 'scale', label: '节点扩容', status: 'preview_only', execution_available: false, reason: '尚未配置节点池' },
+        { action: 'upgrade', label: '版本升级', status: 'preview_only', execution_available: false, reason: '尚未配置兼容矩阵' },
+        { action: 'backup', label: '集群备份', status: 'preview_only', execution_available: false, reason: '尚未配置备份存储' },
+        { action: 'restore', label: '集群恢复', status: 'preview_only', execution_available: false, reason: '尚未登记可验证备份' },
+        { action: 'helm', label: 'Helm 部署', status: 'preview_only', execution_available: false, reason: '仅支持隔离执行' },
+      ],
+    });
     vi.mocked(getHelmApprovals).mockResolvedValue({ items: [], total: 0 });
+  });
+
+  it('loads action capabilities for the selected cluster', async () => {
+    render(<KubernetesChangesPage initialCluster={target} />);
+    expect(await screen.findByRole('region', { name: '变更能力' })).toBeVisible();
+    expect(screen.getByText('尚未配置节点池')).toBeVisible();
+    expect(getKubernetesChangeCapabilities).toHaveBeenCalledWith(target.id, expect.any(AbortSignal));
   });
 
   it('requires a selected cluster', async () => {

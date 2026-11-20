@@ -12,12 +12,31 @@ from src.routes.kubernetes import SafeKubernetesRoute, _cluster, _error, _valida
 from src.services import kubernetes_clusters, kubernetes_helm_approvals as approvals
 from src.services import kubernetes_helm_admission as admission
 from src.services import kubernetes_helm_execution as execution
-from src.services.kubernetes_change_preflight import CHANGE_INPUT, Helm, Preflight, build_preflight
+from src.services.kubernetes_change_preflight import (
+    CHANGE_INPUT, ChangeCapabilities, Helm, Preflight, build_preflight, change_capabilities,
+)
 from src.services.kubernetes_cluster_target_policy import KubernetesTargetPolicy
 from src.services.kubernetes_helm import HelmPreviewError, preview, public_catalog
 from src.services.kubernetes_overview_jobs import utc
 
 router = APIRouter(prefix="/kubernetes", tags=["kubernetes"], route_class=SafeKubernetesRoute)
+
+
+@router.get("/clusters/{cluster_id}/change-capabilities", response_model=ChangeCapabilities)
+def capabilities(
+    cluster_id: str, request: Request,
+    session: Session = Depends(get_session), principal: AuthPrincipal = Depends(require_real_admin),
+) -> ChangeCapabilities:
+    cluster = _cluster(session, cluster_id)
+    policy = KubernetesTargetPolicy.from_settings(request.app.state.runtime_settings)
+    result = change_capabilities(
+        session, cluster, policy,
+        bool(public_catalog(request.app.state.runtime_settings.kubernetes_helm_trusted_charts)["enabled"]),
+    )
+    kubernetes_clusters._audit(session, cluster.id, principal.username, "change_capabilities_viewed",
+                               "accepted", str(uuid4()))
+    kubernetes_clusters._commit(session)
+    return result
 
 
 @router.get("/helm-charts")

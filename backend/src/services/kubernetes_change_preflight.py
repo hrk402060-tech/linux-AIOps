@@ -53,6 +53,7 @@ Change = Scale | Upgrade | Backup | Restore | Helm
 CHANGE_INPUT = TypeAdapter(Annotated[Change, Field(discriminator="action")])
 CheckStatus = Literal["passed", "blocked", "unverified"]
 Phase = Literal["blocked", "requires_validation"]
+ActionName = Literal["scale", "upgrade", "backup", "restore", "helm"]
 
 
 class Check(BaseModel):
@@ -73,6 +74,24 @@ class Preflight(BaseModel):
     node_count: int | None
     ready_nodes: int | None
     checks: list[Check]
+
+
+class ChangeCapability(BaseModel):
+    action: ActionName
+    label: str
+    status: Literal["preview_only", "blocked"]
+    execution_available: Literal[False] = False
+    reason: str
+
+
+class ChangeCapabilities(BaseModel):
+    cluster_id: str
+    cluster_revision: int
+    snapshot_freshness: str
+    observed_at: str | None
+    node_count: int | None
+    ready_nodes: int | None
+    actions: list[ChangeCapability]
 
 
 def _as_version(value: str | None, *, live: bool = False) -> tuple[int, int, int] | None:
@@ -134,4 +153,45 @@ def build_preflight(
         observed_at=observed if isinstance(observed, str) else None,
         node_count=nodes if type(nodes) is int else None, ready_nodes=ready if type(ready) is int else None,
         checks=checks,
+    )
+
+
+def change_capabilities(
+    session: Session, cluster: KubernetesCluster, policy: KubernetesTargetPolicy,
+    helm_enabled: bool,
+) -> ChangeCapabilities:
+    data = overview(session, cluster, policy)
+    counts = data.get("counts")
+    node_count = counts.get("nodes") if isinstance(counts, dict) else None
+    ready_nodes = counts.get("nodes_ready") if isinstance(counts, dict) else None
+    snapshot_freshness = str(data.get("freshness") or "unobserved")
+    observed_at = data.get("observed_at")
+    observed_text = observed_at if isinstance(observed_at, str) else None
+    lifecycle_ready = cluster.lifecycle == "active" and cluster.connection_status == "connected"
+    action_specs: list[tuple[ActionName, str, str]] = [
+        ("scale", "节点扩容", "尚未配置节点池、候选主机、配额和网络校验"),
+        ("upgrade", "版本升级", "尚未配置发行版兼容矩阵、维护窗口和恢复证据"),
+        ("backup", "集群备份", "尚未配置备份存储、命名空间和持久卷覆盖范围"),
+        ("restore", "集群恢复", "尚未登记可验证备份和隔离恢复目标"),
+    ]
+    actions = [
+        ChangeCapability(
+            action=action, label=label,
+            status="preview_only" if lifecycle_ready else "blocked",
+            reason=reason if lifecycle_ready else "集群未处于已验证的可用状态",
+        )
+        for action, label, reason in action_specs
+    ]
+    actions.append(ChangeCapability(
+        action="helm", label="Helm 部署",
+        status="preview_only" if lifecycle_ready and helm_enabled else "blocked",
+        reason=("仅支持受信 Chart 的预览、审批和隔离执行"
+                if lifecycle_ready and helm_enabled else "受信 Chart 或隔离执行能力未启用"),
+    ))
+    return ChangeCapabilities(
+        cluster_id=cluster.id, cluster_revision=cluster.revision,
+        snapshot_freshness=snapshot_freshness, observed_at=observed_text,
+        node_count=node_count if type(node_count) is int else None,
+        ready_nodes=ready_nodes if type(ready_nodes) is int else None,
+        actions=actions,
     )

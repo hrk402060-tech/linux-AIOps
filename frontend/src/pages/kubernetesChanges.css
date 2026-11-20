@@ -10,6 +10,12 @@
 .k8s-preflight-result dd { margin: 2px 0 0; overflow-wrap: anywhere; }
 .k8s-preflight-result ul { margin: 0; padding: 0; list-style: none; }
 .k8s-preflight-result li { display: flex; align-items: baseline; gap: 8px; padding: 8px 0; border-top: 1px solid #e5e9e7; }
+.k8s-change-capabilities { border-top: 1px solid #e5e9e7; padding-top: 12px; }
+.k8s-change-capabilities-heading { display: flex; align-items: baseline; gap: 10px; }
+.k8s-change-capabilities-heading span { color: #69746f; font-size: 12px; }
+.k8s-change-capability-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 8px 16px; margin-top: 8px; }
+.k8s-change-capability { display: grid; grid-template-columns: auto auto 1fr; gap: 6px; align-items: center; min-width: 0; }
+.k8s-change-capability small { color: #69746f; overflow-wrap: anywhere; }
 .k8s-helm-resources { border-top: 1px solid #e5e9e7; padding-top: 12px; }
 .k8s-helm-resources h3, .k8s-helm-approval-heading h3 { margin: 0; font-size: 15px; }
 .k8s-helm-resource-list { list-style: none; margin: 8px 0 0; padding: 0; }

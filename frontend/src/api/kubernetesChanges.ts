@@ -79,12 +79,39 @@ export interface ChangePreflight {
   checks: Array<{ code: string; label: string; status: 'passed' | 'blocked' | 'unverified' }>;
 }
 
+export interface ChangeCapability {
+  action: ChangeParameters['action'];
+  label: string;
+  status: 'preview_only' | 'blocked';
+  execution_available: false;
+  reason: string;
+}
+
+export interface ChangeCapabilities {
+  cluster_id: string;
+  cluster_revision: number;
+  snapshot_freshness: string;
+  observed_at: string | null;
+  node_count: number | null;
+  ready_nodes: number | null;
+  actions: ChangeCapability[];
+}
+
 export function checkKubernetesChange(
   clusterId: string, revision: number, change: ChangeParameters, signal?: AbortSignal,
 ): Promise<ChangePreflight> {
   return request(`/api/v1/kubernetes/clusters/${encodeURIComponent(clusterId)}/change-preflight`, {
     method: 'POST', body: JSON.stringify({ ...change, expected_revision: revision }), signal,
   }, '集群变更预检失败');
+}
+
+export function getKubernetesChangeCapabilities(
+  clusterId: string, signal?: AbortSignal,
+): Promise<ChangeCapabilities> {
+  return request(
+    `/api/v1/kubernetes/clusters/${encodeURIComponent(clusterId)}/change-capabilities`,
+    { signal }, '集群变更能力读取失败',
+  );
 }
 
 export function getHelmCharts(signal?: AbortSignal): Promise<HelmCatalog> {

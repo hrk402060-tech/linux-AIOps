@@ -2,7 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { Alert, Button, Form, Input, InputNumber, Pagination, Select, Space, Tag, Tooltip } from 'antd';
 import { ListChecks, RefreshCw } from 'lucide-react';
 import { getKubernetesClusters, kubernetesRequestError, type KubernetesCluster } from '../api/kubernetes';
-import { checkKubernetesChange, getHelmCharts, previewHelmChange, type ChangeParameters, type ChangePreflight, type HelmChart } from '../api/kubernetesChanges';
+import {
+  checkKubernetesChange, getHelmCharts, getKubernetesChangeCapabilities, previewHelmChange,
+  type ChangeCapabilities, type ChangeParameters, type ChangePreflight, type HelmChart,
+} from '../api/kubernetesChanges';
 import { HelmResources, KubernetesHelmApprovals } from './KubernetesHelmApprovals';
 import './kubernetesChanges.css';
 
@@ -92,6 +95,8 @@ export function KubernetesChangesPage({ initialCluster }: { initialCluster?: Kub
   const [helmPreview, setHelmPreview] = useState<Awaited<ReturnType<typeof previewHelmChange>>>();
   const [helmCharts, setHelmCharts] = useState<HelmChart[]>([]);
   const [helmEnabled, setHelmEnabled] = useState(false);
+  const [capabilities, setCapabilities] = useState<ChangeCapabilities>();
+  const [capabilityError, setCapabilityError] = useState('');
   const requestRef = useRef<AbortController>();
   const cluster = clusters.find((item) => item.id === clusterId);
 
@@ -110,6 +115,22 @@ export function KubernetesChangesPage({ initialCluster }: { initialCluster?: Kub
       .finally(() => { if (!ignore) setLoading(false); });
     return () => { ignore = true; };
   }, [page, reload]);
+  useEffect(() => {
+    if (!clusterId) {
+      setCapabilities(undefined);
+      setCapabilityError('');
+      return;
+    }
+    const controller = new AbortController();
+    setCapabilities(undefined);
+    setCapabilityError('');
+    getKubernetesChangeCapabilities(clusterId, controller.signal)
+      .then((value) => { if (!controller.signal.aborted) setCapabilities(value); })
+      .catch((reason: unknown) => {
+        if (!controller.signal.aborted) setCapabilityError(kubernetesRequestError(reason));
+      });
+    return () => controller.abort();
+  }, [clusterId, reload]);
   useEffect(() => () => requestRef.current?.abort(), []);
 
   function clearResult() { setResult(undefined); setHelmPreview(undefined); setError(''); }
@@ -163,6 +184,22 @@ export function KubernetesChangesPage({ initialCluster }: { initialCluster?: Kub
       {total > PAGE_SIZE && <Pagination simple current={page} pageSize={PAGE_SIZE} total={total} disabled={busy || loading}
         onChange={(value) => { clearResult(); setPage(value); }} />}
     </Space>
+    {capabilityError && <Alert type="error" showIcon message={capabilityError} />}
+    {capabilities && <section className="k8s-change-capabilities" aria-label="变更能力">
+      <div className="k8s-change-capabilities-heading">
+        <strong>变更能力</strong>
+        <span>{capabilities.snapshot_freshness === 'fresh' ? '快照有效' : '快照不可用或已过期'}</span>
+      </div>
+      <div className="k8s-change-capability-list">
+        {capabilities.actions.map((item) => <div key={item.action} className="k8s-change-capability">
+          <Tag color={item.status === 'preview_only' ? 'warning' : 'error'}>
+            {item.status === 'preview_only' ? '仅预检' : '不可用'}
+          </Tag>
+          <span>{item.label}</span>
+          <small>{item.reason}</small>
+        </div>)}
+      </div>
+    </section>}
     <Form form={form} layout="vertical" preserve={false} disabled={busy} onValuesChange={clearResult} onFinish={run}>
       <div className="k8s-preflight-fields" key={action}><ChangeInputs action={action} />{action === 'helm' && <Form.Item noStyle shouldUpdate>
         {() => <>

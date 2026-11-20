@@ -66,6 +66,24 @@ def test_stale_snapshot_and_skipped_minor_block_preflight(kclient: TestClient) -
     }
 
 
+def test_change_capabilities_are_explicitly_preview_only(kclient: TestClient) -> None:
+    cluster = create(kclient)
+    url = f"{BASE}/clusters/{cluster['id']}"
+    seed_snapshot(kclient, url)
+    response = kclient.get(f"{url}/change-capabilities")
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["cluster_id"] == cluster["id"]
+    assert body["snapshot_freshness"] == "fresh"
+    assert {item["action"] for item in body["actions"]} == {
+        "scale", "upgrade", "backup", "restore", "helm",
+    }
+    assert all(item["execution_available"] is False for item in body["actions"])
+    assert all(item["status"] == "preview_only" for item in body["actions"])
+    kclient.cookies.clear()
+    assert kclient.get(f"{url}/change-capabilities").status_code == 401
+
+
 def test_invalid_payload_revision_and_token_do_not_pass(kclient: TestClient) -> None:
     cluster = create(kclient)
     url = f"{BASE}/clusters/{cluster['id']}/change-preflight"
